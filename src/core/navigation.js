@@ -24,6 +24,13 @@ export const FEATURED_MODES = Object.freeze([
     description: 'Dash into rivals, protect your balloons, and be the last floating.',
     status: 'On this device · Training rivals',
   }),
+  Object.freeze({
+    id: 'skate',
+    name: 'Skate Race',
+    icon: '67',
+    description: 'Board race on the Skyway — faster, lower, first to the line.',
+    status: 'On this device · Training race',
+  }),
 ]);
 
 export function availableFeaturedModes(games) {

@@ -83,10 +83,13 @@ export function stepPlayer(s, input, dt, env) {
   else s.coyoteTime = Math.max(0, s.coyoteTime - dt);
 
   // --- Horizontal acceleration toward desired velocity ---
-  const wantX = input.moving ? input.dirX * TUNING.maxSpeed : 0;
-  const wantZ = input.moving ? input.dirZ * TUNING.maxSpeed : 0;
+  // sprintHeld (right Shift / stick pushed to the rim) raises top speed 45%.
+  // Optional input field: bots and old callers that omit it are unchanged.
+  const topSpeed = TUNING.maxSpeed * (input.sprintHeld ? 1.45 : 1);
+  const wantX = input.moving ? input.dirX * topSpeed : 0;
+  const wantZ = input.moving ? input.dirZ * topSpeed : 0;
   const rate = input.moving ? TUNING.accel : TUNING.decel;
-  const blend = Math.min(1, rate * dt / TUNING.maxSpeed);
+  const blend = Math.min(1, rate * dt / topSpeed);
   s.vel.x += (wantX - s.vel.x) * blend;
   s.vel.z += (wantZ - s.vel.z) * blend;
 

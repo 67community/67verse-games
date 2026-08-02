@@ -9,6 +9,7 @@ const GAME_LOADERS = Object.freeze({
   tag: () => import('./games/tag.js'),
   balloon: () => import('./games/balloon.js'),
   obstacle: () => import('./games/obstacle.js'),
+  skate: () => import('./games/skate-race.js'),
   creator: () => import('./ugc/editor.js'),
   // 67Show is a development-only route today. Preload its local rounds so the
   // gauntlet keeps its existing behavior if QA opens it with ?game=show67.

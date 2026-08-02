@@ -834,7 +834,7 @@ registerGame({
         if (player.boostT > 0) { ix *= BOOST_MULT; iz *= BOOST_MULT; }
         if (pad.grabPressed) startDash(player, dirX, dirZ);
         const wasGrounded = player.state.grounded;
-        stepPlayer(player.state, { dirX: ix, dirZ: iz, moving, jumpHeld: pad.jumpHeld, grabPressed: false }, dt, env);
+        stepPlayer(player.state, { dirX: ix, dirZ: iz, moving, jumpHeld: pad.jumpHeld, sprintHeld: pad.sprintHeld, grabPressed: false }, dt, env);
         if (player.state.jumpEvent) player.character?.animator.signal('jump');
         if (!wasGrounded && player.state.grounded) player.character?.animator.signal('land');
         applyDash(player, dt);

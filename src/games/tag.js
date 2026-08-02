@@ -610,6 +610,7 @@ registerGame({
         dirX, dirZ,
         moving: direction.moving,
         jumpHeld: pad.jumpHeld,
+        sprintHeld: pad.sprintHeld,
         grabPressed: false, // grab not used in Tag
       };
 

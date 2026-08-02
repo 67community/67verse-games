@@ -201,6 +201,10 @@ export function createInput() {
 
     let jumpHeld = keys.has('Space') || touchJump;
     let grabNow = keys.has('KeyE') || keys.has('ShiftLeft') || touchGrab;
+    // Sprint: right Shift on keyboard, or the touch stick shoved to its rim
+    // (left Shift stays grab — it predates sprint).
+    let sprintHeld = keys.has('ShiftRight') ||
+      (stick.active && Math.hypot(stick.dx, stick.dy) / STICK_RADIUS > 0.92);
 
     let lookYaw = look.yaw;
     let lookPitch = look.pitch;
@@ -224,6 +228,7 @@ export function createInput() {
         looking = true;
       }
       if (pad.buttons[0] && pad.buttons[0].pressed) jumpHeld = true;
+      if (pad.buttons[5] && pad.buttons[5].pressed) sprintHeld = true;   // RB = sprint
       const padGrab =
         (pad.buttons[1] && pad.buttons[1].pressed) ||
         (pad.buttons[7] && pad.buttons[7].pressed);
@@ -243,6 +248,7 @@ export function createInput() {
       mx, my,
       moving: len > 0.12,
       jumpHeld,
+      sprintHeld,
       grabPressed,
       lookYaw,
       lookPitch,

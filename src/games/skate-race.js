@@ -71,7 +71,7 @@ const {
 const FINISH_Z = SKYWAY_FINISH_Z;
 export { SKYWAY_COURSE_BEATS, SKYWAY_LEVEL_DESCRIPTION, SKYWAY_WORLD_BOUND };
 const BOT_COUNT = 4;
-export const SKYWAY_RUN_SCALE = 0.84;
+export const SKYWAY_RUN_SCALE = 1.06;
 const COINS_BY_PLACE = [120, 80, 55, 40, 30]; // 1st..5th
 const BOT_NAMES = ['Echo', 'Miso', 'Pulse', 'Sunny'];
 const BOT_ACCENTS = [0xee806e, 0x56b9b1, 0x8b79c9, 0xe8b64a];
@@ -420,9 +420,9 @@ export function createSkywayGlazeData(size = SKYWAY_RENDER_TREATMENT.glazeSize) 
 }
 
 registerGame({
-  id: 'obstacle',
-  name: 'Skyway Sprint',
-  hint: 'Race to the finish',
+  id: 'skate',
+  name: 'Skate Race',
+  hint: 'Board race to the finish',
   color: 0x5a9c7a,
   mount(ctx, opts = {}) {
     ctx.party ||= createPartySession(ctx);
@@ -1466,8 +1466,30 @@ registerGame({
         playerRig = instance.root;
         player.rig = playerRig;
         scene.add(playerRig);
+        attachBoard(playerRig);
       })
       .catch(() => {});
+
+    // Skate Race twist: every racer stands on a board.
+    function attachBoard(group) {
+      if (group.userData.hasBoard) return;
+      group.userData.hasBoard = true;
+      const b = new T.Group();
+      const deck = new T.Mesh(
+        new T.BoxGeometry(0.46, 0.06, 1.5),
+        vinyl(0x21242c, { roughness: 0.5 }),
+      );
+      deck.position.y = 0.16; b.add(deck);
+      for (const tz of [-0.5, 0.5]) for (const wx of [-0.17, 0.17]) {
+        const w = new T.Mesh(
+          new T.CylinderGeometry(0.08, 0.08, 0.06, 10),
+          vinyl(0xf2f2ee, { roughness: 0.35 }),
+        );
+        w.rotation.z = Math.PI / 2; w.position.set(wx, 0.08, tz); b.add(w);
+      }
+      b.userData.rivalAccent = true;
+      group.add(b);
+    }
 
     function addRacerAccent(group, color) {
       const ring = new T.Mesh(
@@ -1525,6 +1547,16 @@ registerGame({
       group.add(spirit);
       group.userData.echoSpirit = spirit;
       addRacerAccent(group, color);
+      attachBoard(group);
+      // Upgrade the translucent spirit to a REAL 3D rider once the mesh is in.
+      ctx.characters.buildMesh('kid', { skinTone: ctx.save.settings.skinTone })
+        .then((mesh) => {
+          if (!alive) return;
+          spirit.visible = false;
+          mesh.userData.rivalAccent = true;
+          group.add(mesh);
+        })
+        .catch(() => {});
       return group;
     }
 
@@ -1564,10 +1596,11 @@ registerGame({
             pending: true,
           };
           remoteRacers.set(remote.id, racer);
-          ctx.characters.buildMesh('ghost', { skinTone: ctx.save.settings.skinTone })
+          ctx.characters.buildMesh('kid', { skinTone: ctx.save.settings.skinTone })
             .then((group) => {
               if (!alive || !remoteRacers.has(remote.id)) return;
               addRacerAccent(group, BOT_ACCENTS[remoteRacers.size % BOT_ACCENTS.length]);
+              attachBoard(group);
               group.position.copy(racer.target);
               group.rotation.y = racer.yaw;
               scene.add(group);

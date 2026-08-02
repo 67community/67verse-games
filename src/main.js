@@ -946,6 +946,7 @@ function frame(now) {
     dirX, dirZ,
     moving: direction.moving,
     jumpHeld: pad.jumpHeld,
+    sprintHeld: pad.sprintHeld,
     grabPressed: queuedGrabPressed,
   };
 
