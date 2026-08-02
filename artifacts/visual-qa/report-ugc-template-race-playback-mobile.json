@@ -1,0 +1,396 @@
+{
+  "kind": "67verse-visual-qa-report",
+  "generatedAt": "2026-07-28T07:33:43.828Z",
+  "artBible": "ART-BIBLE.md",
+  "caveat": "Headless fixed-view evidence. Mobile viewports are not physical-device benchmarks.",
+  "automatedStatus": "pass",
+  "humanReview": "required",
+  "captures": [
+    {
+      "id": "ugc-template-race-playback-mobile",
+      "scope": "ugc-template-playback",
+      "route": "/?panel=discovery&qa=1&perf=1&visualQaUgc=1",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "deviceScaleFactor": 1,
+        "isMobile": true,
+        "hasTouch": true
+      },
+      "screenshot": "artifacts/visual-qa/ugc-template-race-playback-mobile.png",
+      "screenshotSha256": "d1a712ada40dbdb24ebd24c03bb3e377e9e1df20cc57661658acae8242b7146e",
+      "visualEvidence": {
+        "sampledPixels": 4000,
+        "rgbVariance": 5387.757657312499,
+        "quantizedColorCount": 138
+      },
+      "errors": [],
+      "runtime": {
+        "kind": "67verse-local-performance-observation",
+        "label": "ugc-template-race-playback-mobile",
+        "scope": "ugc",
+        "capturedAt": 1785224023393,
+        "startedAt": 1785224014822,
+        "sampleCount": 600,
+        "warmupFrames": 45,
+        "minimumSamples": 120,
+        "status": "within-guardrails",
+        "breaches": [],
+        "budget": {
+          "frameP95Ms": 33.3,
+          "drawCalls": 160,
+          "triangles": 240000
+        },
+        "metrics": {
+          "frameMs": {
+            "current": 5.300000000001091,
+            "p50": 8.5,
+            "p95": 26.099999999999454,
+            "max": 87.10000000000036
+          },
+          "drawCalls": {
+            "current": 18,
+            "peak": 18
+          },
+          "triangles": {
+            "current": 4504,
+            "peak": 4504
+          },
+          "characters": {
+            "active": 2,
+            "hero": 1,
+            "game": 1,
+            "crowd": 0
+          }
+        },
+        "meta": {
+          "viewport": "390x844",
+          "devicePixelRatio": 1,
+          "touch": true,
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/150.0.0.0 Safari/537.36",
+          "qualityPreference": "auto",
+          "qualityTier": "low",
+          "qualityPixelRatio": 1,
+          "qualityShadows": false,
+          "qualityVisualDensity": "reduced"
+        },
+        "caveat": "Local browser observation only; not a production benchmark."
+      },
+      "attribution": {
+        "kind": "67verse-local-scene-attribution",
+        "scope": "ugc",
+        "estimatedDraws": 18,
+        "triangles": 4504,
+        "renderables": 18,
+        "uniqueGeometries": 18,
+        "uniqueMaterials": 14,
+        "groups": [
+          {
+            "group": "characters",
+            "renderables": 5,
+            "instances": 5,
+            "estimatedDraws": 5,
+            "triangles": 2416,
+            "shadowCasters": 5,
+            "uniqueGeometries": 5,
+            "uniqueMaterials": 1
+          },
+          {
+            "group": "ugc-stage",
+            "renderables": 4,
+            "instances": 29,
+            "estimatedDraws": 4,
+            "triangles": 740,
+            "shadowCasters": 0,
+            "uniqueGeometries": 4,
+            "uniqueMaterials": 4
+          },
+          {
+            "group": "ugc-animated",
+            "renderables": 4,
+            "instances": 6,
+            "estimatedDraws": 4,
+            "triangles": 616,
+            "shadowCasters": 0,
+            "uniqueGeometries": 4,
+            "uniqueMaterials": 4
+          },
+          {
+            "group": "unattributed",
+            "renderables": 2,
+            "instances": 2,
+            "estimatedDraws": 2,
+            "triangles": 568,
+            "shadowCasters": 1,
+            "uniqueGeometries": 2,
+            "uniqueMaterials": 2
+          },
+          {
+            "group": "ugc-static",
+            "renderables": 2,
+            "instances": 11,
+            "estimatedDraws": 2,
+            "triangles": 128,
+            "shadowCasters": 2,
+            "uniqueGeometries": 2,
+            "uniqueMaterials": 2
+          },
+          {
+            "group": "ugc-objective",
+            "renderables": 1,
+            "instances": 3,
+            "estimatedDraws": 1,
+            "triangles": 36,
+            "shadowCasters": 0,
+            "uniqueGeometries": 1,
+            "uniqueMaterials": 1
+          }
+        ],
+        "topMaterials": [
+          {
+            "id": "c8c1a8fa-8e28-4247-b6e5-b0e9f8903e5d",
+            "label": "MeshStandardMaterial#ffffff",
+            "objects": 5,
+            "estimatedDraws": 5,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "e3510f97-e129-4b7a-ac96-4bd5a631134c",
+            "label": "MeshStandardMaterial#8fbc7c",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "ugc-stage"
+            ]
+          },
+          {
+            "id": "db4be93f-9236-4da0-a80d-de2eb7678de4",
+            "label": "MeshStandardMaterial#f1dec0",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "ugc-stage"
+            ]
+          },
+          {
+            "id": "cb567339-ed73-45f8-be6a-a349d543114a",
+            "label": "MeshStandardMaterial#6f9f78",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "ugc-stage"
+            ]
+          },
+          {
+            "id": "a9311a41-958f-4309-a0cf-cb1f467fd84a",
+            "label": "MeshBasicMaterial#35ada7",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "ugc-stage"
+            ]
+          },
+          {
+            "id": "6176a903-0977-478e-bba4-aabdd1b0b4b0",
+            "label": "MeshStandardMaterial#d96f55",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "ugc-static"
+            ]
+          },
+          {
+            "id": "65bdce86-70b4-4595-b3c0-1c41fa8007f3",
+            "label": "MeshStandardMaterial#f0b83f",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "ugc-static"
+            ]
+          },
+          {
+            "id": "fa4dfd41-f98d-443d-91dd-9bfe4363fbc5",
+            "label": "MeshStandardMaterial#c75d86",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "ugc-animated"
+            ]
+          },
+          {
+            "id": "ce1f0a81-ea65-42ee-848e-4ba4c4c910b3",
+            "label": "MeshStandardMaterial#2a2724",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "ugc-animated"
+            ]
+          },
+          {
+            "id": "ea913061-cd0f-40d7-b5d8-205128c2b14f",
+            "label": "MeshStandardMaterial#35ada7",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "ugc-animated"
+            ]
+          },
+          {
+            "id": "ec3f8071-d39b-42ef-aaef-2375efe12784",
+            "label": "MeshStandardMaterial#fbfff8",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "ugc-animated"
+            ]
+          },
+          {
+            "id": "af537543-e41d-4378-9a68-746dd153fc26",
+            "label": "MeshBasicMaterial#e8b64a",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "unattributed"
+            ]
+          }
+        ],
+        "topGeometries": [
+          {
+            "id": "e187a713-f19f-45be-93c1-e235f82df27a",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 816,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "a32a3963-fa72-4e3e-b577-ed0cdd716559",
+            "label": "TorusGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 560,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "3544d9b5-6f8d-43c5-8c29-f3f49461c174",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 432,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "bdb0ae7b-57ca-4845-87a3-436901379a7a",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 432,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "474a9357-e642-4493-ae17-1b6014a1ed18",
+            "label": "TorusGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 384,
+            "groups": [
+              "ugc-animated"
+            ]
+          },
+          {
+            "id": "5ddf6443-d3a4-401c-949f-bd0baf479a80",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 368,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "92d9ddcd-4090-4d68-8899-43541d30ba04",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 368,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "33fb4ed8-40ca-4352-a4d2-145c272b9f69",
+            "label": "DodecahedronGeometry",
+            "objects": 1,
+            "instances": 9,
+            "triangles": 324,
+            "groups": [
+              "ugc-stage"
+            ]
+          },
+          {
+            "id": "44f46e28-6630-40bf-bc60-b0752d25cc91",
+            "label": "CircleGeometry",
+            "objects": 1,
+            "instances": 18,
+            "triangles": 216,
+            "groups": [
+              "ugc-stage"
+            ]
+          },
+          {
+            "id": "4fb30f7b-1080-43c8-9d13-b0f57350ec17",
+            "label": "CylinderGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 160,
+            "groups": [
+              "ugc-stage"
+            ]
+          },
+          {
+            "id": "d26045be-bf45-4e20-986a-f5b8a68b92b8",
+            "label": "CylinderGeometry",
+            "objects": 1,
+            "instances": 2,
+            "triangles": 128,
+            "groups": [
+              "ugc-animated"
+            ]
+          },
+          {
+            "id": "5907c2c4-8412-4ede-8116-a325c8fd508a",
+            "label": "BoxGeometry",
+            "objects": 1,
+            "instances": 10,
+            "triangles": 120,
+            "groups": [
+              "ugc-static"
+            ]
+          }
+        ],
+        "caveat": "Static visible-scene estimate; renderer totals may differ for culling, passes, and shadows."
+      },
+      "quality": {
+        "preference": "auto",
+        "tier": "low",
+        "reason": "auto-constrained-device",
+        "pixelRatio": 1,
+        "shadows": false,
+        "visualDensity": "reduced",
+        "managedObjects": 1,
+        "visibleManagedObjects": 0
+      }
+    }
+  ],
+  "failures": []
+}

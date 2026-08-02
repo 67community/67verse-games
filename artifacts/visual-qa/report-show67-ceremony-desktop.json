@@ -1,0 +1,348 @@
+{
+  "kind": "67verse-visual-qa-report",
+  "generatedAt": "2026-07-28T06:10:04.133Z",
+  "artBible": "ART-BIBLE.md",
+  "caveat": "Headless fixed-view evidence. Mobile viewports are not physical-device benchmarks.",
+  "automatedStatus": "fail",
+  "humanReview": "required",
+  "captures": [
+    {
+      "id": "show67-ceremony-desktop",
+      "scope": "show67",
+      "route": "/?game=show67&qa=1&perf=1&visualQaShow=ceremony",
+      "viewport": {
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1
+      },
+      "screenshot": "artifacts/visual-qa/show67-ceremony-desktop.png",
+      "screenshotSha256": "d6f6754048c6191992a1a45cc5663e82b88f91bc2a03efaab22eac283ea0caa4",
+      "visualEvidence": {
+        "sampledPixels": 4000,
+        "rgbVariance": 3950.5640933749964,
+        "quantizedColorCount": 166
+      },
+      "errors": [],
+      "runtime": {
+        "kind": "67verse-local-performance-observation",
+        "label": "show67-ceremony-desktop",
+        "scope": "show67",
+        "capturedAt": 1785219002498,
+        "startedAt": 1785218997393,
+        "sampleCount": 130,
+        "warmupFrames": 45,
+        "minimumSamples": 120,
+        "status": "over-budget",
+        "breaches": [
+          "frame-p95"
+        ],
+        "budget": {
+          "frameP95Ms": 33.3,
+          "drawCalls": 80,
+          "triangles": 380000
+        },
+        "metrics": {
+          "frameMs": {
+            "current": 63.79999999999927,
+            "p50": 18.799999999999727,
+            "p95": 73.5,
+            "max": 101.59999999999945
+          },
+          "drawCalls": {
+            "current": 59,
+            "peak": 59
+          },
+          "triangles": {
+            "current": 16276,
+            "peak": 16276
+          },
+          "characters": {
+            "active": 1,
+            "hero": 1,
+            "game": 0,
+            "crowd": 0
+          }
+        },
+        "meta": {
+          "viewport": "1440x900",
+          "devicePixelRatio": 1,
+          "touch": false,
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/150.0.0.0 Safari/537.36",
+          "qualityPreference": "auto",
+          "qualityTier": "high",
+          "qualityPixelRatio": 1,
+          "qualityShadows": true,
+          "qualityVisualDensity": "full"
+        },
+        "caveat": "Local browser observation only; not a production benchmark."
+      },
+      "attribution": {
+        "kind": "67verse-local-scene-attribution",
+        "scope": "show67",
+        "estimatedDraws": 32,
+        "triangles": 8940,
+        "renderables": 32,
+        "uniqueGeometries": 32,
+        "uniqueMaterials": 22,
+        "groups": [
+          {
+            "group": "unattributed",
+            "renderables": 32,
+            "instances": 161,
+            "estimatedDraws": 32,
+            "triangles": 8940,
+            "shadowCasters": 25,
+            "uniqueGeometries": 32,
+            "uniqueMaterials": 22
+          }
+        ],
+        "topMaterials": [
+          {
+            "id": "c5f7d71c-18d8-446f-828f-f76f1ffccaf3",
+            "label": "MeshStandardMaterial#ffffff",
+            "objects": 5,
+            "estimatedDraws": 5,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "a3ed4f8b-b793-47f1-aeb1-c8b31672047e",
+            "label": "MeshStandardMaterial#ffffff",
+            "objects": 5,
+            "estimatedDraws": 5,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "ee908b55-e309-462c-bada-6368182ba849",
+            "label": "MeshStandardMaterial#2a2724",
+            "objects": 3,
+            "estimatedDraws": 3,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "c81bcaa8-6877-451d-8071-d84f3a69e25d",
+            "label": "MeshStandardMaterial#eae4d9",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "f193810b-0027-40e6-9435-dfd15559476a",
+            "label": "MeshStandardMaterial#f4efe7",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "c3973c54-1e0d-4d49-b5e0-7322dd82e408",
+            "label": "MeshStandardMaterial#8a6fb0",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "84fe69fe-a7f4-4ec6-b878-8c08c553400e",
+            "label": "MeshStandardMaterial#514154",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "7ff2c29b-158f-4618-9813-ae3b4d4d73f0",
+            "label": "MeshStandardMaterial#e8b64a",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "178191dd-8bda-42ed-960d-7b9e8a917d97",
+            "label": "MeshBasicMaterial#ffe9b8",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "45ae0890-974d-4b20-baae-d5abf503bae6",
+            "label": "MeshStandardMaterial#514154",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "4d80c6dc-96c4-40f4-bef4-b9d0991f6530",
+            "label": "MeshStandardMaterial#e8b64a",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "a00f81ba-f218-4efb-94a5-a56ffadd94da",
+            "label": "MeshBasicMaterial#ffe9b8",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "unattributed"
+            ]
+          }
+        ],
+        "topGeometries": [
+          {
+            "id": "f04f177d-c9af-4e7c-b352-5f07092f83a5",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 816,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "a1279871-9f3a-4ccf-9c03-532c696b412d",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 816,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "d6fa2834-7cc2-47b5-b83f-30de0afcae05",
+            "label": "TorusGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 800,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "c06e8131-ae84-4221-83d4-3a51b15646fb",
+            "label": "SphereGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 600,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "bf517503-21a4-43c1-9e8c-bfde14a5160f",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 432,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "cb4df044-2038-481c-9017-65a9270bfe9c",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 432,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "84249bd5-cd13-43ad-a5e4-eb0ca0c4e67a",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 432,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "4f523b17-220c-428a-82ae-a61ba8b266c2",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 432,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "14288d82-3046-4b73-b68c-80fe9e6b5272",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 368,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "95146be9-853f-4444-907b-e0277c0ab766",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 368,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "4f984458-e724-412c-b967-732c1275c173",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 368,
+            "groups": [
+              "unattributed"
+            ]
+          },
+          {
+            "id": "6e350960-a944-4f77-9a04-d6dfbcecc0bd",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 368,
+            "groups": [
+              "unattributed"
+            ]
+          }
+        ],
+        "caveat": "Static visible-scene estimate; renderer totals may differ for culling, passes, and shadows."
+      },
+      "quality": {
+        "preference": "auto",
+        "tier": "high",
+        "reason": "auto-roomy-device",
+        "pixelRatio": 1,
+        "shadows": true,
+        "visualDensity": "full",
+        "managedObjects": 1,
+        "visibleManagedObjects": 1
+      }
+    }
+  ],
+  "failures": [
+    "show67-ceremony-desktop: runtime over-budget"
+  ]
+}

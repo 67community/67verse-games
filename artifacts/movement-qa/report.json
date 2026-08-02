@@ -1,0 +1,477 @@
+{
+  "kind": "67verse-movement-qa-report",
+  "generatedAt": "2026-07-28T08:36:22.620Z",
+  "caveat": "Procedural QA placeholder, not a production character rig.",
+  "status": "pass",
+  "failures": [],
+  "evidence": {
+    "stateSequence": [
+      "run",
+      "run",
+      "jump",
+      "fall"
+    ],
+    "contactSerialDelta": 1,
+    "playerDistance": 1.6819871416357763,
+    "armSwingRadians": {
+      "left": 1.3113237388906276,
+      "right": 1.3113237388906276
+    },
+    "legSwingRadians": {
+      "left": 1.5594120138158816,
+      "right": 1.5594120138158816
+    },
+    "jumpHeight": 0.6899999999999995
+  },
+  "contactSheet": "artifacts/movement-qa/movement-contact-sheet.png",
+  "frames": [
+    {
+      "id": "stride-a",
+      "label": "Run - right leg back",
+      "screenshot": "artifacts/movement-qa/stride-a.png",
+      "screenshotSha256": "c1612cc1b9c75e50ff1c7d1cc6780a4780cca13e0ea7bd985586a8743c7d058b",
+      "player": {
+        "x": 3.5065098554573117e-16,
+        "y": 0.07999999999999997,
+        "z": 25.136717412809404,
+        "grounded": true
+      },
+      "camera": {
+        "yaw": 3.141592653589793,
+        "pitch": 0,
+        "position": [
+          -4.2897440418339233e-16,
+          3.7308718224978388,
+          31.51414643973211
+        ],
+        "desiredPosition": [
+          -3.1678151998957635e-16,
+          3.73,
+          30.586717412809403
+        ],
+        "focus": [
+          4.296141778783416e-16,
+          1.6300000000000001,
+          24.49193401577127
+        ],
+        "desiredDistance": 6.446424175991808,
+        "resolvedDistance": 7.32974281552875
+      },
+      "animation": {
+        "characterId": "qa-runner",
+        "taggedJointCount": 5,
+        "locomotionState": "run",
+        "action": null,
+        "contact": {
+          "serial": 2,
+          "foot": "right"
+        },
+        "pose": {
+          "state": "run",
+          "phase": 1.2880806749023979,
+          "speedRatio": 0.9769445409668657,
+          "locomotionWeight": 0.9625243732189289,
+          "stride": 0.9243135124884007,
+          "joints": {
+            "leg-l": {
+              "rotation": {
+                "x": 0.8133958909897926,
+                "y": 0,
+                "z": -0.06470194587418805
+              },
+              "position": {
+                "x": -0.21663764322479123,
+                "y": 0.812350972937094,
+                "z": 0
+              }
+            },
+            "leg-r": {
+              "rotation": {
+                "x": -0.8133958909897926,
+                "y": 0,
+                "z": 0
+              },
+              "position": {
+                "x": 0.2,
+                "y": 0.78,
+                "z": 0
+              }
+            },
+            "arm-l": {
+              "rotation": {
+                "x": -0.6839919992414165,
+                "y": 0,
+                "z": 0.16243135124884006
+              },
+              "position": {
+                "x": -0.43,
+                "y": 1.37,
+                "z": 0
+              }
+            },
+            "arm-r": {
+              "rotation": {
+                "x": 0.6839919992414165,
+                "y": 0,
+                "z": 0.022431351248840076
+              },
+              "position": {
+                "x": 0.43,
+                "y": 1.37,
+                "z": 0
+              }
+            },
+            "torso": {
+              "rotation": {
+                "x": 0,
+                "y": -0.13864702687326008,
+                "z": 0.01663764322479121
+              },
+              "position": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "stride-b",
+      "label": "Run - left leg back",
+      "screenshot": "artifacts/movement-qa/stride-b.png",
+      "screenshotSha256": "59a46616abd4aec2401ccec3dde0ce6bdd16659b9267412a41aa21fdce0aab52",
+      "player": {
+        "x": 5.566350024668565e-16,
+        "y": 0.08000000000000035,
+        "z": 23.454730271173627,
+        "grounded": true
+      },
+      "camera": {
+        "yaw": 3.141592653589793,
+        "pitch": 0,
+        "position": [
+          -2.3914879447165974e-16,
+          3.730216607258625,
+          29.95560676904854
+        ],
+        "desiredPosition": [
+          -1.10797503068451e-16,
+          3.7300000000000004,
+          28.904730271173626
+        ],
+        "focus": [
+          6.371166386545979e-16,
+          1.6300000000000003,
+          22.79754783911423
+        ],
+        "desiredDistance": 6.458148129181842,
+        "resolvedDistance": 7.459806796547565
+      },
+      "animation": {
+        "characterId": "qa-runner",
+        "taggedJointCount": 5,
+        "locomotionState": "run",
+        "action": null,
+        "contact": {
+          "serial": 3,
+          "foot": "left"
+        },
+        "pose": {
+          "state": "run",
+          "phase": 4.164856215628044,
+          "speedRatio": 0.9957309576657535,
+          "locomotionWeight": 0.9928954762388978,
+          "stride": -0.8477455941205556,
+          "joints": {
+            "leg-l": {
+              "rotation": {
+                "x": -0.746016122826089,
+                "y": 0,
+                "z": 0
+              },
+              "position": {
+                "x": -0.2,
+                "y": 0.78,
+                "z": 0
+              }
+            },
+            "leg-r": {
+              "rotation": {
+                "x": 0.746016122826089,
+                "y": 0,
+                "z": 0.0593421915884389
+              },
+              "position": {
+                "x": 0.21525942069417,
+                "y": 0.8096710957942195,
+                "z": 0
+              }
+            },
+            "arm-l": {
+              "rotation": {
+                "x": 0.6273317396492112,
+                "y": 0,
+                "z": -0.014774559412055577
+              },
+              "position": {
+                "x": -0.43,
+                "y": 1.37,
+                "z": 0
+              }
+            },
+            "arm-r": {
+              "rotation": {
+                "x": -0.6273317396492112,
+                "y": 0,
+                "z": -0.15477455941205556
+              },
+              "position": {
+                "x": 0.43,
+                "y": 1.37,
+                "z": 0
+              }
+            },
+            "torso": {
+              "rotation": {
+                "x": 0,
+                "y": 0.12716183911808335,
+                "z": -0.01525942069417
+              },
+              "position": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "jump-rise",
+      "label": "Jump - rising pose",
+      "screenshot": "artifacts/movement-qa/jump-rise.png",
+      "screenshotSha256": "684b3a5b1793365bda3b0e358c395d63e0001ee29aa2dc9c988317d510855bdf",
+      "player": {
+        "x": 7.521797102323088e-16,
+        "y": 0.4566666666666661,
+        "z": 21.857986557789502,
+        "grounded": false
+      },
+      "camera": {
+        "yaw": 3.141592653589793,
+        "pitch": 0,
+        "position": [
+          -5.421502212040591e-17,
+          3.8363687482168207,
+          28.44346317314998
+        ],
+        "desiredPosition": [
+          8.474720469700124e-17,
+          4.106666666666666,
+          27.3079865577895
+        ],
+        "focus": [
+          8.32935844131765e-16,
+          2.006666666666666,
+          21.198562681814145
+        ],
+        "desiredDistance": 6.460267803763071,
+        "resolvedDistance": 7.472375314221521
+      },
+      "animation": {
+        "characterId": "qa-runner",
+        "taggedJointCount": 5,
+        "locomotionState": "jump",
+        "action": "jump",
+        "contact": {
+          "serial": 3,
+          "foot": "left"
+        },
+        "pose": {
+          "state": "jump",
+          "phase": 0.5860794783806771,
+          "speedRatio": 0.9991270848111476,
+          "locomotionWeight": 0.6211173926043545,
+          "stride": 0.3435394302203915,
+          "joints": {
+            "leg-l": {
+              "rotation": {
+                "x": 0.022314698593944526,
+                "y": 0,
+                "z": -0.02404776011542741
+              },
+              "position": {
+                "x": -0.20618370974396705,
+                "y": 0.7920238800577137,
+                "z": 0
+              }
+            },
+            "leg-r": {
+              "rotation": {
+                "x": -0.12231469859394456,
+                "y": 0,
+                "z": 0
+              },
+              "position": {
+                "x": 0.2,
+                "y": 0.78,
+                "z": 0
+              }
+            },
+            "arm-l": {
+              "rotation": {
+                "x": -0.9742191783630897,
+                "y": 0,
+                "z": -0.07564605697796084
+              },
+              "position": {
+                "x": -0.43,
+                "y": 1.37,
+                "z": 0
+              }
+            },
+            "arm-r": {
+              "rotation": {
+                "x": -0.46578082163691026,
+                "y": 0,
+                "z": 0.14435394302203916
+              },
+              "position": {
+                "x": 0.43,
+                "y": 1.37,
+                "z": 0
+              }
+            },
+            "torso": {
+              "rotation": {
+                "x": 0,
+                "y": -0.051530914533058726,
+                "z": 0.006183709743967047
+              },
+              "position": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "jump-fall",
+      "label": "Jump - falling pose",
+      "screenshot": "artifacts/movement-qa/jump-fall.png",
+      "screenshotSha256": "04cf22e5ab317ddf607a254a429af18be18f160de3d8a8739f8345dbb4891be8",
+      "player": {
+        "x": 8.990659942262006e-16,
+        "y": 0.6899999999999995,
+        "z": 20.65856902698666,
+        "grounded": false
+      },
+      "camera": {
+        "yaw": 3.141592653589793,
+        "pitch": 0,
+        "position": [
+          9.624315678369831e-17,
+          4.138585656821023,
+          27.214385537514428
+        ],
+        "desiredPosition": [
+          2.3163348869089306e-16,
+          4.34,
+          26.10856902698666
+        ],
+        "focus": [
+          9.79871228982131e-16,
+          2.2399999999999993,
+          19.99874421209154
+        ],
+        "desiredDistance": 6.460646969824941,
+        "resolvedDistance": 7.461240328084672
+      },
+      "animation": {
+        "characterId": "qa-runner",
+        "taggedJointCount": 5,
+        "locomotionState": "fall",
+        "action": null,
+        "contact": {
+          "serial": 3,
+          "foot": "left"
+        },
+        "pose": {
+          "state": "fall",
+          "phase": 2.7444072005579017,
+          "speedRatio": 0.99973456802291,
+          "locomotionWeight": 0.46135771317072016,
+          "stride": 0.17846443621412858,
+          "joints": {
+            "leg-l": {
+              "rotation": {
+                "x": -0.28,
+                "y": 0,
+                "z": 0
+              },
+              "position": {
+                "x": -0.2,
+                "y": 0.78,
+                "z": 0
+              }
+            },
+            "leg-r": {
+              "rotation": {
+                "x": 0.18,
+                "y": 0,
+                "z": 0
+              },
+              "position": {
+                "x": 0.2,
+                "y": 0.78,
+                "z": 0
+              }
+            },
+            "arm-l": {
+              "rotation": {
+                "x": -0.28,
+                "y": 0,
+                "z": -0.06
+              },
+              "position": {
+                "x": -0.43,
+                "y": 1.37,
+                "z": 0
+              }
+            },
+            "arm-r": {
+              "rotation": {
+                "x": -0.28,
+                "y": 0,
+                "z": 0.06
+              },
+              "position": {
+                "x": 0.43,
+                "y": 1.37,
+                "z": 0
+              }
+            },
+            "torso": {
+              "rotation": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              },
+              "position": {
+                "x": 0,
+                "y": 0,
+                "z": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

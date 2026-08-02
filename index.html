@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <title>67VERSE — Skate Park Hub</title>
+  <script>
+    // The Vite app needs an HTTP origin for ES modules and its GLB asset.
+    // Opening index.html directly now enters the live local build instead of
+    // leaving a visually loaded but non-interactive shell.
+    if (window.location.protocol === 'file:') {
+      window.location.replace('http://127.0.0.1:7130/');
+    }
+  </script>
+  <style>
+    :root {
+      /* Public Network design tokens (Figma "Public Network Final", iOS-aligned).
+         Near-white surfaces, near-black ink, greys carrying the hierarchy —
+         no warm cream, no gold. Colour is reserved for the 3D world; the
+         interface stays quiet so the game reads through it. */
+      --ink: #060c21;          /* PN foreground */
+      --ink-subtle: #4e4d4d;   /* secondary text */
+      --ink-muted: #9a9aa2;    /* tertiary/meta text */
+      --ink-soft: #707070;     /* data lines */
+      --surface: #fbfbfc;      /* panels */
+      --bg: #fdfdfd;           /* app background */
+      --divider: #f5f5f7;
+      --separator: #e5e5ea;    /* hairline borders */
+      --fill-hover: #fafafa;
+      --fill-pressed: #ebebef;
+      --accent: #0A84FF;       /* iOS systemBlue */
+      --positive: #30D158;
+      --radius-card: 10px;
+      --radius-input: 14px;
+      /* Legacy aliases: the mode HUDs still reference these names. */
+      --cream: #fdfdfd;
+      --terracotta: #060c21;
+      --yellow: #0A84FF;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-right: env(safe-area-inset-right, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-left: env(safe-area-inset-left, 0px);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      touch-action: none;
+      overscroll-behavior: none;
+      background: var(--cream);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--ink);
+      -webkit-user-select: none; user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    canvas { display: block; }
+
+    /* ---------- HUD ---------- */
+    #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+    /* Wordmark: one ink weight, tight tracking, no colour split — the PN
+       lockup reads as a single quiet mark, not a two-tone logo. */
+    #wordmark {
+      position: absolute; top: calc(var(--safe-top) + 18px); left: calc(var(--safe-left) + 22px);
+      font-weight: 600; font-size: 19px; letter-spacing: -0.01em;
+      color: var(--ink);
+    }
+    #wordmark span { color: var(--ink); font-weight: 400; }
+    /* Primary action: PN ink-filled button. Solid, quiet, with the iOS press
+       scale rather than a colour flash. */
+    #primary-play {
+      pointer-events: auto;
+      min-height: 44px;
+      padding: 0 18px;
+      border: 1px solid var(--ink);
+      border-radius: var(--radius-card);
+      background: var(--ink);
+      color: #ffffff;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+      font: 500 14px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+      cursor: pointer;
+      transition: transform 150ms ease-out, background 150ms ease-out;
+    }
+    #primary-play:hover { background: #11182f; }
+    #primary-play:active { transform: scale(0.98); }
+    #hub-actions {
+      position: absolute;
+      top: calc(var(--safe-top) + 58px);
+      left: calc(var(--safe-left) + 22px);
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+    /* Secondary action: PN outline button — white surface, hairline border,
+       ink label. Same height and radius as primary so they sit as one row. */
+    #primary-chat {
+      min-height: 44px;
+      padding: 0 16px;
+      border: 1px solid var(--separator);
+      border-radius: var(--radius-card);
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--ink);
+      box-shadow: none;
+      font: 500 14px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      cursor: pointer;
+      backdrop-filter: blur(12px) saturate(180%);
+      transition: transform 150ms ease-out, background 150ms ease-out;
+    }
+    #primary-chat:hover { background: #ffffff; border-color: var(--separator-strong, #a9a9b1); }
+    #primary-chat:active { transform: scale(0.98); }
+    body.in-game #hub-actions,
+    body.entry-open #hub-actions { display: none; }
+    body.in-game #wordmark,
+    body.in-game #hint { display: none; }
+    #hint {
+      position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%);
+      font-size: 14px; font-weight: 600; letter-spacing: 0.04em;
+      color: var(--ink); opacity: 0.75;
+      background: rgba(255, 255, 255, 0.78);
+      padding: 8px 18px; border-radius: 999px;
+      white-space: nowrap;
+      backdrop-filter: blur(4px);
+    }
+    #hint.destination {
+      color: var(--ink);
+      opacity: 1;
+      background: rgba(255, 255, 255, 0.92);
+      border: 1px solid var(--separator);
+      box-shadow: 0 8px 24px rgba(6, 12, 33, 0.10), 0 0 0 3px rgba(10, 132, 255, 0.14);
+      font-weight: 600;
+    }
+    #hub-activity {
+      position: absolute;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 3px 14px;
+      align-items: center;
+      width: min(470px, calc(100vw - 330px));
+      min-height: 68px;
+      padding: 10px 10px 10px 15px;
+      border: 1px solid rgba(6, 12, 33, 0.10);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.92);
+      box-shadow: 0 10px 28px rgba(6, 12, 33, 0.10);
+      backdrop-filter: blur(9px);
+      pointer-events: auto;
+    }
+    #hub-activity[hidden] { display: none; }
+    #hub-activity-copy { min-width: 0; }
+    #hub-activity-title {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+    #hub-activity-status {
+      margin-top: 3px;
+      overflow: hidden;
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 400;
+      line-height: 1.25;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #hub-activity-exit {
+      min-width: 68px;
+      min-height: 44px;
+      padding: 0 12px;
+      border: 1px solid var(--separator);
+      border-radius: 12px;
+      background: var(--divider);
+      color: var(--ink);
+      font: 500 12px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      cursor: pointer;
+    }
+    body.in-game #hub-activity,
+    body.entry-open #hub-activity { display: none; }
+    #mode-nav {
+      position: fixed;
+      top: calc(var(--safe-top) + 12px);
+      right: calc(var(--safe-right) + 12px);
+      z-index: 58;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      max-width: calc(100vw - var(--safe-left) - var(--safe-right) - 24px);
+      padding: 7px 8px 7px 13px;
+      border: 1px solid rgba(6, 12, 33, 0.10);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--ink);
+      box-shadow: 0 6px 20px rgba(6, 12, 33, 0.10);
+      backdrop-filter: blur(8px);
+      font: 500 12px/1.15 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      pointer-events: auto;
+    }
+    body.in-game #mode-nav { display: flex; }
+    #mode-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #mode-name small {
+      display: block;
+      margin-top: 2px;
+      color: var(--ink-muted);
+      font-size: 11px;
+      font-weight: 400;
+    }
+    #return-skypark {
+      min-height: 36px;
+      flex: 0 0 auto;
+      padding: 0 13px;
+      border: 1px solid var(--separator);
+      border-radius: 999px;
+      background: var(--divider);
+      color: var(--ink);
+      font: 500 12px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      cursor: pointer;
+    }
+    /* PN focus ring: a single ink hairline held well off the control, rather
+       than a thick coloured band. Quiet enough to live on every surface,
+       still unmistakable against both white panels and the 3D world. */
+    button:focus-visible, input:focus-visible, summary:focus-visible {
+      outline: 1px solid var(--ink);
+      outline-offset: 4px;
+    }
+    .sr-only {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      padding: 0 !important;
+      margin: -1px !important;
+      overflow: hidden !important;
+      clip: rect(0, 0, 0, 0) !important;
+      white-space: nowrap !important;
+      border: 0 !important;
+    }
+
+    /* ---------- Entry ---------- */
+    /* Entry gate: a light PN scrim over the world instead of a dark wash, so
+       the first thing the player sees is the sky, softly veiled. */
+    #entry-gate {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: grid;
+      place-items: center;
+      background: rgba(253, 253, 253, 0.62);
+      backdrop-filter: blur(18px) saturate(180%);
+      transition: opacity 240ms ease, visibility 240ms ease;
+    }
+    #entry-gate.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+    #entry-content {
+      text-align: center;
+      color: var(--ink);
+      text-shadow: none;
+      padding: calc(var(--safe-top) + 24px) calc(var(--safe-right) + 24px) calc(var(--safe-bottom) + 24px) calc(var(--safe-left) + 24px);
+    }
+    #entry-kicker {
+      margin-bottom: 12px;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--ink-muted);
+    }
+    #entry-title {
+      font-size: clamp(48px, 9vw, 96px);
+      line-height: 0.94;
+      letter-spacing: -0.03em;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    #entry-title span { color: var(--ink); font-weight: 300; }
+    #entry-summary {
+      margin-top: 14px;
+      font-size: 13px;
+      font-weight: 400;
+      letter-spacing: 0;
+      color: var(--ink-subtle);
+    }
+    #enter-game {
+      margin-top: 34px;
+      min-width: 210px;
+      min-height: 52px;
+      padding: 0 24px;
+      border: 1px solid var(--ink);
+      border-radius: var(--radius-card);
+      background: var(--ink);
+      color: #ffffff;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+      font: 500 15px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+      cursor: pointer;
+      transition: transform 150ms ease-out, background 150ms ease-out;
+    }
+    #enter-game:hover { background: #11182f; }
+    #enter-game:active { transform: scale(0.98); }
+
+    #dev-overlay {
+      display: none;
+      position: fixed;
+      left: calc(var(--safe-left) + 12px);
+      bottom: calc(var(--safe-bottom) + 12px);
+      z-index: 90;
+      box-sizing: border-box;
+      max-width: calc(100vw - 24px);
+      padding: 8px 10px;
+      border-radius: 6px;
+      background: rgba(29, 29, 31, 0.82);
+      color: #d9f7d9;
+      font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      pointer-events: none;
+    }
+
+    /* ---------- Touch controls ---------- */
+    #touch-ui { position: fixed; inset: 0; pointer-events: none; z-index: 20; display: none; }
+    body.touch #touch-ui { display: block; }
+    body.entry-open #touch-ui,
+    body.modal-open #touch-ui,
+    body.show67-overlay-open #touch-ui { visibility: hidden; }
+
+    #stick-base {
+      position: absolute; width: 120px; height: 120px; border-radius: 50%;
+      background: rgba(255, 255, 255, 0.40);
+      border: 2px solid rgba(42, 39, 36, 0.25);
+      display: none; transform: translate(-50%, -50%);
+    }
+    #stick-knob {
+      position: absolute; width: 56px; height: 56px; border-radius: 50%;
+      background: rgba(42, 39, 36, 0.45);
+      left: 50%; top: 50%; transform: translate(-50%, -50%);
+    }
+    #touch-buttons {
+      position: absolute;
+      right: calc(var(--safe-right) + 20px);
+      bottom: calc(var(--safe-bottom) + 20px);
+      display: flex; gap: 16px; align-items: flex-end;
+      pointer-events: none;
+    }
+    .tbtn {
+      pointer-events: auto;
+      width: 72px; height: 72px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: 13px; letter-spacing: 0.05em;
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.62);
+      border: 2px solid rgba(42, 39, 36, 0.3);
+      backdrop-filter: blur(3px);
+      font-family: inherit;
+    }
+    .tbtn:active, .tbtn.held { background: rgba(6, 12, 33, 0.14); transform: scale(0.94); }
+    #btn-jump { width: 84px; height: 84px; background: rgba(208, 119, 94, 0.55); border-color: rgba(208,119,94,0.7); }
+
+    /* Keep the full hub visible on phones: two compact icon rows share the
+       top safe area with the wordmark instead of covering the city horizon. */
+    @media (max-width: 600px) {
+      #wordmark { top: calc(var(--safe-top) + 14px); left: calc(var(--safe-left) + 16px); font-size: 17px; letter-spacing: .1em; }
+      #hub-actions { top: calc(var(--safe-top) + 54px); left: calc(var(--safe-left) + 16px); gap: 6px; }
+      #primary-play, #primary-chat { min-height: 42px; padding: 0 13px; font-size: 12px; }
+      body .uv-hudbar {
+        top: calc(var(--safe-top) + 8px);
+        right: calc(var(--safe-right) + 8px);
+        width: auto;
+        max-width: calc(100vw - 126px);
+        gap: 3px;
+        flex-wrap: nowrap;
+      }
+      body .uv-hudbar button {
+        width: 34px;
+        height: 34px;
+        border-radius: 11px;
+        font-size: 16px;
+        padding: 0;
+      }
+      #hint { bottom: calc(var(--safe-bottom) + 18px); max-width: calc(100vw - var(--safe-left) - var(--safe-right) - 32px); overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+      body.touch #hint {
+        left: calc(var(--safe-left) + 16px);
+        bottom: calc(var(--safe-bottom) + 112px);
+        max-width: min(58vw, 240px);
+        transform: none;
+        white-space: normal;
+        line-height: 1.35;
+        padding: 8px 12px;
+      }
+      #hub-activity {
+        top: calc(var(--safe-top) + 106px);
+        width: calc(100vw - var(--safe-left) - var(--safe-right) - 32px);
+        min-height: 62px;
+        border-radius: 16px;
+      }
+      #hub-activity-title { font-size: 14px; }
+      #hub-activity-status { font-size: 11px; white-space: normal; }
+      #mode-nav {
+        top: calc(var(--safe-top) + 8px);
+        left: calc(var(--safe-left) + 8px);
+        right: calc(var(--safe-right) + 8px);
+        justify-content: space-between;
+      }
+      #return-skypark { min-height: 44px; }
+      #mode-name small { display: none; }
+    }
+    @media (max-height: 540px) and (orientation: landscape) {
+      #touch-buttons { right: calc(var(--safe-right) + 12px); bottom: calc(var(--safe-bottom) + 10px); gap: 10px; }
+      .tbtn { width: 60px; height: 60px; font-size: 11px; }
+      #btn-jump { width: 68px; height: 68px; }
+      body.touch #hint { display: none; }
+      #mode-nav { max-width: min(58vw, 440px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #hint { transition: none; }
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body class="entry-open">
+  <div id="hud">
+    <div id="wordmark">67<span>VERSE</span></div>
+    <div id="hub-actions" role="navigation" aria-label="Skypark actions">
+      <button id="primary-play" type="button" aria-label="Choose a game">▶ PLAY GAMES</button>
+      <button id="primary-chat" type="button" aria-label="Open on-device chat">💬 LOCAL CHAT</button>
+    </div>
+    <section id="hub-activity" aria-label="Hub activity" hidden>
+      <div id="hub-activity-copy">
+        <div id="hub-activity-title"></div>
+        <div id="hub-activity-status" role="status" aria-live="polite"></div>
+      </div>
+      <button id="hub-activity-exit" type="button">EXIT</button>
+    </section>
+    <div id="hint">WASD move · Space jump · E grab</div>
+  </div>
+  <div
+    id="entry-gate"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="entry-title"
+    aria-describedby="entry-summary"
+  >
+    <div id="entry-content">
+      <div id="entry-kicker">SKYPARK</div>
+      <h1 id="entry-title">67<span>VERSE</span></h1>
+      <p id="entry-summary">INSTANT LOCAL PLAY · 3 GAMES + CREATOR</p>
+      <button id="enter-game" type="button">ENTER SKYPARK</button>
+    </div>
+  </div>
+  <div id="dev-overlay"></div>
+  <nav id="mode-nav" aria-label="Current game">
+    <div id="mode-name" role="status" aria-live="polite" aria-atomic="true">Game mode<small>Local play · training rivals</small></div>
+    <button id="return-skypark" type="button">← Return to Skypark</button>
+  </nav>
+  <div id="hub-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div id="touch-ui" inert aria-hidden="true">
+    <div id="stick-base"><div id="stick-knob"></div></div>
+    <div id="touch-buttons">
+      <button class="tbtn" id="btn-grab" type="button" aria-label="Grab or interact">GRAB</button>
+      <button class="tbtn" id="btn-jump" type="button" aria-label="Jump">JUMP</button>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

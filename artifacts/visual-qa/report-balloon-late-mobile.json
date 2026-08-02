@@ -1,0 +1,380 @@
+{
+  "kind": "67verse-visual-qa-report",
+  "generatedAt": "2026-07-28T05:58:15.813Z",
+  "artBible": "ART-BIBLE.md",
+  "caveat": "Headless fixed-view evidence. Mobile viewports are not physical-device benchmarks.",
+  "automatedStatus": "fail",
+  "humanReview": "required",
+  "captures": [
+    {
+      "id": "balloon-late-mobile",
+      "scope": "balloon",
+      "route": "/?game=balloon&qa=1&perf=1&visualQaBalloon=late",
+      "viewport": {
+        "width": 390,
+        "height": 844,
+        "deviceScaleFactor": 1,
+        "isMobile": true,
+        "hasTouch": true
+      },
+      "screenshot": "artifacts/visual-qa/balloon-late-mobile.png",
+      "screenshotSha256": "f66800eacbb09e9909ed6167abec91790eebc8d9ac35203cf6fc3f869cd3c281",
+      "visualEvidence": {
+        "sampledPixels": 4000,
+        "rgbVariance": 4227.695697749994,
+        "quantizedColorCount": 164
+      },
+      "errors": [],
+      "runtime": {
+        "kind": "67verse-local-performance-observation",
+        "label": "balloon-late-mobile",
+        "scope": "balloon",
+        "capturedAt": 1785218292604,
+        "startedAt": 1785218278785,
+        "sampleCount": 401,
+        "warmupFrames": 45,
+        "minimumSamples": 120,
+        "status": "over-budget",
+        "breaches": [
+          "frame-p95"
+        ],
+        "budget": {
+          "frameP95Ms": 33.3,
+          "drawCalls": 80,
+          "triangles": 380000
+        },
+        "metrics": {
+          "frameMs": {
+            "current": 8.200000000000728,
+            "p50": 23.5,
+            "p95": 65.40000000000146,
+            "max": 250
+          },
+          "drawCalls": {
+            "current": 68,
+            "peak": 69
+          },
+          "triangles": {
+            "current": 17892,
+            "peak": 20156
+          },
+          "characters": {
+            "active": 6,
+            "hero": 1,
+            "game": 1,
+            "crowd": 4
+          }
+        },
+        "meta": {
+          "viewport": "390x844",
+          "devicePixelRatio": 1,
+          "touch": true,
+          "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/150.0.0.0 Safari/537.36",
+          "qualityPreference": "auto",
+          "qualityTier": "low",
+          "qualityPixelRatio": 1,
+          "qualityShadows": false,
+          "qualityVisualDensity": "reduced"
+        },
+        "caveat": "Local browser observation only; not a production benchmark."
+      },
+      "attribution": {
+        "kind": "67verse-local-scene-attribution",
+        "scope": "balloon",
+        "estimatedDraws": 67,
+        "triangles": 17668,
+        "renderables": 67,
+        "uniqueGeometries": 58,
+        "uniqueMaterials": 47,
+        "groups": [
+          {
+            "group": "characters",
+            "renderables": 46,
+            "instances": 46,
+            "estimatedDraws": 46,
+            "triangles": 10932,
+            "shadowCasters": 5,
+            "uniqueGeometries": 46,
+            "uniqueMaterials": 30
+          },
+          {
+            "group": "balloon-rigs",
+            "renderables": 10,
+            "instances": 14,
+            "estimatedDraws": 10,
+            "triangles": 1876,
+            "shadowCasters": 5,
+            "uniqueGeometries": 2,
+            "uniqueMaterials": 6
+          },
+          {
+            "group": "balloon-arena",
+            "renderables": 7,
+            "instances": 65,
+            "estimatedDraws": 7,
+            "triangles": 4748,
+            "shadowCasters": 1,
+            "uniqueGeometries": 7,
+            "uniqueMaterials": 7
+          },
+          {
+            "group": "balloon-effects",
+            "renderables": 4,
+            "instances": 4,
+            "estimatedDraws": 4,
+            "triangles": 112,
+            "shadowCasters": 0,
+            "uniqueGeometries": 3,
+            "uniqueMaterials": 4
+          }
+        ],
+        "topMaterials": [
+          {
+            "id": "5e2f4c5f-e771-4f63-ab96-ecd5d75e7466",
+            "label": "MeshStandardMaterial#ffffff",
+            "objects": 5,
+            "estimatedDraws": 5,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "79395cf2-c0a9-4ebe-974f-b88da244f9ed",
+            "label": "MeshStandardMaterial#7a736a",
+            "objects": 5,
+            "estimatedDraws": 5,
+            "groups": [
+              "balloon-rigs"
+            ]
+          },
+          {
+            "id": "727e6d55-ad58-4821-9ce1-4a94e05ba9fd",
+            "label": "MeshStandardMaterial#7fa8b8",
+            "objects": 3,
+            "estimatedDraws": 3,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "5db2b035-0565-4abe-8359-06d8c6473996",
+            "label": "MeshStandardMaterial#2a2724",
+            "objects": 3,
+            "estimatedDraws": 3,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "b3a4b98a-6bcc-4e4e-b3d0-d3692bf54751",
+            "label": "MeshStandardMaterial#2a2724",
+            "objects": 3,
+            "estimatedDraws": 3,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "c25dcba1-90b8-45bc-9240-b63a75338b26",
+            "label": "MeshStandardMaterial#2a2724",
+            "objects": 3,
+            "estimatedDraws": 3,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "34e71668-493b-451d-addb-4e52ef485252",
+            "label": "MeshStandardMaterial#d8a878",
+            "objects": 3,
+            "estimatedDraws": 3,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "c3c53be6-ffcb-4737-a9d6-d06e1faea237",
+            "label": "MeshStandardMaterial#2a2724",
+            "objects": 3,
+            "estimatedDraws": 3,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "e0cf81cf-b49c-45af-aca2-11d000ac7245",
+            "label": "MeshStandardMaterial#91c8bd",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "balloon-arena"
+            ]
+          },
+          {
+            "id": "234d01d4-2779-4d1e-9d77-b8b8deb8e60d",
+            "label": "MeshStandardMaterial#d9eee3",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "balloon-arena"
+            ]
+          },
+          {
+            "id": "30abe9ac-738a-43f1-ac3c-f15c3c54122d",
+            "label": "MeshBasicMaterial#ff806f",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "balloon-arena"
+            ]
+          },
+          {
+            "id": "c377ebac-85f2-4499-8610-24ce05f0ffed",
+            "label": "MeshStandardMaterial#ff6f61",
+            "objects": 1,
+            "estimatedDraws": 1,
+            "groups": [
+              "balloon-arena"
+            ]
+          }
+        ],
+        "topGeometries": [
+          {
+            "id": "f558af02-ba16-4995-8540-6405c0b794cd",
+            "label": "CapsuleGeometry",
+            "objects": 1,
+            "instances": 33,
+            "triangles": 3696,
+            "groups": [
+              "balloon-arena"
+            ]
+          },
+          {
+            "id": "99a2e8ca-ae38-4435-ba7a-d29999ceeabc",
+            "label": "SphereGeometry",
+            "objects": 5,
+            "instances": 7,
+            "triangles": 1764,
+            "groups": [
+              "balloon-rigs"
+            ]
+          },
+          {
+            "id": "0003bdb8-6662-4da1-8a36-5a699281aa77",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 816,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "f61faa76-29b5-4a89-9446-abfef12308da",
+            "label": "SphereGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 600,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "1d00ca0e-0489-4f34-922f-28f62e676344",
+            "label": "SphereGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 600,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "ee3b4703-1543-48e4-a041-f3f9a74a3d9a",
+            "label": "TorusGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 512,
+            "groups": [
+              "balloon-arena"
+            ]
+          },
+          {
+            "id": "b0afdf50-489e-4533-bfe6-7deaa205eba2",
+            "label": "SphereGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 460,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "020db519-c027-4596-9c15-1bfe49abd089",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 432,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "3912d273-12d5-4e66-9236-02d058e155df",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 432,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "40a547cd-bdac-421c-89e3-47e4a107ea27",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 368,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "a1fbae0b-623d-4831-915b-63d6fb5f5034",
+            "label": "BufferGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 368,
+            "groups": [
+              "characters"
+            ]
+          },
+          {
+            "id": "5e35842b-0dc2-4294-96e9-d31ae525f98a",
+            "label": "CapsuleGeometry",
+            "objects": 1,
+            "instances": 1,
+            "triangles": 364,
+            "groups": [
+              "characters"
+            ]
+          }
+        ],
+        "caveat": "Static visible-scene estimate; renderer totals may differ for culling, passes, and shadows."
+      },
+      "quality": {
+        "preference": "auto",
+        "tier": "low",
+        "reason": "auto-constrained-device",
+        "pixelRatio": 1,
+        "shadows": false,
+        "visualDensity": "reduced",
+        "managedObjects": 1,
+        "visibleManagedObjects": 0
+      }
+    }
+  ],
+  "failures": [
+    "balloon-late-mobile: runtime over-budget"
+  ]
+}

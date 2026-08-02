@@ -1,0 +1,103 @@
+{
+  "kind": "67verse-first-playable-readiness",
+  "generatedAt": "2026-07-28T04:40:36.093Z",
+  "environment": {
+    "browser": "Chrome/150.0.7871.187",
+    "caveat": "Headless Chrome viewport emulation; not a physical iOS or Android device."
+  },
+  "status": "pass",
+  "desktop": {
+    "progress": {
+      "role": "progressbar",
+      "label": "Course progress",
+      "min": "0",
+      "max": "100",
+      "now": "0"
+    },
+    "assertiveLiveRegion": "assertive",
+    "hudRole": "group",
+    "hudLabel": "Skyway Sprint race status",
+    "reducedMotion": {
+      "matches": true,
+      "confettiDisplay": "none",
+      "guideTransitionDuration": "1e-05s"
+    },
+    "returnButton": {
+      "label": "← Return to Skypark",
+      "disabled": false
+    },
+    "tabOrder": [
+      {
+        "id": "return-skypark",
+        "label": "← Return to Skypark"
+      }
+    ],
+    "focus": {
+      "active": true,
+      "outlineStyle": "solid",
+      "outlineWidth": "3px"
+    },
+    "dialog": {
+      "label": "Are you sure?",
+      "labelledBy": "uv-panel-title-1785213634921-0",
+      "describedBy": "uv-confirm-message-1785213634921",
+      "text": "Are you sure?✕Return to Skypark? Current round progress will be lost.CancelYes",
+      "activeText": "✕",
+      "activeLabel": "Close Are you sure?",
+      "focusInside": true
+    }
+  },
+  "mobile": {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "jump": {
+      "top": 740,
+      "right": 370,
+      "bottom": 824,
+      "left": 286,
+      "width": 84,
+      "height": 84,
+      "insideViewport": true
+    },
+    "nav": {
+      "top": 8,
+      "right": 374,
+      "bottom": 68,
+      "left": 8,
+      "width": 366,
+      "height": 60,
+      "insideViewport": true
+    },
+    "status": {
+      "top": 62,
+      "right": 164.15625,
+      "bottom": 142,
+      "left": 8,
+      "width": 156.15625,
+      "height": 80,
+      "insideViewport": true
+    },
+    "timer": {
+      "top": 62,
+      "right": 382,
+      "bottom": 98,
+      "left": 298.515625,
+      "width": 83.484375,
+      "height": 36,
+      "insideViewport": true
+    },
+    "touch": {
+      "inert": false,
+      "ariaHidden": null,
+      "visibility": "visible"
+    },
+    "jumpLabel": "Jump"
+  },
+  "contrast": {
+    "bodyTextOnCeramic": 14.009290337065936,
+    "creamTextOnInk": 9.676901894641556,
+    "checkpointTextOnCeramic": 10.910126089801363
+  }
+}
