@@ -11,6 +11,7 @@
 
 import * as THREE from 'three';
 import { AVENUE, buildCityAvenue } from './world/city-avenue.js';
+import { buildCityDistricts } from './world/city-districts.js';
 import { buildTerrainMesh, getHeight } from './world/sixseven-terrain.js';
 
 export const PALETTE = Object.freeze({
@@ -99,6 +100,11 @@ export function buildWorld(scene) {
   const avenue = buildCityAvenue({ group, add, material, animated });
   const solids = avenue.colliders ?? [];
 
+  // ---------------------------------------------------------------------
+  // CITY DISTRICTS — skatepark east, blocks west, market south, pond park
+  // ---------------------------------------------------------------------
+  const districts = buildCityDistricts({ group, add, material, animated });
+
   // Low kerb ring at the world edge: the invisible bound needs something
   // visible, or players walk into a wall that is not there.
   const EDGE_COUNT = 88;
@@ -162,6 +168,10 @@ export function buildWorld(scene) {
     const plazaDz = z - AVENUE.plazaZ;
     if (Math.hypot(plazaDx, plazaDz) <= AVENUE.plazaR) {
       return { y: AVENUE.y + 0.12, box2: null };           // plaza disc
+    }
+    const park = districts.skatepark;
+    if (x > park.minX && x < park.maxX && z > park.minZ && z < park.maxZ) {
+      return { y: park.topY, box2: null };                 // skatepark slab
     }
     return { y: getHeight(x, z), box2: null };
   }

@@ -2145,20 +2145,30 @@ test('town lobby stays inside the draw budget at both quality tiers', () => {
   });
 });
 
-test('town lobby ships the street and nothing left over from the old hub', () => {
+test('town lobby ships the pedestrian city and nothing left over from the old hub', () => {
   const scene = new THREE.Scene();
   const world = buildWorld(scene);
 
-  // What the lobby is.
+  // What the lobby is: the promenade, the shops, and the authored districts
+  // from the 2026-08-04 island-city references — skatepark east, blocks west,
+  // market south, pond park south-east.
   assert.ok(world.group.getObjectByName('town:ground'));
   assert.ok(world.group.getObjectByName('city:avenue-road'));
   assert.ok(world.group.getObjectByName('city:shop-body')?.isInstancedMesh);
-  assert.ok(world.group.getObjectByName('city:traffic-bodies')?.isInstancedMesh);
-  assert.ok(world.group.getObjectByName('city:traffic-wheels')?.isInstancedMesh);
+  assert.ok(world.group.getObjectByName('district:skatepark-slab'));
+  assert.ok(world.group.getObjectByName('district:skatepark-bowl'));
+  assert.ok(world.group.getObjectByName('district:basketball-court'));
+  assert.ok(world.group.getObjectByName('district:market-tower'));
+  assert.ok(world.group.getObjectByName('district:pond'));
 
-  // What it is not: every landmark, district and route prop from the old
-  // civic-plaza hub is gone rather than merely hidden.
+  // What it is not: traffic is gone by explicit order (no cars, no lane
+  // paint, no crossing), and every landmark or route prop from the old
+  // civic-plaza hub stays gone rather than merely hidden.
   for (const removed of [
+    'city:traffic-bodies',
+    'city:traffic-wheels',
+    'city:lane-dashes',
+    'city:crossing',
     'hierarchy:confluence-plaza',
     'hierarchy:arrival-court',
     'hierarchy:background-civic-terraces',

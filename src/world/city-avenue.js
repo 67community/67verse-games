@@ -1,7 +1,7 @@
 // city-avenue.js — the hub's main street.
 //
 // Ported from the 67 World town build (sixseven-world): one straight avenue
-// with pavements, a crossing, shopfronts facing the road on both sides, and
+// with pavements, shopfronts facing the promenade on both sides, and
 // traffic moving through. That layout is what makes the lobby read as a place
 // people wait around in rather than an empty plaza — there is somewhere to
 // stand, something to look at, and constant motion at the edge of vision.
@@ -143,7 +143,6 @@ export function buildCityAvenue({ group, add, material, animated }) {
   const midZ = (A.startZ + A.endZ) / 2;
 
   const MAT = {
-    asphalt: material(0x3c4148, { roughness: 1 }),
     pavement: material(0xc3c6cb, { roughness: 1, flatShading: true }),
     kerb: material(0x9da1a8, { roughness: 1 }),
     paint: material(0xf2efe6, { roughness: 1 }),
@@ -156,28 +155,16 @@ export function buildCityAvenue({ group, add, material, animated }) {
     }),
   };
 
-  // ---- Carriageway ----
+  // ---- Promenade ----
+  // The carriageway is gone by explicit order (no traffic in the hub). The
+  // same strip is now a cream pedestrian promenade between the shopfronts.
   const road = new THREE.Mesh(
     new THREE.BoxGeometry(A.roadHalfWidth * 2, 0.1, length),
-    MAT.asphalt,
+    material(0xe9e2d2, { roughness: 0.8 }),
   );
   road.position.set(0, A.y, midZ);
   road.name = 'city:avenue-road';
   add(road, { walkable: true, camera: false, cast: false });
-
-  // Centre line. Instanced: a loop of individual dashes would cost one draw
-  // call each and the hub runs to a hard 120-draw budget.
-  const dashZs = [];
-  for (let z = A.startZ + 3; z <= A.endZ - 3; z += 6) dashZs.push(z);
-  const laneDashes = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(0.35, 0.02, 2.6), MAT.paint, dashZs.length,
-  );
-  dashZs.forEach((z, i) => {
-    laneDashes.setMatrixAt(i, new THREE.Matrix4().makeTranslation(0, A.y + 0.07, z));
-  });
-  laneDashes.instanceMatrix.needsUpdate = true;
-  laneDashes.name = 'city:lane-dashes';
-  add(laneDashes, { camera: false, cast: false });
 
   // ---- Pavements and kerbs ----
   for (const side of [-1, 1]) {
@@ -194,17 +181,6 @@ export function buildCityAvenue({ group, add, material, animated }) {
     kerb.name = 'city:kerb';
     add(kerb, { camera: false, cast: false });
   }
-
-  // ---- Zebra crossing, placed where the plaza meets the street ----
-  const crossing = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(0.9, 0.02, 3.4), MAT.paint, 9,
-  );
-  for (let i = 0; i < 9; i += 1) {
-    crossing.setMatrixAt(i, new THREE.Matrix4().makeTranslation((i - 4) * 1.15, A.y + 0.07, -20));
-  }
-  crossing.instanceMatrix.needsUpdate = true;
-  crossing.name = 'city:crossing';
-  add(crossing, { camera: false, cast: false });
 
   // ---- Plaza where the road meets the park (z=+30), with the fountain ----
   const plaza = new THREE.Mesh(
@@ -376,121 +352,6 @@ export function buildCityAvenue({ group, add, material, animated }) {
     add(mesh, { camera: false, cast: false });
   }
 
-  // ---- Traffic ----
-  // Four cars share two instanced meshes and one animation hook. They drive the
-  // avenue and wrap at the ends, so the street is never empty and never turns
-  // into a parade of evenly spaced clones.
-  const CAR_COUNT = 4;
-  const carBodies = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(1.7, 0.66, 3.6),
-    material(0xffffff, { roughness: 0.4 }),
-    CAR_COUNT,
-  );
-  const carCabins = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(1.44, 0.52, 1.6),
-    material(0x2b3a67, { roughness: 0.3 }),
-    CAR_COUNT,
-  );
-  const PAINT = [0xe0745e, 0x5a80d6, 0xf6c445, 0x6fae72];
-  PAINT.forEach((hex, i) => carBodies.setColorAt(i, new THREE.Color(hex)));
-  if (carBodies.instanceColor) carBodies.instanceColor.needsUpdate = true;
-
-  // Wheels: four per car, one instanced mesh for the lot. A car whose wheels
-  // do not turn reads as a sliding prop, and that is the first thing the eye
-  // catches on a straight road.
-  const WHEELS_PER_CAR = 4;
-  const wheels = new THREE.InstancedMesh(
-    // Unity-style cylinder stands on Y, so it is rolled onto its side below.
-    new THREE.CylinderGeometry(0.34, 0.34, 0.26, 14),
-    material(0x24262c, { roughness: 0.85 }),
-    CAR_COUNT * WHEELS_PER_CAR,
-  );
-  // [x offset, z offset] in car space — front/rear, left/right.
-  const WHEEL_OFFSETS = [
-    [-0.78, 1.15], [0.78, 1.15], [-0.78, -1.15], [0.78, -1.15],
-  ];
-
-  carBodies.name = 'city:traffic-bodies';
-  carCabins.name = 'city:traffic-cabins';
-  wheels.name = 'city:traffic-wheels';
-  add(carBodies, { camera: false, cast: true, receive: false });
-  add(carCabins, { camera: false, cast: false, receive: false });
-  add(wheels, { camera: false, cast: false, receive: false });
-
-  const CARS = Array.from({ length: CAR_COUNT }, (unused, i) => ({
-    // Lane 1 drives +z on the right of the centre line, lane 0 drives -z.
-    lane: i % 2 === 0 ? -2.4 : 2.4,
-    direction: i % 2 === 0 ? 1 : -1,
-    speed: 3.4 + (i % 3) * 0.7,
-    phase: (i / CAR_COUNT) * length,
-  }));
-
-  {
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const e = new THREE.Euler();
-    const p = new THREE.Vector3();
-    const s = new THREE.Vector3(1, 1, 1);
-    // Wheel scratch objects, hoisted so the animation loop allocates nothing.
-    const wheelQuat = new THREE.Quaternion();
-    const wheelSpin = new THREE.Quaternion();
-    const wheelEuler = new THREE.Euler();
-    const wheelPos = new THREE.Vector3();
-    const WHEEL_AXIS = new THREE.Vector3(1, 0, 0);
-    // Cylinders are built standing on Y; this lays one on its side so it rolls.
-    const WHEEL_LAY = new THREE.Quaternion()
-      .setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
-    animated.push((time) => {
-      for (let i = 0; i < CARS.length; i += 1) {
-        const car = CARS[i];
-        // Wrap with a positive modulo so cars re-enter at the far end rather
-        // than popping at z=0.
-        const travelled = (car.phase + time * car.speed) % length;
-        const along = ((travelled % length) + length) % length;
-        const z = car.direction > 0 ? A.startZ + along : A.endZ - along;
-        e.set(0, car.direction > 0 ? 0 : Math.PI, 0);
-        q.setFromEuler(e);
-        p.set(car.lane, A.y + 0.36, z);
-        m.compose(p, q, s);
-        carBodies.setMatrixAt(i, m);
-        p.y = A.y + 0.92;
-        m.compose(p, q, s);
-        carCabins.setMatrixAt(i, m);
-
-        // The authored model, once loaded, drives the same path. Its base sits
-        // on y=0 after normalisation, so it rides the road surface directly.
-        if (car.model) {
-          car.model.position.set(car.lane, A.y + 0.05, z);
-          car.model.quaternion.copy(q);
-        }
-
-        // Wheels ride under the car and spin at the rate the car is actually
-        // travelling — circumference 2*pi*r, so radians = distance / r. Tying
-        // it to distance rather than a fixed rate keeps the roll matched to the
-        // motion instead of drifting into a visible slide.
-        const spin = (time * car.speed) / 0.34;
-        for (let w = 0; w < WHEELS_PER_CAR; w += 1) {
-          const [ox, oz] = WHEEL_OFFSETS[w];
-          wheelEuler.set(0, car.direction > 0 ? 0 : Math.PI, 0);
-          wheelQuat.setFromEuler(wheelEuler);
-          // Roll about the car's local X, then lay the cylinder on its side.
-          wheelSpin.setFromAxisAngle(WHEEL_AXIS, spin * car.direction);
-          wheelQuat.multiply(wheelSpin).multiply(WHEEL_LAY);
-          wheelPos.set(
-            car.lane + (car.direction > 0 ? ox : -ox),
-            A.y + 0.34,
-            z + (car.direction > 0 ? oz : -oz),
-          );
-          m.compose(wheelPos, wheelQuat, s);
-          wheels.setMatrixAt(i * WHEELS_PER_CAR + w, m);
-        }
-      }
-      carBodies.instanceMatrix.needsUpdate = true;
-      carCabins.instanceMatrix.needsUpdate = true;
-      wheels.instanceMatrix.needsUpdate = true;
-    });
-  }
-
   // ---- Authored model swap ----
   // Each variant loads once and is cloned onto the sites that asked for it.
   // Failure is silent by design: the procedural street already reads correctly,
@@ -499,7 +360,7 @@ export function buildCityAvenue({ group, add, material, animated }) {
   // root-relative URL has no origin to resolve against. Skip the fetch there:
   // the placeholder street is exactly what those tests measure.
   if (typeof document === 'undefined') {
-    return { shopCount: SHOPS.length, carCount: CAR_COUNT };
+    return { shopCount: SHOPS.length, carCount: 0 };
   }
 
   const loader = new GLTFLoader();
@@ -529,25 +390,6 @@ export function buildCityAvenue({ group, add, material, animated }) {
     }, undefined, () => { /* keep the procedural shop */ });
   }
 
-  for (const [variantIndex, url] of CITY_MODELS.car.urls.entries()) {
-    loader.load(url, (gltf) => {
-      const proto = normalizeCityModel(gltf, CITY_MODELS.car.height);
-      CARS.forEach((car, index) => {
-        if (index % CITY_MODELS.car.urls.length !== variantIndex) return;
-        const instance = proto.clone();
-        instance.name = `city:car-model-${index}`;
-        group.add(instance);
-        car.model = instance;
-      });
-      // The placeholder boxes stay in the scene but are emptied of instances
-      // the moment every car has a model.
-      if (CARS.every((car) => car.model)) {
-        carBodies.visible = false;
-        carCabins.visible = false;
-      }
-    }, undefined, () => { /* keep the procedural car */ });
-  }
-
   // Solid footprints the player cannot walk through: the eight shops and the
   // fountain. Shops rotate +/-90 degrees, so width and depth swap in world
   // space (7x6 local becomes 6x7 on the ground).
@@ -562,5 +404,5 @@ export function buildCityAvenue({ group, add, material, animated }) {
     topY: 2.6,
   });
 
-  return { shopCount: SHOPS.length, carCount: CAR_COUNT, colliders };
+  return { shopCount: SHOPS.length, carCount: 0, colliders };
 }
