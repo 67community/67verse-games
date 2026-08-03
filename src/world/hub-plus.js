@@ -188,7 +188,7 @@ function installCompactProofHub(ctx, scene, world, getSim) {
     active: false,
     stage: 0,
     prompt: '',
-    startPosition: { x: 0, z: 28 },
+    startPosition: { x: 0, z: 42 },
     start() {
       this.active = true;
       this.stage = 0;

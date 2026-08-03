@@ -74,7 +74,10 @@ scene.fog = new THREE.Fog(PALETTE.sky, 76, 172);
 const pmrem = new THREE.PMREMGenerator(renderer);
 const envRT = pmrem.fromScene(new RoomEnvironment(), 0.04);
 scene.environment = envRT.texture;
-scene.environmentIntensity = 0.55; // subtle: the sun still leads the key light
+// Per-scene, so the games keep their own look. Measurement against the
+// reference showed the residual over-brightness was a flat additive lift on
+// every channel — the IBL's signature — so this is the dial that owns it.
+scene.environmentIntensity = 0.3;
 pmrem.dispose();
 
 // Plain daylight dome over the park.
@@ -151,18 +154,22 @@ function renderFrame(activeScene, activeCamera) {
 // ---------- Lighting ----------
 // The hemisphere fill is deliberately low: scene.environment (IBL) already
 // supplies ambient bounce, and stacking both washes every surface flat.
-const hemi = new THREE.HemisphereLight(0xdff3ff, 0x86776b, 0.42);
+// Measured against the reference render: the previous levels sat a uniform
+// ~+25/255 above it on every channel, which is an ambient-lift signature,
+// not a material error. Trimmed to land the city on the reference exposure.
+const hemi = new THREE.HemisphereLight(0xdff3ff, 0x86776b, 0.34);
 scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xffefd4, 2.15);
+const sun = new THREE.DirectionalLight(0xffefd4, 1.88);
 sun.position.set(18, 36, -20);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.left = -45;
-sun.shadow.camera.right = 45;
-sun.shadow.camera.top = 45;
-sun.shadow.camera.bottom = -45;
+// The city plan is 124 units across, so the shadow frustum covers it whole.
+sun.shadow.camera.left = -64;
+sun.shadow.camera.right = 64;
+sun.shadow.camera.top = 64;
+sun.shadow.camera.bottom = -64;
 sun.shadow.camera.near = 1;
-sun.shadow.camera.far = 100;
+sun.shadow.camera.far = 140;
 sun.shadow.bias = -0.0006;
 sun.shadow.radius = 7; // wide soft penumbra (PCFSoft)
 scene.add(sun);
@@ -219,7 +226,10 @@ function fireGrabFeedback() {
 
 // ---------- Sim + input ----------
 // Spawn at the authored arrival court, facing the Play portal and 67 Beacon.
-const sim = createPlayerState(0, 28);
+// Arrival: the south end of the boulevard, clear of the market stalls and
+// the blocks either side, facing the 67 plaza up the street. The Quick Start
+// arc still runs north to the plaza, which is where it completes.
+const sim = createPlayerState(0, 42);
 const input = createInput();
 
 // ---------- Shared ctx + module shell ----------

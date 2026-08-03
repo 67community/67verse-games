@@ -101,28 +101,32 @@ export function buildWorld(scene) {
   const districts = buildCityDistricts({ group, add, material, animated });
   const solids = districts.colliders ?? [];
 
-  // Low kerb ring at the world edge: the invisible bound needs something
-  // visible, or players walk into a wall that is not there.
-  const EDGE_COUNT = 124;
+  // Low kerb along the world edge: the invisible bound needs something
+  // visible, or players walk into a wall that is not there. The plan is
+  // square, so the kerb is a square perimeter — four runs of segments.
+  const EDGE_PER_SIDE = 30;
+  const EDGE_COUNT = EDGE_PER_SIDE * 4;
+  const EDGE_LIMIT = 61.5;
   const edge = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(2.25, 0.5, 0.3),
+    new THREE.BoxGeometry(EDGE_LIMIT * 2 / EDGE_PER_SIDE, 0.5, 0.3),
     MAT.kerb,
     EDGE_COUNT,
   );
   {
     const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const e = new THREE.Euler();
-    for (let i = 0; i < EDGE_COUNT; i += 1) {
-      const angle = (i / EDGE_COUNT) * Math.PI * 2;
-      e.set(0, -(angle + Math.PI / 2), 0);
-      q.setFromEuler(e);
-      m.compose(
-        new THREE.Vector3(Math.cos(angle) * 61.5, 0.25 + getHeight(Math.cos(angle) * 61.5, Math.sin(angle) * 61.5), Math.sin(angle) * 61.5),
-        q,
-        new THREE.Vector3(1, 1, 1),
-      );
-      edge.setMatrixAt(i, m);
+    const step = (EDGE_LIMIT * 2) / EDGE_PER_SIDE;
+    let index = 0;
+    for (let i = 0; i < EDGE_PER_SIDE; i += 1) {
+      const t = -EDGE_LIMIT + step * (i + 0.5);
+      for (const [x, z, rot] of [
+        [t, -EDGE_LIMIT, 0], [t, EDGE_LIMIT, 0],
+        [-EDGE_LIMIT, t, Math.PI / 2], [EDGE_LIMIT, t, Math.PI / 2],
+      ]) {
+        m.makeRotationY(rot);
+        m.setPosition(x, 0.25 + getHeight(x, z), z);
+        edge.setMatrixAt(index, m);
+        index += 1;
+      }
     }
     edge.instanceMatrix.needsUpdate = true;
   }
@@ -178,10 +182,10 @@ export function buildWorld(scene) {
     registerWalkable,
     registerCameraCollider,
     applyItems,
-    // Enlarged from 44 for the 2026-08-04 island-city references: the funfair,
-    // coast, stadium and suburbs need the extra ring.
+    // The reference plan is a square city, not a round island: the reachable
+    // area is the square that holds the grid, the coast and the suburbs.
     bounds: 62,
-    boundsCircle: true,
+    boundsCircle: false,
     // The street runs along -z, so the far end of the avenue is where players
     // head for. Audio and the optional hub-plus layer read this.
     // North gate of the boulevard — the reference city's top exit.

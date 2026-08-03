@@ -1,19 +1,19 @@
-// city-districts.js — the 67 city around the promenade (reference: Oscar's
-// full city plan, 2026-08-04, second richer render).
+// city-districts.js — Oscar's 67 city, copied cell-for-cell from the rich
+// reference render (2026-08-04). No interpretation: the reference is a square
+// street GRID, sea filling the whole right margin, river down the left and
+// along the bottom with suburb houses outside the grid. Every position below
+// is the reference's pixel fraction mapped onto world units (image fx,fy ->
+// x=(fx-0.5)*120, z=(fy-0.5)*120), and every color is sampled from the
+// render's lit pixels.
 //
-// Layout on the enlarged r=62 island, promenade running north-south at x=0:
-//   NW  kart track, parking lot, solar-roof gym, athletics oval, baseball
-//   N-E the 67 skatepark (UNTOUCHED by explicit order)
-//   NE  funfair — ferris wheel (animated), carousel, roller coaster, big top
-//   E   coast — sea, beach with umbrellas, lighthouse, marina with boats
-//   SE  the 67 stadium (walkable pitch) and the playground pond park
-//   S   market square with tower and awning stalls
-//   W   building blocks with the basketball court
-//   SW  river with bridges and suburb houses
-// Cars exist as parked rows and a slow ring-road loop — the no-traffic order
-// applied to the skatepark zone, and the reference city is visibly driven.
-// Everything is primitive-authored; Meshy GLBs swap in per piece later using
-// the same placeholder-then-model pattern the avenue shops use.
+// Cells (world coords, roads at x=-20/+16/+44/-51, z=-19/+16/+46/-51):
+//   NW corner  kart loop; then parking + solar gym; athletics; baseball
+//   N center   the 67 skatepark (moved whole, not altered)
+//   NE         funfair (ferris, carousel, coaster); marina on the coast road
+//   E margin   SEA, beach cape with umbrellas and the lighthouse
+//   center     framed 67 plaza; left dense blocks + court; right the stadium
+//   S center   market square; SW/SE blocks and the playground with pools
+//   edges      river + bridges + suburb houses
 import * as THREE from 'three';
 
 const COPING = Object.freeze({ red: 0xe0745e, blue: 0x5a80d6, yellow: 0xf6c445 });
@@ -44,191 +44,212 @@ function flatLabel(text, size) {
 }
 
 export function buildCityDistricts({ group, add, material, animated }) {
-  // Every value below is sampled from the reference render itself (lit-patch
-  // picks over shaded ones), so the city carries its exact palette: sage
-  // lawns, taupe streets, dusty-cream blocks, pale steel water.
+  // Calibrated, not guessed: the first pass was measured against the
+  // reference by sampling matching zones in both renders. The hub lighting
+  // lifts everything ~1.22x, so each base color is the reference color
+  // divided back down by its measured ratio. Water needed the most: it was
+  // washing out to near-white, so its base is a real blue now.
   const mats = {
-    concrete: material(0xefe9df, { roughness: 0.62 }),
-    concreteDeep: material(0xe2dbce, { roughness: 0.7 }),
-    block: material(0xd5c7c4, { roughness: 0.7 }),
-    blockDark: material(0xc4b4ae, { roughness: 0.75 }),
-    court: material(0x8fa478, { roughness: 0.9 }),
-    pitch: material(0x687365, { roughness: 0.92 }),
-    trackRed: material(0xcd8f83, { roughness: 0.9 }),
-    grass: material(0xa4ab88, { roughness: 0.95 }),
-    sand: material(0xd5c8b2, { roughness: 0.95 }),
-    water: material(0xbdc9d9, { roughness: 0.25, transparent: true, opacity: 0.95 }),
-    road: material(0xbfb0a6, { roughness: 0.95 }),
-    paint: material(0xe8ddd2, { roughness: 0.9 }),
-    stone: material(0xd1c5c3, { roughness: 0.8 }),
-    wood: material(0xb9854f, { flatShading: true, roughness: 1 }),
-    rail: material(0x8a8f98, { roughness: 0.35, metalness: 0.4 }),
-    white: material(0xe9e0d6, { roughness: 0.6 }),
-    cream: material(0xe7d8d1, { roughness: 0.5 }),
+    concrete: material(0xc4beb4, { roughness: 0.62 }),
+    concreteDeep: material(0xb8b2a6, { roughness: 0.7 }),
+    block: material(0xb5a9a6, { roughness: 0.7 }),
+    blockDark: material(0xa39590, { roughness: 0.75 }),
+    court: material(0x748560, { roughness: 0.9 }),
+    pitch: material(0x475142, { roughness: 0.92 }),
+    trackRed: material(0xa9736a, { roughness: 0.9 }),
+    grass: material(0x868b6e, { roughness: 0.95 }),
+    sand: material(0xaaa27f, { roughness: 0.95 }),
+    water: material(0x8db2d6, { roughness: 0.25, transparent: true, opacity: 0.97 }),
+    road: material(0x9d8f86, { roughness: 0.95 }),
+    kerbLight: material(0xb4a89e, { roughness: 0.9 }),
+    paint: material(0xd6ccc0, { roughness: 0.9 }),
+    stone: material(0xaf9f9e, { roughness: 0.8 }),
+    wood: material(0x96693c, { flatShading: true, roughness: 1 }),
+    rail: material(0x70757e, { roughness: 0.35, metalness: 0.4 }),
+    white: material(0xc0b7ad, { roughness: 0.6 }),
+    cream: material(0xbeb0a9, { roughness: 0.5 }),
     copingRed: material(COPING.red, { roughness: 0.35 }),
     copingBlue: material(COPING.blue, { roughness: 0.35 }),
     copingYellow: material(COPING.yellow, { roughness: 0.35 }),
     pink: material(0xe89ab8, { roughness: 0.7 }),
+    carDark: material(0x3f4652, { roughness: 0.35 }),
+    tire: material(0x2c2f34, { roughness: 0.9 }),
     glass: material(0xcfe9f5, { roughness: 0.3, emissive: 0x88b8cc, emissiveIntensity: 0.25 }),
   };
   const CAR_PAINT = [0xe0745e, 0x5a80d6, 0xf6c445, 0x6fae72, 0xd8d3c8, 0xa78bda];
 
   // -------------------------------------------------------------------
-  // STREET GRID — boulevard, two crosstown streets, feeder segments,
-  // crosswalk stripes, two roundabouts, street traffic. Positions follow
-  // the reference plan: the boulevard runs the island north-south, the
-  // crosstown streets pass just clear of the skatepark and the plaza.
+  // STREET GRID — reference-exact: light warm asphalt, dashed center
+  // lines, kerb edge strips, crosswalks at every junction.
   // -------------------------------------------------------------------
-  const boulevard = new THREE.Mesh(new THREE.BoxGeometry(6.8, 0.08, 104), mats.road);
-  boulevard.position.set(0, 0.04, 0);
-  boulevard.name = 'district:road-grid';
-  add(boulevard, { walkable: true, camera: false, cast: false });
-  const crossRoads = new THREE.InstancedMesh(new THREE.BoxGeometry(104, 0.08, 4.4), mats.road, 2);
-  [-19, 22].forEach((z, i) => {
-    crossRoads.setMatrixAt(i, new THREE.Matrix4().makeTranslation(0, 0.04, z));
+  const ROAD_W = 4.6;
+  const V_ROADS = [-20, 16, 44, -51];          // x positions, z span -51..46
+  const H_ROADS = [-19, 16, 46, -51];          // z positions, x span -51..44
+  const vRoads = new THREE.InstancedMesh(new THREE.BoxGeometry(ROAD_W, 0.08, 100), mats.road, V_ROADS.length);
+  V_ROADS.forEach((x, i) => {
+    vRoads.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.04, -2.5));
   });
-  crossRoads.instanceMatrix.needsUpdate = true;
-  crossRoads.name = 'district:cross-roads';
-  add(crossRoads, { camera: false, cast: false });
-  const feeders = new THREE.InstancedMesh(new THREE.BoxGeometry(4.4, 0.08, 27), mats.road, 2);
-  [[-36, -32.5], [-36, 35.5]].forEach(([x, z], i) => {
-    feeders.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.04, z));
+  vRoads.instanceMatrix.needsUpdate = true;
+  vRoads.name = 'district:road-grid';
+  add(vRoads, { walkable: true, camera: false, cast: false });
+  const hRoads = new THREE.InstancedMesh(new THREE.BoxGeometry(98, 0.08, ROAD_W), mats.road, H_ROADS.length);
+  H_ROADS.forEach((z, i) => {
+    hRoads.setMatrixAt(i, new THREE.Matrix4().makeTranslation(-3.5, 0.04, z));
   });
-  feeders.instanceMatrix.needsUpdate = true;
-  add(feeders, { camera: false, cast: false });
+  hRoads.instanceMatrix.needsUpdate = true;
+  hRoads.name = 'district:cross-roads';
+  add(hRoads, { camera: false, cast: false });
 
-  // Crosswalk stripe sets at the mid-block crossings and the feeder mouths.
-  const CROSSINGS = [
-    [0, -36, 0], [0, 8, 0], [0, 38, 0],
-    [-20, -19, Math.PI / 2], [16, -19, Math.PI / 2], [-20, 22, Math.PI / 2], [16, 22, Math.PI / 2],
-  ];
-  const stripes = new THREE.InstancedMesh(new THREE.BoxGeometry(0.7, 0.02, 3.6), mats.paint, CROSSINGS.length * 5);
-  CROSSINGS.forEach(([cx, cz, rot], c) => {
+  // Kerb edge strips: the light lip both sides of every road.
+  const kerbCount = (V_ROADS.length + H_ROADS.length) * 2;
+  const kerbs = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.1, 100), mats.kerbLight, kerbCount);
+  let kerbIndex = 0;
+  const kerbM = new THREE.Matrix4();
+  for (const x of V_ROADS) {
+    for (const side of [-1, 1]) {
+      kerbM.identity();
+      kerbM.setPosition(x + side * (ROAD_W / 2 + 0.25), 0.05, -2.5);
+      kerbs.setMatrixAt(kerbIndex, kerbM);
+      kerbIndex += 1;
+    }
+  }
+  for (const z of H_ROADS) {
+    for (const side of [-1, 1]) {
+      kerbM.makeRotationY(Math.PI / 2);
+      kerbM.setPosition(-3.5, 0.05, z + side * (ROAD_W / 2 + 0.25));
+      kerbs.setMatrixAt(kerbIndex, kerbM);
+      kerbIndex += 1;
+    }
+  }
+  kerbs.instanceMatrix.needsUpdate = true;
+  add(kerbs, { camera: false, cast: false });
+
+  // Dashed center lines along every road.
+  const dashPositions = [];
+  for (const x of V_ROADS) {
+    for (let z = -49; z <= 44; z += 4.4) dashPositions.push([x, z, 0]);
+  }
+  for (const z of H_ROADS) {
+    for (let x = -49; x <= 42; x += 4.4) dashPositions.push([x, z, Math.PI / 2]);
+  }
+  const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(0.28, 0.02, 1.9), mats.paint, dashPositions.length);
+  dashPositions.forEach(([x, z, rot], i) => {
+    const m = new THREE.Matrix4().makeRotationY(rot);
+    m.setPosition(x, 0.1, z);
+    dashes.setMatrixAt(i, m);
+  });
+  dashes.instanceMatrix.needsUpdate = true;
+  dashes.name = 'district:lane-dashes';
+  add(dashes, { camera: false, cast: false });
+
+  // Crosswalks at every internal junction.
+  const junctions = [];
+  for (const x of [-20, 16]) for (const z of [-19, 16, 46]) junctions.push([x, z]);
+  junctions.push([-20, -51], [16, -51], [44, -19], [44, 16], [-51, -19], [-51, 16]);
+  const stripes = new THREE.InstancedMesh(new THREE.BoxGeometry(0.7, 0.02, 3.4), mats.paint, junctions.length * 10);
+  let stripeIndex = 0;
+  const stripeM = new THREE.Matrix4();
+  junctions.forEach(([cx, cz]) => {
     for (let s = 0; s < 5; s += 1) {
-      const offset = (s - 2) * 1.05;
-      const m = new THREE.Matrix4().makeRotationY(rot);
-      m.setPosition(
-        cx + (rot === 0 ? offset : 0),
-        0.1,
-        cz + (rot === 0 ? 0 : offset),
-      );
-      stripes.setMatrixAt(c * 5 + s, m);
+      const offset = (s - 2) * 1.0;
+      stripeM.identity();
+      stripeM.setPosition(cx + offset, 0.1, cz + ROAD_W / 2 + 2.1);
+      stripes.setMatrixAt(stripeIndex, stripeM);
+      stripeIndex += 1;
+      stripeM.makeRotationY(Math.PI / 2);
+      stripeM.setPosition(cx + ROAD_W / 2 + 2.1, 0.1, cz + offset);
+      stripes.setMatrixAt(stripeIndex, stripeM);
+      stripeIndex += 1;
     }
   });
   stripes.instanceMatrix.needsUpdate = true;
   stripes.name = 'district:crosswalks';
   add(stripes, { camera: false, cast: false });
 
-  // Roundabouts where the crosstown streets meet the boulevard.
-  const roundabouts = new THREE.InstancedMesh(new THREE.CylinderGeometry(4.4, 4.4, 0.1, 18), mats.road, 2);
-  const roundGreens = new THREE.InstancedMesh(new THREE.CylinderGeometry(1.7, 1.7, 0.14, 14), mats.grass, 2);
-  [[0, -19], [0, 22]].forEach(([x, z], i) => {
-    roundabouts.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.05, z));
-    roundGreens.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.08, z));
-  });
-  roundabouts.instanceMatrix.needsUpdate = true;
-  roundGreens.instanceMatrix.needsUpdate = true;
-  add(roundabouts, { walkable: true, camera: false, cast: false });
-  add(roundGreens, { camera: false, cast: false });
-
-  // Street traffic: six parked cars at their reference kerbs, four slow
-  // drivers looping the boulevard (two each way).
-  const streetCars = new THREE.InstancedMesh(new THREE.BoxGeometry(1.5, 0.6, 2.7), mats.white, 10);
-  const STREET_PARKED = [[2.9, -30], [2.9, -6], [-2.9, 14], [2.9, 32], [-22, -17.2], [-10, 24.2]];
-  STREET_PARKED.forEach(([x, z], i) => {
-    const m = new THREE.Matrix4();
-    if (Math.abs(x) > 5) m.makeRotationY(Math.PI / 2);
-    m.setPosition(x, 0.34, z);
-    streetCars.setMatrixAt(i, m);
-  });
-  for (let i = 0; i < 10; i += 1) streetCars.setColorAt(i, new THREE.Color(CAR_PAINT[i % CAR_PAINT.length]));
-  if (streetCars.instanceColor) streetCars.instanceColor.needsUpdate = true;
-  streetCars.name = 'district:street-cars';
-  add(streetCars, { camera: false, cast: true });
-  const drive = new THREE.Matrix4();
-  const driveQ = new THREE.Quaternion();
-  const driveE = new THREE.Euler();
-  animated?.push((time) => {
-    for (let i = 0; i < 4; i += 1) {
-      const dir = i % 2 === 0 ? 1 : -1;
-      const lane = dir * 1.7;
-      const span = 96;
-      const zPos = ((time * 4.2 + i * 27) % span) - span / 2;
-      driveE.set(0, dir > 0 ? Math.PI : 0, 0);
-      driveQ.setFromEuler(driveE);
-      drive.compose(
-        new THREE.Vector3(lane, 0.34, dir > 0 ? zPos : -zPos),
-        driveQ,
+  // -------------------------------------------------------------------
+  // CARS — real three-part cars (body + cabin + four wheels), exactly the
+  // silhouette the reference draws. Parked in the gym lot and at kerbs;
+  // four slow drivers loop the two inner avenues.
+  // -------------------------------------------------------------------
+  const PARKED = [
+    // gym parking lot rows (reference top-left)
+    [-46, -44, 0], [-43, -44, 0], [-40, -44, 0], [-37, -44, 0],
+    [-46, -40.5, 0], [-43, -40.5, 0], [-40, -40.5, 0],
+    // kerb-parked around the grid
+    [-17.2, -30, 0], [-17.2, 4, 0], [18.8, 30, 0], [13.2, -8, 0],
+    [-30, -16.2, Math.PI / 2], [4, 18.8, Math.PI / 2], [30, 13.2, Math.PI / 2],
+  ];
+  const DRIVERS = 4;
+  const CAR_N = PARKED.length + DRIVERS;
+  const carBodies = new THREE.InstancedMesh(new THREE.BoxGeometry(1.6, 0.55, 3.1), mats.white, CAR_N);
+  const carCabins = new THREE.InstancedMesh(new THREE.BoxGeometry(1.35, 0.45, 1.5), mats.carDark, CAR_N);
+  const carWheels = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(0.28, 0.28, 0.22, 10),
+    mats.tire,
+    CAR_N * 4,
+  );
+  const WHEEL_OFFSETS = [[-0.72, 1.0], [0.72, 1.0], [-0.72, -1.0], [0.72, -1.0]];
+  const carM = new THREE.Matrix4();
+  const carQ = new THREE.Quaternion();
+  const carE = new THREE.Euler();
+  const wheelSpin = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, Math.PI / 2));
+  function placeCar(index, x, z, yaw) {
+    carE.set(0, yaw, 0);
+    carQ.setFromEuler(carE);
+    carM.compose(new THREE.Vector3(x, 0.55, z), carQ, new THREE.Vector3(1, 1, 1));
+    carBodies.setMatrixAt(index, carM);
+    carM.compose(new THREE.Vector3(x, 0.98, z).add(new THREE.Vector3(0, 0, -0.25).applyQuaternion(carQ)), carQ, new THREE.Vector3(1, 1, 1));
+    carCabins.setMatrixAt(index, carM);
+    for (let w = 0; w < 4; w += 1) {
+      const [ox, oz] = WHEEL_OFFSETS[w];
+      const offset = new THREE.Vector3(ox, 0, oz).applyQuaternion(carQ);
+      carM.compose(
+        new THREE.Vector3(x + offset.x, 0.28, z + offset.z),
+        carQ.clone().multiply(wheelSpin),
         new THREE.Vector3(1, 1, 1),
       );
-      streetCars.setMatrixAt(6 + i, drive);
+      carWheels.setMatrixAt(index * 4 + w, carM);
     }
-    streetCars.instanceMatrix.needsUpdate = true;
-  });
-
-  // -------------------------------------------------------------------
-  // CENTRAL PLAZA — the framed square west of the boulevard: stone plate,
-  // fountain, painted 67, tree ring, four round corner towers.
-  // -------------------------------------------------------------------
-  const plazaPlate = new THREE.Mesh(new THREE.BoxGeometry(22, 0.16, 22), mats.stone);
-  plazaPlate.position.set(-15, 0.08, 3);
-  plazaPlate.name = 'district:plaza';
-  add(plazaPlate, { walkable: true, camera: false, cast: false });
-  const plazaFrame = new THREE.InstancedMesh(new THREE.BoxGeometry(22.8, 0.3, 0.5), mats.white, 4);
-  [[-15, -8.15, 0], [-15, 14.15, 0], [-26.15, 3, Math.PI / 2], [-3.85, 3, Math.PI / 2]].forEach(([x, z, rot], i) => {
-    const m = new THREE.Matrix4().makeRotationY(rot);
-    m.setPosition(x, 0.18, z);
-    plazaFrame.setMatrixAt(i, m);
-  });
-  plazaFrame.instanceMatrix.needsUpdate = true;
-  add(plazaFrame, { camera: false, cast: false });
-  const fBase = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.9, 0.6, 16), mats.stone);
-  fBase.position.set(-15, 0.46, 3);
-  add(fBase, { camera: false, cast: false });
-  const fPool = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.3, 0.12, 16), mats.water);
-  fPool.position.set(-15, 0.78, 3);
-  add(fPool, { camera: false, cast: false });
-  const fColumn = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.45, 1.5, 10), mats.stone);
-  fColumn.position.set(-15, 1.4, 3);
-  add(fColumn, { camera: false, cast: true });
-  const plazaLabel = flatLabel('67', 5);
-  if (plazaLabel) {
-    plazaLabel.position.set(-15, 0.17, 9.5);
-    group.add(plazaLabel);
   }
-  const PLAZA_TREES = [[-22, -4], [-8, -4], [-22, 10], [-8, 10], [-15, -6.5], [-15, 12.5], [-25, 3], [-5, 3]];
-  const plazaTrunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.14, 0.2, 1, 6), mats.wood, PLAZA_TREES.length);
-  const plazaCrowns = new THREE.InstancedMesh(new THREE.SphereGeometry(0.8, 10, 8), material(0x98a37e, { roughness: 0.95, flatShading: true }), PLAZA_TREES.length);
-  PLAZA_TREES.forEach(([x, z], i) => {
-    plazaTrunks.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.6, z));
-    plazaCrowns.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 1.6, z));
+  PARKED.forEach(([x, z, yaw], i) => placeCar(i, x, z, yaw));
+  for (let i = 0; i < CAR_N; i += 1) carBodies.setColorAt(i, new THREE.Color(CAR_PAINT[i % CAR_PAINT.length]));
+  if (carBodies.instanceColor) carBodies.instanceColor.needsUpdate = true;
+  carBodies.name = 'district:street-cars';
+  add(carBodies, { camera: false, cast: true });
+  add(carCabins, { camera: false, cast: false });
+  add(carWheels, { camera: false, cast: false });
+  animated?.push((time) => {
+    for (let d = 0; d < DRIVERS; d += 1) {
+      const index = PARKED.length + d;
+      const road = d % 2 === 0 ? -20 : 16;
+      const dir = d < 2 ? 1 : -1;
+      const lane = road + dir * 1.15;
+      const span = 92;
+      const along = ((time * 4.5 + d * 23) % span) - span / 2;
+      placeCar(index, lane, dir > 0 ? along : -along, dir > 0 ? Math.PI : 0);
+    }
+    carBodies.instanceMatrix.needsUpdate = true;
+    carCabins.instanceMatrix.needsUpdate = true;
+    carWheels.instanceMatrix.needsUpdate = true;
   });
-  plazaTrunks.instanceMatrix.needsUpdate = true;
-  plazaCrowns.instanceMatrix.needsUpdate = true;
-  add(plazaTrunks, { camera: false, cast: true });
-  add(plazaCrowns, { camera: false, cast: true });
-  const TOWERS = [[-25, -7], [-5, -7], [-25, 13], [-5, 13]];
-  const towerShafts = new THREE.InstancedMesh(new THREE.CylinderGeometry(1.05, 1.15, 4.6, 12), mats.white, TOWERS.length);
-  const towerCaps = new THREE.InstancedMesh(new THREE.SphereGeometry(1.05, 12, 8), mats.cream, TOWERS.length);
-  TOWERS.forEach(([x, z], i) => {
-    towerShafts.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 2.3, z));
-    towerCaps.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 4.7, z));
-  });
-  towerShafts.instanceMatrix.needsUpdate = true;
-  towerCaps.instanceMatrix.needsUpdate = true;
-  towerShafts.name = 'district:plaza-towers';
-  add(towerShafts, { camera: true, cast: true });
-  add(towerCaps, { camera: false, cast: true });
 
   // -------------------------------------------------------------------
-  // EAST — the 67 skatepark (x 17..41, z -16..16). UNTOUCHED.
+  // N CENTER — the 67 skatepark, moved whole into its reference cell
+  // (x -17..16, z -48..-21). Geometry untouched: same slab, bowl, flow
+  // line, stair sets and corner quarters, rotated to the cell's aspect.
   // -------------------------------------------------------------------
-  const parkC = { x: 29, z: 0 };
-  const slab = new THREE.Mesh(new THREE.BoxGeometry(24, 0.44, 32), mats.concrete);
-  slab.position.set(parkC.x, 0.22, parkC.z);
+  const skate = new THREE.Group();
+  skate.name = 'district:skatepark';
+  const skAdd = (mesh, opts = {}) => {
+    skate.add(mesh);
+    if (opts.cast) mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    return mesh;
+  };
+  const slab = new THREE.Mesh(new THREE.BoxGeometry(32, 0.44, 26), mats.concrete);
+  slab.position.set(0, 0.22, 0);
   slab.name = 'district:skatepark-slab';
-  add(slab, { walkable: true, camera: false, cast: false });
-
+  skAdd(slab);
   const bowl = new THREE.Group();
   bowl.name = 'district:skatepark-bowl';
   const rim = copingArc(mats.copingRed, 4.6, 0.18, Math.PI * 2);
@@ -244,23 +265,17 @@ export function buildCityDistricts({ group, add, material, animated }) {
     bowlLabel.position.y = 0.47;
     bowl.add(bowlLabel);
   }
-  bowl.position.set(parkC.x - 6, 0.22, parkC.z - 9);
-  bowl.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
-  group.add(bowl);
-
+  bowl.position.set(-9, 0.22, -6);
+  skate.add(bowl);
   const flowCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(parkC.x - 9, 0.62, parkC.z + 12),
-    new THREE.Vector3(parkC.x - 4, 0.62, parkC.z + 6),
-    new THREE.Vector3(parkC.x - 8, 0.62, parkC.z + 0),
-    new THREE.Vector3(parkC.x - 2, 0.62, parkC.z - 4),
-    new THREE.Vector3(parkC.x + 3, 0.62, parkC.z + 2),
-    new THREE.Vector3(parkC.x + 8, 0.62, parkC.z - 2),
+    new THREE.Vector3(-12, 0.62, 9), new THREE.Vector3(-5, 0.62, 4),
+    new THREE.Vector3(-9, 0.62, -1), new THREE.Vector3(-2, 0.62, -5),
+    new THREE.Vector3(4, 0.62, 1), new THREE.Vector3(10, 0.62, -3),
   ]);
   const flow = new THREE.Mesh(new THREE.TubeGeometry(flowCurve, 48, 0.16, 8), mats.copingBlue);
   flow.name = 'district:skatepark-flow';
-  add(flow, { camera: false, cast: false });
-
-  for (const [sx, sz, rot] of [[parkC.x + 6, parkC.z + 9, 0], [parkC.x + 7, parkC.z - 11, Math.PI / 6]]) {
+  skAdd(flow);
+  for (const [sx, sz, rot] of [[8, 8, 0], [10, -9, Math.PI / 6]]) {
     const stairs = new THREE.Group();
     for (let step = 0; step < 4; step += 1) {
       const tread = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.22, 0.7), mats.concreteDeep);
@@ -279,103 +294,80 @@ export function buildCityDistricts({ group, add, material, animated }) {
     stairs.position.set(sx, 0.44, sz);
     stairs.rotation.y = rot;
     stairs.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    group.add(stairs);
+    skate.add(stairs);
   }
-
   const neQuarter = copingArc(mats.copingBlue, 3.4, 0.16, Math.PI / 2);
-  neQuarter.position.set(parkC.x + 9, 0.66, parkC.z + 13);
+  neQuarter.position.set(13, 0.66, 10);
   neQuarter.rotation.z = Math.PI;
-  add(neQuarter, { camera: false, cast: false });
+  skAdd(neQuarter);
   const seQuarter = copingArc(mats.copingRed, 3.4, 0.16, Math.PI / 2);
-  seQuarter.position.set(parkC.x + 9, 0.66, parkC.z - 13);
+  seQuarter.position.set(13, 0.66, -10);
   seQuarter.rotation.z = Math.PI / 2;
-  add(seQuarter, { camera: false, cast: false });
+  skAdd(seQuarter);
+  skate.position.set(-0.5, 0, -34.5);
+  group.add(skate);
 
   // -------------------------------------------------------------------
-  // NW — kart track, parking, gym, athletics, baseball
+  // NW — kart loop in the corner, parking + solar gym, athletics, baseball
   // -------------------------------------------------------------------
   const kartCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-44, 0.1, -26), new THREE.Vector3(-36, 0.1, -22),
-    new THREE.Vector3(-28, 0.1, -26), new THREE.Vector3(-26, 0.1, -34),
-    new THREE.Vector3(-32, 0.1, -40), new THREE.Vector3(-42, 0.1, -40),
-    new THREE.Vector3(-47, 0.1, -33),
+    new THREE.Vector3(-58, 0.1, -52), new THREE.Vector3(-50, 0.1, -55),
+    new THREE.Vector3(-44, 0.1, -51), new THREE.Vector3(-47, 0.1, -45),
+    new THREE.Vector3(-54, 0.1, -43), new THREE.Vector3(-59, 0.1, -47),
   ], true);
-  const kart = new THREE.Mesh(new THREE.TubeGeometry(kartCurve, 72, 1.6, 8), mats.road);
+  const kart = new THREE.Mesh(new THREE.TubeGeometry(kartCurve, 72, 1.5, 8), mats.road);
   kart.scale.y = 0.06;
   kart.position.y = 0.08;
   kart.name = 'district:kart-track';
   add(kart, { camera: false, cast: false });
 
-  const gym = new THREE.Mesh(new THREE.BoxGeometry(9, 4, 6.5), mats.block);
-  gym.position.set(-19, 2, -31);
+  const gym = new THREE.Mesh(new THREE.BoxGeometry(11, 4.2, 7), mats.block);
+  gym.position.set(-31, 2.1, -42);
   gym.name = 'district:gym';
   add(gym, { camera: true, cast: true });
-  const gymRoof = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.3, 4.5), mats.glass);
-  gymRoof.position.set(-19, 4.15, -31);
+  const gymRoof = new THREE.Mesh(new THREE.BoxGeometry(8, 0.3, 5), mats.glass);
+  gymRoof.position.set(-31, 4.35, -42);
   add(gymRoof, { camera: false, cast: false });
 
-  // Parking rows by the gym: one instanced mesh, colored per car.
-  const PARKED = [[-13.5, -38], [-11, -38], [-8.5, -38], [-13.5, -34.5], [-11, -34.5], [-8.5, -34.5]];
-  const parkedCars = new THREE.InstancedMesh(new THREE.BoxGeometry(1.5, 0.6, 2.6), mats.white, PARKED.length);
-  PARKED.forEach(([x, z], i) => {
-    parkedCars.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.34, z));
-    parkedCars.setColorAt(i, new THREE.Color(CAR_PAINT[i % CAR_PAINT.length]));
-  });
-  parkedCars.instanceMatrix.needsUpdate = true;
-  if (parkedCars.instanceColor) parkedCars.instanceColor.needsUpdate = true;
-  parkedCars.name = 'district:parked-cars';
-  add(parkedCars, { camera: false, cast: true });
-
-  // Athletics oval with a green infield.
-  const oval = copingArc(mats.trackRed, 6.2, 1.5, Math.PI * 2);
-  oval.scale.set(1.4, 1, 0.05);
-  oval.position.set(-31, 0.1, -17);
+  const oval = copingArc(mats.trackRed, 6, 1.5, Math.PI * 2);
+  oval.scale.set(1.3, 1, 0.05);
+  oval.position.set(-38, 0.1, -28);
   oval.name = 'district:athletics-track';
   add(oval, { camera: false, cast: false });
-  const infield = new THREE.Mesh(new THREE.CylinderGeometry(5.6, 5.6, 0.08, 20), mats.pitch);
-  infield.scale.x = 1.4;
-  infield.position.set(-31, 0.08, -17);
+  const infield = new THREE.Mesh(new THREE.CylinderGeometry(5.4, 5.4, 0.08, 20), mats.pitch);
+  infield.scale.x = 1.3;
+  infield.position.set(-38, 0.08, -28);
   add(infield, { walkable: true, camera: false, cast: false });
 
-  // Baseball diamond: sand fan + green outfield wedge.
-  const fan = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 0.08, 14, 1, false, 0, Math.PI / 2), mats.sand);
-  fan.position.set(-13, 0.08, -24);
+  const fan = new THREE.Mesh(new THREE.CylinderGeometry(5.4, 5.4, 0.08, 14, 1, false, 0, Math.PI / 2), mats.sand);
+  fan.position.set(-25, 0.08, -27);
   fan.rotation.y = Math.PI * 0.78;
   fan.name = 'district:baseball';
   add(fan, { camera: false, cast: false });
 
   // -------------------------------------------------------------------
-  // NE — funfair: ferris wheel, carousel, roller coaster, big top
+  // NE — funfair, and the marina against the coast road
   // -------------------------------------------------------------------
   const ferris = new THREE.Group();
   ferris.name = 'district:ferris-wheel';
   const wheelRing = new THREE.Mesh(new THREE.TorusGeometry(5.2, 0.22, 10, 36), mats.copingYellow);
   ferris.add(wheelRing);
   const spokes = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 10.2, 0.16), mats.rail, 4);
-  for (let i = 0; i < 4; i += 1) {
-    const m = new THREE.Matrix4().makeRotationZ((i / 4) * Math.PI);
-    spokes.setMatrixAt(i, m);
-  }
+  for (let i = 0; i < 4; i += 1) spokes.setMatrixAt(i, new THREE.Matrix4().makeRotationZ((i / 4) * Math.PI));
   spokes.instanceMatrix.needsUpdate = true;
   ferris.add(spokes);
   const gondolas = new THREE.InstancedMesh(new THREE.BoxGeometry(0.9, 0.7, 0.7), mats.white, 8);
   for (let i = 0; i < 8; i += 1) gondolas.setColorAt(i, new THREE.Color(CAR_PAINT[i % CAR_PAINT.length]));
   if (gondolas.instanceColor) gondolas.instanceColor.needsUpdate = true;
   ferris.add(gondolas);
-  const wheelSpin = ferris;
-  wheelSpin.position.set(19, 6.4, -35);
-  const legL = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.28, 6.6, 8), mats.rail);
-  legL.position.set(18.2, 3.3, -35);
-  legL.rotation.z = 0.12;
-  add(legL, { camera: false, cast: true });
-  const legR = legL.clone();
-  legR.position.x = 19.8;
-  legR.rotation.z = -0.12;
-  add(legR, { camera: false, cast: true });
+  ferris.position.set(25, 6.4, -42);
+  for (const legX of [24.2, 25.8]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.28, 6.6, 8), mats.rail);
+    leg.position.set(legX, 3.3, -42);
+    leg.rotation.z = legX < 25 ? 0.12 : -0.12;
+    add(leg, { camera: false, cast: true });
+  }
   group.add(ferris);
-  // Gondolas ride the rim but hang level: their instance matrix cancels the
-  // group spin (Rz(-t)) after placing them at the spun rim position, so the
-  // combined transform is a pure world translation.
   const gondolaSpin = new THREE.Matrix4();
   const gondolaAt = new THREE.Matrix4();
   animated?.push((time) => {
@@ -401,21 +393,21 @@ export function buildCityDistricts({ group, add, material, animated }) {
   const carPole = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 2.8, 8), mats.rail);
   carPole.position.y = 1.8;
   carousel.add(carPole);
-  carousel.position.set(29, 0, -28);
+  carousel.position.set(33, 0, -33);
   carousel.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   group.add(carousel);
 
   const coasterCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(36, 0.8, -24), new THREE.Vector3(40, 3.4, -28),
-    new THREE.Vector3(43, 1.2, -33), new THREE.Vector3(40, 4.6, -38),
-    new THREE.Vector3(35, 1.4, -41), new THREE.Vector3(33, 3.2, -34),
-    new THREE.Vector3(33, 0.9, -28),
+    new THREE.Vector3(22, 0.8, -28), new THREE.Vector3(27, 3.4, -30),
+    new THREE.Vector3(32, 1.2, -26), new THREE.Vector3(37, 4.6, -28),
+    new THREE.Vector3(40, 1.4, -24), new THREE.Vector3(31, 3.2, -22),
+    new THREE.Vector3(24, 0.9, -24),
   ], true);
   const coaster = new THREE.Mesh(new THREE.TubeGeometry(coasterCurve, 96, 0.14, 8), mats.cream);
   coaster.name = 'district:roller-coaster';
   add(coaster, { camera: false, cast: true });
   const coasterPosts = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.08, 0.08, 1, 6), mats.rail, 6);
-  [[40, -28, 3.4], [40, -38, 4.6], [35, -41, 1.4], [33, -34, 3.2], [43, -33, 1.2], [36, -24, 0.8]]
+  [[27, -30, 3.4], [37, -28, 4.6], [40, -24, 1.4], [31, -22, 3.2], [32, -26, 1.2], [22, -28, 0.8]]
     .forEach(([x, z, h], i) => {
       const m = new THREE.Matrix4().makeScale(1, h, 1);
       m.setPosition(x, h / 2, z);
@@ -423,28 +415,36 @@ export function buildCityDistricts({ group, add, material, animated }) {
     });
   coasterPosts.instanceMatrix.needsUpdate = true;
   add(coasterPosts, { camera: false, cast: false });
-
   const tent = new THREE.Mesh(new THREE.ConeGeometry(2.6, 2.6, 12), mats.copingRed);
-  tent.position.set(24, 1.3, -42);
+  tent.position.set(38, 1.3, -36);
   tent.name = 'district:big-top';
   add(tent, { camera: false, cast: true });
-  const tentFlag = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), mats.copingYellow);
-  tentFlag.position.set(24, 2.8, -42);
-  add(tentFlag, { camera: false, cast: false });
 
   // -------------------------------------------------------------------
-  // EAST COAST — sea, beach, lighthouse, marina
+  // EAST MARGIN — the SEA fills the whole right edge; beach cape with
+  // umbrellas; the lighthouse on the point; marina rows off the coast road.
   // -------------------------------------------------------------------
-  const sea = new THREE.Mesh(new THREE.BoxGeometry(26, 0.1, 96), mats.water);
-  sea.position.set(60, 0.02, 0);
+  // The sea fills the right margin exactly: from the coastline at x=46 to the
+  // terrain plane's own edge at x=75, and the full depth of that plane. Sized
+  // to the land, so the waterline is a coast rather than a slab on a lawn.
+  const sea = new THREE.Mesh(new THREE.BoxGeometry(29, 0.1, 150), mats.water);
+  sea.position.set(60.5, 0.02, 0);
   sea.name = 'district:sea';
   add(sea, { camera: false, cast: false });
-  const beach = new THREE.Mesh(new THREE.BoxGeometry(7, 0.14, 34), mats.sand);
-  beach.position.set(45.5, 0.07, 8);
-  beach.name = 'district:beach';
-  add(beach, { walkable: true, camera: false, cast: false });
-  const umbrellas = new THREE.InstancedMesh(new THREE.ConeGeometry(0.9, 0.5, 10), mats.copingRed, 4);
-  [[44.5, 1], [46.5, 6], [44.8, 12], [46.2, 18]].forEach(([x, z], i) => {
+
+  const capeShape = new THREE.Shape();
+  capeShape.moveTo(0, -14);
+  capeShape.quadraticCurveTo(9, -12, 10, -2);
+  capeShape.quadraticCurveTo(10.5, 8, 6, 14);
+  capeShape.quadraticCurveTo(1, 12, 0, 6);
+  capeShape.lineTo(0, -14);
+  const cape = new THREE.Mesh(new THREE.ShapeGeometry(capeShape, 18), mats.sand);
+  cape.rotation.x = -Math.PI / 2;
+  cape.position.set(47, 0.09, -2);
+  cape.name = 'district:beach';
+  add(cape, { walkable: true, camera: false, cast: false });
+  const umbrellas = new THREE.InstancedMesh(new THREE.ConeGeometry(0.9, 0.5, 10), mats.copingRed, 5);
+  [[50, -10], [53, -5], [54, 1], [52, 7], [49, 3]].forEach(([x, z], i) => {
     umbrellas.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 1.15, z));
     umbrellas.setColorAt(i, new THREE.Color(CAR_PAINT[(i * 2) % CAR_PAINT.length]));
   });
@@ -466,38 +466,93 @@ export function buildCityDistricts({ group, add, material, animated }) {
   const lhLamp = new THREE.Mesh(new THREE.SphereGeometry(0.45, 10, 8), mats.copingYellow);
   lhLamp.position.y = 6.1;
   lighthouse.add(lhLamp);
-  lighthouse.position.set(46, 0, 26);
+  lighthouse.position.set(55, 0, -16);
   lighthouse.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   group.add(lighthouse);
 
-  const docks = new THREE.InstancedMesh(new THREE.BoxGeometry(1.4, 0.24, 7), mats.wood, 3);
-  [[47, -20], [47, -26], [47, -32]].forEach(([x, z], i) => {
+  const docks = new THREE.InstancedMesh(new THREE.BoxGeometry(8, 0.24, 1.3), mats.wood, 4);
+  [[52, -30], [52, -34], [52, -38], [52, -42]].forEach(([x, z], i) => {
     docks.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.2, z));
   });
   docks.instanceMatrix.needsUpdate = true;
   docks.name = 'district:marina-docks';
   add(docks, { camera: false, cast: false });
-  const boats = new THREE.InstancedMesh(new THREE.BoxGeometry(1.1, 0.5, 2.6), mats.white, 5);
-  [[49.2, -19], [49.2, -23.5], [49.2, -28], [49.2, -33], [51.5, -25]].forEach(([x, z], i) => {
-    boats.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.3, z));
-    boats.setColorAt(i, new THREE.Color(CAR_PAINT[(i + 1) % CAR_PAINT.length]));
-  });
+  const boats = new THREE.InstancedMesh(new THREE.BoxGeometry(2.4, 0.5, 1.05), mats.white, 8);
+  [[50.6, -31.9], [54.2, -31.9], [50.6, -35.9], [54.2, -35.9], [50.6, -39.9], [54.2, -39.9], [51, -44], [57, -27]]
+    .forEach(([x, z], i) => {
+      boats.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.3, z));
+      boats.setColorAt(i, new THREE.Color(CAR_PAINT[(i + 1) % CAR_PAINT.length]));
+    });
   boats.instanceMatrix.needsUpdate = true;
   if (boats.instanceColor) boats.instanceColor.needsUpdate = true;
   boats.name = 'district:marina-boats';
   add(boats, { camera: false, cast: false });
 
   // -------------------------------------------------------------------
-  // SE — the 67 stadium (walkable pitch) + playground pond park
+  // CENTER — the framed 67 plaza with fountain, tree ring, corner towers
+  // -------------------------------------------------------------------
+  const plazaPlate = new THREE.Mesh(new THREE.BoxGeometry(30, 0.16, 30), mats.stone);
+  plazaPlate.position.set(-2, 0.08, -1.5);
+  plazaPlate.name = 'district:plaza';
+  add(plazaPlate, { walkable: true, camera: false, cast: false });
+  const plazaFrame = new THREE.InstancedMesh(new THREE.BoxGeometry(30.8, 0.3, 0.5), mats.white, 4);
+  [[-2, -16.65, 0], [-2, 13.65, 0], [-17.15, -1.5, Math.PI / 2], [13.15, -1.5, Math.PI / 2]].forEach(([x, z, rot], i) => {
+    const m = new THREE.Matrix4().makeRotationY(rot);
+    m.setPosition(x, 0.18, z);
+    plazaFrame.setMatrixAt(i, m);
+  });
+  plazaFrame.instanceMatrix.needsUpdate = true;
+  add(plazaFrame, { camera: false, cast: false });
+  const fBase = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.9, 0.6, 16), mats.stone);
+  fBase.position.set(-2, 0.46, -1.5);
+  add(fBase, { camera: false, cast: false });
+  const fPool = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.3, 0.12, 16), mats.water);
+  fPool.position.set(-2, 0.78, -1.5);
+  add(fPool, { camera: false, cast: false });
+  const fColumn = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.45, 1.5, 10), mats.stone);
+  fColumn.position.set(-2, 1.4, -1.5);
+  add(fColumn, { camera: false, cast: true });
+  const plazaLabel = flatLabel('67', 6);
+  if (plazaLabel) {
+    plazaLabel.position.set(-2, 0.17, 6.5);
+    group.add(plazaLabel);
+  }
+  const PLAZA_TREES = [[-11, -10], [7, -10], [-11, 7], [7, 7], [-2, -12], [-2, 9], [-14, -1.5], [10, -1.5]];
+  const plazaTrunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.14, 0.2, 1, 6), mats.wood, PLAZA_TREES.length);
+  const crownMat = material(0x7a8564, { roughness: 0.95, flatShading: true });
+  const plazaCrowns = new THREE.InstancedMesh(new THREE.SphereGeometry(0.8, 10, 8), crownMat, PLAZA_TREES.length);
+  PLAZA_TREES.forEach(([x, z], i) => {
+    plazaTrunks.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.6, z));
+    plazaCrowns.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 1.6, z));
+  });
+  plazaTrunks.instanceMatrix.needsUpdate = true;
+  plazaCrowns.instanceMatrix.needsUpdate = true;
+  add(plazaTrunks, { camera: false, cast: true });
+  add(plazaCrowns, { camera: false, cast: true });
+  const TOWERS = [[-15.5, -15], [11.5, -15], [-15.5, 12], [11.5, 12]];
+  const towerShafts = new THREE.InstancedMesh(new THREE.CylinderGeometry(1.05, 1.15, 4.6, 12), mats.white, TOWERS.length);
+  const towerCaps = new THREE.InstancedMesh(new THREE.SphereGeometry(1.05, 12, 8), mats.cream, TOWERS.length);
+  TOWERS.forEach(([x, z], i) => {
+    towerShafts.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 2.3, z));
+    towerCaps.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 4.7, z));
+  });
+  towerShafts.instanceMatrix.needsUpdate = true;
+  towerCaps.instanceMatrix.needsUpdate = true;
+  towerShafts.name = 'district:plaza-towers';
+  add(towerShafts, { camera: true, cast: true });
+  add(towerCaps, { camera: false, cast: true });
+
+  // -------------------------------------------------------------------
+  // E CELL — the 67 stadium in its reference position right of the plaza
   // -------------------------------------------------------------------
   const stadium = new THREE.Group();
   stadium.name = 'district:stadium';
   const stand = copingArc(mats.blockDark, 8.6, 1.4, Math.PI * 2);
-  stand.scale.set(1.25, 1, 0.5);
+  stand.scale.set(1.2, 1, 0.5);
   stand.position.y = 0.7;
   stadium.add(stand);
   const pitch = new THREE.Mesh(new THREE.CylinderGeometry(7.4, 7.4, 0.1, 22), mats.pitch);
-  pitch.scale.x = 1.25;
+  pitch.scale.x = 1.2;
   pitch.position.y = 0.06;
   pitch.name = 'district:stadium-pitch';
   stadium.add(pitch);
@@ -506,95 +561,194 @@ export function buildCityDistricts({ group, add, material, animated }) {
     pitchLabel.position.y = 0.13;
     stadium.add(pitchLabel);
   }
-  stadium.position.set(31, 0, 33);
+  stadium.position.set(31, 0, -1);
   stadium.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
   group.add(stadium);
 
-  const lawn = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 0.1, 20), mats.grass);
-  lawn.position.set(13, 0.05, 43);
-  lawn.name = 'district:pond-lawn';
-  add(lawn, { walkable: true, camera: false, cast: false });
-  const pondShape = new THREE.Shape();
-  pondShape.absellipse(0, 0, 3, 2, 0, Math.PI * 2);
-  const pond = new THREE.Mesh(new THREE.ShapeGeometry(pondShape, 24), mats.water);
-  pond.rotation.x = -Math.PI / 2;
-  pond.position.set(14.5, 0.14, 42);
-  pond.name = 'district:pond';
-  add(pond, { camera: false, cast: false });
-  // Teddy statue: the playground's landmark.
-  const teddy = new THREE.Group();
-  teddy.name = 'district:teddy';
-  const tBody = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 10), mats.pink);
-  tBody.position.y = 1;
-  teddy.add(tBody);
-  const tHead = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 10), mats.pink);
-  tHead.position.y = 2.3;
-  teddy.add(tHead);
-  for (const side of [-1, 1]) {
-    const ear = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 6), mats.pink);
-    ear.position.set(side * 0.55, 2.85, 0);
-    teddy.add(ear);
-  }
-  teddy.position.set(10, 0, 40);
-  teddy.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-  group.add(teddy);
-  const TREES = [[8, 46], [12, 48], [18, 46.5], [19, 39], [7, 37]];
-  const crownMat = material(0x98a37e, { roughness: 0.95, flatShading: true });
-  const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.14, 0.2, 1, 6), mats.wood, TREES.length);
-  const crowns = new THREE.InstancedMesh(new THREE.SphereGeometry(0.9, 10, 8), crownMat, TREES.length);
-  TREES.forEach(([x, z], i) => {
-    trunks.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.55, z));
-    crowns.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 1.6, z));
-  });
-  trunks.instanceMatrix.needsUpdate = true;
-  crowns.instanceMatrix.needsUpdate = true;
-  add(trunks, { camera: false, cast: true });
-  add(crowns, { camera: false, cast: true });
-
   // -------------------------------------------------------------------
-  // WEST — building blocks and the basketball court
+  // WEST + SOUTH CELLS — dense blocks, the basketball court, the market
   // -------------------------------------------------------------------
-  // Dense reference fill: every quarter carries blocks; none intrude on the
-  // plaza, the court, the roads, the pond lawn or the activity spots.
   const BLOCKS = [
-    [-32, 10, 5, 3.2, 6], [-42, 8, 4, 2.6, 5], [-44, -2, 5, 3.6, 6],
-    [-31, -8, 4, 2.4, 5], [-42, -14, 4, 2.2, 4],
-    [-30, 28, 4, 4.2, 5], [-26, 40, 4, 2.8, 5], [-8, 30, 5, 3, 7], [-8, 48, 4, 2.4, 5],
-    [9, -8, 4, 3, 5], [10, 6, 4, 2.4, 5], [12, -28, 5, 2.8, 6], [7, -38, 4, 2.2, 4],
+    // middle-left dense quarter
+    [-28, -12, 5, 3.2, 6], [-38, -14, 4, 2.6, 5], [-46, -10, 5, 3.6, 6],
+    [-27, 10, 4, 2.4, 5], [-36, 12, 5, 3, 7], [-45, 8, 4, 2.2, 4],
+    [-46, 0, 4, 4.2, 5], [-27, -2, 4, 2.8, 5],
+    // bottom-left quarter
+    [-45, 24, 5, 3, 6], [-36, 28, 4, 2.4, 5], [-27, 24, 4, 3.4, 5],
+    [-45, 36, 4, 2.8, 5], [-34, 38, 5, 2.2, 5], [-25, 36, 4, 2.6, 4],
+    // bottom-center around the market
+    [-12, 24, 4, 3, 5], [8, 24, 4, 2.6, 5], [-12, 40, 4, 2.4, 5], [8, 40, 4, 3.2, 5],
+    // top-right small pair by the funfair entrance
+    [20, -14, 4, 2.4, 4], [38, 8, 4, 2.6, 5],
   ];
-  // One instanced draw for the whole quarter; scale carries each block's size
-  // and instance color carries the two-tone facade rhythm.
   const blockBodies = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.white, BLOCKS.length);
   BLOCKS.forEach(([x, z, w, h, d], i) => {
     const m = new THREE.Matrix4().makeScale(w, h, d);
     m.setPosition(x, h / 2, z);
     blockBodies.setMatrixAt(i, m);
-    blockBodies.setColorAt(i, new THREE.Color(i % 3 === 0 ? 0xded5c4 : 0xf1ece1));
+    blockBodies.setColorAt(i, new THREE.Color(i % 3 === 0 ? 0xc4b4ae : 0xd5c7c4));
   });
   blockBodies.instanceMatrix.needsUpdate = true;
   if (blockBodies.instanceColor) blockBodies.instanceColor.needsUpdate = true;
   blockBodies.name = 'district:blocks';
   add(blockBodies, { camera: true, cast: true });
-  const court = new THREE.Mesh(new THREE.BoxGeometry(7.5, 0.08, 11), mats.court);
-  court.position.set(-29, 0.06, 2);
-  court.name = 'district:basketball-court';
-  add(court, { walkable: true, camera: false, cast: false });
-  const hoopPoles = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.09, 0.09, 2.6, 8), mats.rail, 2);
-  const hoopBoards = new THREE.InstancedMesh(new THREE.BoxGeometry(1.1, 0.7, 0.08), mats.block, 2);
-  [-2.8, 6.8].forEach((hz, i) => {
-    hoopPoles.setMatrixAt(i, new THREE.Matrix4().makeTranslation(-29, 1.3, hz));
-    hoopBoards.setMatrixAt(i, new THREE.Matrix4().makeTranslation(-29, 2.5, hz + (hz < 2 ? 0.12 : -0.12)));
-  });
-  hoopPoles.instanceMatrix.needsUpdate = true;
-  hoopBoards.instanceMatrix.needsUpdate = true;
-  add(hoopPoles, { camera: false, cast: true });
-  add(hoopBoards, { camera: false, cast: false });
 
-  // -------------------------------------------------------------------
-  // SOUTH — market square with the tower
-  // -------------------------------------------------------------------
-  const marketGround = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 6.5, 0.12, 20), mats.concreteDeep);
-  marketGround.position.set(-16, 0.06, 34);
+  // --- Basketball court, built from the close-up reference ---
+  // A painted court on a rounded concrete apron, ringed by rounded-corner
+  // blocks — some domed, all with small roof units. Markings are drawn to a
+  // canvas so the court carries real lines (key, arcs, center 67) instead of
+  // reading as a green rectangle.
+  const COURT = { x: -36, z: 0, w: 8.5, d: 13 };
+  const apronShape = new THREE.Shape();
+  {
+    const w = COURT.w / 2 + 2.2;
+    const d = COURT.d / 2 + 2.2;
+    const r = 1.8;
+    apronShape.moveTo(-w + r, -d);
+    apronShape.lineTo(w - r, -d);
+    apronShape.quadraticCurveTo(w, -d, w, -d + r);
+    apronShape.lineTo(w, d - r);
+    apronShape.quadraticCurveTo(w, d, w - r, d);
+    apronShape.lineTo(-w + r, d);
+    apronShape.quadraticCurveTo(-w, d, -w, d - r);
+    apronShape.lineTo(-w, -d + r);
+    apronShape.quadraticCurveTo(-w, -d, -w + r, -d);
+  }
+  const apron = new THREE.Mesh(new THREE.ShapeGeometry(apronShape, 8), mats.concrete);
+  apron.rotation.x = -Math.PI / 2;
+  apron.position.set(COURT.x, 0.05, COURT.z);
+  apron.name = 'district:court-apron';
+  add(apron, { camera: false, cast: false });
+
+  function courtMaterial() {
+    if (typeof document === 'undefined') return mats.court;
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 384;
+    const c = canvas.getContext('2d');
+    // The canvas is a lit surface, so its base sits well below the reference
+    // court green — at the hub's exposure this is what lands on it.
+    c.fillStyle = '#3f5130';
+    c.fillRect(0, 0, 256, 384);
+    c.strokeStyle = '#cfcbb8';
+    c.lineWidth = 4;
+    c.strokeRect(14, 14, 228, 356);
+    c.beginPath();               // center line
+    c.moveTo(14, 192);
+    c.lineTo(242, 192);
+    c.stroke();
+    c.beginPath();               // center circle
+    c.arc(128, 192, 34, 0, Math.PI * 2);
+    c.stroke();
+    for (const top of [true, false]) {
+      const baseY = top ? 14 : 370;
+      const dir = top ? 1 : -1;
+      c.strokeRect(88, top ? 14 : 274, 80, 96);          // the key
+      c.beginPath();             // free-throw circle
+      c.arc(128, baseY + dir * 96, 30, 0, Math.PI * 2);
+      c.stroke();
+      c.beginPath();             // three-point arc
+      c.arc(128, baseY + dir * 18, 96, top ? 0 : Math.PI, top ? Math.PI : 0);
+      c.stroke();
+    }
+    c.fillStyle = '#cfcbb8';     // center 67
+    c.font = '700 30px Figtree, Arial';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('67', 128, 193);
+    return new THREE.MeshStandardMaterial({
+      map: new THREE.CanvasTexture(canvas),
+      roughness: 0.9,
+    });
+  }
+  const court = new THREE.Mesh(new THREE.PlaneGeometry(COURT.w, COURT.d), courtMaterial());
+  court.rotation.x = -Math.PI / 2;
+  court.position.set(COURT.x, 0.09, COURT.z);
+  court.name = 'district:basketball-court';
+  add(court, { walkable: false, camera: false, cast: false });
+  const courtFloor = new THREE.Mesh(new THREE.BoxGeometry(COURT.w, 0.08, COURT.d), mats.court);
+  courtFloor.position.set(COURT.x, 0.05, COURT.z);
+  add(courtFloor, { walkable: true, camera: false, cast: false });
+
+  // Hoops: pole, arm, backboard, rim — one instanced set per part.
+  const HOOPS = [[COURT.x, COURT.z - COURT.d / 2 - 0.6, 1], [COURT.x, COURT.z + COURT.d / 2 + 0.6, -1]];
+  const hoopPoles = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.1, 0.12, 3, 8), mats.rail, 2);
+  const hoopArms = new THREE.InstancedMesh(new THREE.BoxGeometry(0.12, 0.12, 0.8), mats.rail, 2);
+  const hoopBoards = new THREE.InstancedMesh(new THREE.BoxGeometry(1.5, 0.9, 0.08), mats.white, 2);
+  const hoopRims = new THREE.InstancedMesh(new THREE.TorusGeometry(0.32, 0.05, 6, 14), mats.copingRed, 2);
+  HOOPS.forEach(([hx, hz, dir], i) => {
+    hoopPoles.setMatrixAt(i, new THREE.Matrix4().makeTranslation(hx, 1.5, hz));
+    hoopArms.setMatrixAt(i, new THREE.Matrix4().makeTranslation(hx, 2.9, hz + dir * 0.45));
+    hoopBoards.setMatrixAt(i, new THREE.Matrix4().makeTranslation(hx, 2.9, hz + dir * 0.85));
+    const rimM = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
+    rimM.setPosition(hx, 2.62, hz + dir * 1.2);
+    hoopRims.setMatrixAt(i, rimM);
+  });
+  for (const mesh of [hoopPoles, hoopArms, hoopBoards, hoopRims]) mesh.instanceMatrix.needsUpdate = true;
+  hoopBoards.name = 'district:hoop-boards';
+  add(hoopPoles, { camera: false, cast: true });
+  add(hoopArms, { camera: false, cast: false });
+  add(hoopBoards, { camera: false, cast: true });
+  add(hoopRims, { camera: false, cast: false });
+
+  // The ring of rounded-corner blocks that frames the court in the close-up,
+  // half of them domed. Extruded rounded rectangles, one draw for the bodies.
+  function roundedBox(w, d, h, r) {
+    const shape = new THREE.Shape();
+    const hw = w / 2;
+    const hd = d / 2;
+    shape.moveTo(-hw + r, -hd);
+    shape.lineTo(hw - r, -hd);
+    shape.quadraticCurveTo(hw, -hd, hw, -hd + r);
+    shape.lineTo(hw, hd - r);
+    shape.quadraticCurveTo(hw, hd, hw - r, hd);
+    shape.lineTo(-hw + r, hd);
+    shape.quadraticCurveTo(-hw, hd, -hw, hd - r);
+    shape.lineTo(-hw, -hd + r);
+    shape.quadraticCurveTo(-hw, -hd, -hw + r, -hd);
+    const geometry = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false, curveSegments: 4 });
+    geometry.rotateX(-Math.PI / 2);
+    return geometry;
+  }
+  const COURT_BLOCKS = [
+    // [dx, dz, w, d, h, domed]
+    [-9.5, -8, 6, 4.5, 3.2, true], [-1, -10.5, 5, 4, 2.8, false], [7, -9, 5.5, 4.5, 3, false],
+    [-10.5, 0, 5, 5, 2.6, true], [10, 1.5, 5, 5.5, 3.4, false],
+    [-8.5, 9, 6.5, 4.5, 2.9, false], [0.5, 10.5, 5.5, 4, 3.1, true], [8.5, 9.5, 5, 4.5, 2.7, false],
+  ];
+  const courtBlockGeo = roundedBox(1, 1, 1, 0.22);
+  const courtBlocks = new THREE.InstancedMesh(courtBlockGeo, mats.white, COURT_BLOCKS.length);
+  const domeCount = COURT_BLOCKS.filter(([, , , , , domed]) => domed).length;
+  const courtDomes = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 14, 10), mats.white, domeCount);
+  const courtRoofUnits = new THREE.InstancedMesh(new THREE.BoxGeometry(0.9, 0.35, 0.9), mats.blockDark, COURT_BLOCKS.length);
+  let domeIndex = 0;
+  COURT_BLOCKS.forEach(([dx, dz, w, d, h, domed], i) => {
+    const x = COURT.x + dx;
+    const z = COURT.z + dz;
+    const m = new THREE.Matrix4().makeScale(w, h, d);
+    m.setPosition(x, 0, z);
+    courtBlocks.setMatrixAt(i, m);
+    courtBlocks.setColorAt(i, new THREE.Color(i % 3 === 0 ? 0xb0a49f : 0xc0b5ae));
+    const unit = new THREE.Matrix4().makeTranslation(x + w * 0.28, h + 0.17, z - d * 0.28);
+    courtRoofUnits.setMatrixAt(i, unit);
+    if (domed) {
+      const dm = new THREE.Matrix4().makeScale(Math.min(w, d) * 0.34, Math.min(w, d) * 0.34, Math.min(w, d) * 0.34);
+      dm.setPosition(x - w * 0.12, h + Math.min(w, d) * 0.16, z);
+      courtDomes.setMatrixAt(domeIndex, dm);
+      domeIndex += 1;
+    }
+  });
+  courtBlocks.instanceMatrix.needsUpdate = true;
+  if (courtBlocks.instanceColor) courtBlocks.instanceColor.needsUpdate = true;
+  courtDomes.instanceMatrix.needsUpdate = true;
+  courtRoofUnits.instanceMatrix.needsUpdate = true;
+  courtBlocks.name = 'district:court-blocks';
+  add(courtBlocks, { camera: true, cast: true });
+  add(courtDomes, { camera: false, cast: true });
+  add(courtRoofUnits, { camera: false, cast: false });
+
+  const marketGround = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 0.12, 20), mats.concreteDeep);
+  marketGround.position.set(-2, 0.06, 31);
   marketGround.name = 'district:market-ground';
   add(marketGround, { walkable: true, camera: false, cast: false });
   const tower = new THREE.Group();
@@ -607,11 +761,11 @@ export function buildCityDistricts({ group, add, material, animated }) {
   const towerCrown = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10), mats.copingYellow);
   towerCrown.position.y = 4.3;
   tower.add(towerCrown);
-  tower.position.set(-16, 0, 34);
+  tower.position.set(-2, 0, 31);
   tower.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   tower.name = 'district:market-tower';
   group.add(tower);
-  const STALLS = [[-20.5, 31], [-18, 38.5], [-12, 37.5], [-11.5, 31.5], [-16, 29]];
+  const STALLS = [[-7, 28], [-6.5, 34.5], [3, 34], [3.5, 28], [-2, 25.5]];
   const stallTables = new THREE.InstancedMesh(new THREE.BoxGeometry(1.6, 0.8, 1.1), mats.wood, STALLS.length);
   const stallAwnings = new THREE.InstancedMesh(new THREE.BoxGeometry(1.9, 0.12, 1.4), mats.white, STALLS.length);
   const AWNING = [COPING.red, COPING.blue, COPING.yellow];
@@ -627,20 +781,82 @@ export function buildCityDistricts({ group, add, material, animated }) {
   add(stallAwnings, { camera: false, cast: false });
 
   // -------------------------------------------------------------------
-  // SW — river, bridges, suburb houses
+  // SE CELL — playground with pools, teddy statues, dense trees
+  // -------------------------------------------------------------------
+  const lawn = new THREE.Mesh(new THREE.BoxGeometry(26, 0.1, 28), mats.grass);
+  lawn.position.set(31, 0.05, 31);
+  lawn.name = 'district:pond-lawn';
+  add(lawn, { walkable: true, camera: false, cast: false });
+  const pondShape = new THREE.Shape();
+  pondShape.absellipse(0, 0, 3, 2, 0, Math.PI * 2);
+  const pond = new THREE.Mesh(new THREE.ShapeGeometry(pondShape, 24), mats.water);
+  pond.rotation.x = -Math.PI / 2;
+  pond.position.set(28, 0.14, 36);
+  pond.name = 'district:pond';
+  add(pond, { camera: false, cast: false });
+  const pond2 = new THREE.Mesh(new THREE.ShapeGeometry(pondShape, 24), mats.water);
+  pond2.rotation.x = -Math.PI / 2;
+  pond2.scale.setScalar(0.7);
+  pond2.position.set(24, 0.14, 26);
+  add(pond2, { camera: false, cast: false });
+  function teddyAt(x, z, materialTone) {
+    const teddy = new THREE.Group();
+    const tBody = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 10), materialTone);
+    tBody.position.y = 1;
+    teddy.add(tBody);
+    const tHead = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 10), materialTone);
+    tHead.position.y = 2.3;
+    teddy.add(tHead);
+    for (const side of [-1, 1]) {
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 6), materialTone);
+      ear.position.set(side * 0.55, 2.85, 0);
+      teddy.add(ear);
+    }
+    teddy.position.set(x, 0, z);
+    teddy.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    group.add(teddy);
+    return teddy;
+  }
+  teddyAt(23, 21, material(0xe8a45e, { roughness: 0.7 })).name = 'district:teddy';
+  teddyAt(26.5, 22.5, mats.pink).scale.setScalar(0.7);
+
+  // -------------------------------------------------------------------
+  // TREES — playground cluster, suburb and coast greens, one instanced set
+  // -------------------------------------------------------------------
+  const TREES = [
+    [38, 22], [42, 27], [41, 34], [38, 41], [30, 43], [22, 42], [19, 34],
+    [44, 42], [20, 22],
+    [-56, -44], [-57, -20], [-58, 2], [-57, 22], [-56, 40],
+    [-14, 52], [2, 53], [18, 52], [34, 50],
+    [48, -20], [46, 10],
+  ];
+  const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.14, 0.2, 1, 6), mats.wood, TREES.length);
+  const crowns = new THREE.InstancedMesh(new THREE.SphereGeometry(0.9, 10, 8), crownMat, TREES.length);
+  TREES.forEach(([x, z], i) => {
+    trunks.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.55, z));
+    crowns.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 1.6, z));
+  });
+  trunks.instanceMatrix.needsUpdate = true;
+  crowns.instanceMatrix.needsUpdate = true;
+  add(trunks, { camera: false, cast: true });
+  add(crowns, { camera: false, cast: true });
+
+  // -------------------------------------------------------------------
+  // EDGES — river down the left and along the bottom, bridges, suburbs
   // -------------------------------------------------------------------
   const riverCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-52, 0.05, -46), new THREE.Vector3(-47, 0.05, -28),
-    new THREE.Vector3(-50, 0.05, -8), new THREE.Vector3(-46, 0.05, 14),
-    new THREE.Vector3(-50, 0.05, 32), new THREE.Vector3(-44, 0.05, 50),
+    new THREE.Vector3(-54, 0.05, -58), new THREE.Vector3(-55, 0.05, -34),
+    new THREE.Vector3(-53, 0.05, -8), new THREE.Vector3(-55, 0.05, 18),
+    new THREE.Vector3(-52, 0.05, 38), new THREE.Vector3(-44, 0.05, 52),
+    new THREE.Vector3(-24, 0.05, 56), new THREE.Vector3(0, 0.05, 57),
   ]);
-  const river = new THREE.Mesh(new THREE.TubeGeometry(riverCurve, 64, 2.2, 6), mats.water);
+  const river = new THREE.Mesh(new THREE.TubeGeometry(riverCurve, 72, 2.4, 6), mats.water);
   river.scale.y = 0.03;
-  river.position.y = 0.04;
+  river.position.y = 0.05;
   river.name = 'district:river';
   add(river, { camera: false, cast: false });
-  const bridges = new THREE.InstancedMesh(new THREE.BoxGeometry(6.5, 0.4, 2.4), mats.wood, 2);
-  [[-48.5, -18, 0.25], [-47.5, 24, -0.2]].forEach(([x, z, rot], i) => {
+  const bridges = new THREE.InstancedMesh(new THREE.BoxGeometry(7, 0.4, 2.6), mats.wood, 3);
+  [[-54, -19, 0], [-54, 16, 0], [-30, 54.5, 0.35]].forEach(([x, z, rot], i) => {
     const m = new THREE.Matrix4().makeRotationY(rot);
     m.setPosition(x, 0.36, z);
     bridges.setMatrixAt(i, m);
@@ -648,9 +864,10 @@ export function buildCityDistricts({ group, add, material, animated }) {
   bridges.instanceMatrix.needsUpdate = true;
   bridges.name = 'district:river-bridges';
   add(bridges, { camera: false, cast: false });
+
   const HOUSES = [
-    [-56, -30], [-57, -16], [-56, 0], [-55, 16], [-54, 30], [-51, 42],
-    [-32, 50], [-20, 54], [-6, 56], [8, 56], [20, 53], [-44, 46],
+    [-59, -36], [-60, -12], [-59, 10], [-60, 30],
+    [-52, 47], [-40, 52], [-20, 51], [-8, 52], [6, 51], [20, 55], [34, 55], [44, 50],
   ];
   const houseBodies = new THREE.InstancedMesh(new THREE.BoxGeometry(3, 2.2, 3.4), mats.block, HOUSES.length);
   const houseRoofs = new THREE.InstancedMesh(new THREE.ConeGeometry(2.5, 1.5, 4), mats.copingRed, HOUSES.length);
@@ -669,62 +886,24 @@ export function buildCityDistricts({ group, add, material, animated }) {
   add(houseRoofs, { camera: false, cast: true });
 
   // -------------------------------------------------------------------
-  // RING ROAD — a driven loop around the city with slow traffic
+  // Solid footprints for the player sim.
   // -------------------------------------------------------------------
-  const ringRoad = copingArc(mats.road, 52, 2.2, Math.PI * 2);
-  ringRoad.scale.z = 0.03;
-  ringRoad.position.y = 0.06;
-  ringRoad.name = 'district:ring-road';
-  add(ringRoad, { camera: false, cast: false });
-  const ringCars = new THREE.InstancedMesh(new THREE.BoxGeometry(1.5, 0.6, 2.7), mats.white, 5);
-  for (let i = 0; i < 5; i += 1) ringCars.setColorAt(i, new THREE.Color(CAR_PAINT[i % CAR_PAINT.length]));
-  if (ringCars.instanceColor) ringCars.instanceColor.needsUpdate = true;
-  ringCars.name = 'district:ring-cars';
-  add(ringCars, { camera: false, cast: true });
-  animated?.push((time) => {
-    const m = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const e = new THREE.Euler();
-    for (let i = 0; i < 5; i += 1) {
-      const angle = time * 0.06 + (i / 5) * Math.PI * 2;
-      e.set(0, -angle, 0);
-      q.setFromEuler(e);
-      m.compose(
-        new THREE.Vector3(Math.cos(angle) * 52, 0.36, Math.sin(angle) * 52),
-        q,
-        new THREE.Vector3(1, 1, 1),
-      );
-      ringCars.setMatrixAt(i, m);
-    }
-    ringCars.instanceMatrix.needsUpdate = true;
-  });
-
-  // -------------------------------------------------------------------
-  // EDGE — four piers off the island edge
-  // -------------------------------------------------------------------
-  const piers = new THREE.InstancedMesh(new THREE.BoxGeometry(3.2, 0.4, 6.5), mats.wood, 4);
-  [0, Math.PI / 2, Math.PI, -Math.PI / 2].forEach((angle, i) => {
-    const m = new THREE.Matrix4().makeRotationY(-angle + Math.PI / 2);
-    m.setPosition(Math.cos(angle) * 64.5, 0.3, Math.sin(angle) * 64.5);
-    piers.setMatrixAt(i, m);
-  });
-  piers.instanceMatrix.needsUpdate = true;
-  piers.name = 'district:pier';
-  add(piers, { camera: false, cast: false });
-
-  // Solid footprints for the player sim: blocks, the gym and the plaza
-  // towers push the capsule out exactly like the old shop colliders did.
   const colliders = BLOCKS.map(([x, z, w, h, d]) => (
     { minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, topY: h }
   ));
-  colliders.push({ minX: -23.5, maxX: -14.5, minZ: -34.25, maxZ: -27.75, topY: 4 });
+  colliders.push({ minX: -36.5, maxX: -25.5, minZ: -45.5, maxZ: -38.5, topY: 4.2 });
+  for (const [dx, dz, w, d, h] of COURT_BLOCKS) {
+    const x = COURT.x + dx;
+    const z = COURT.z + dz;
+    colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, topY: h });
+  }
   for (const [x, z] of TOWERS) {
     colliders.push({ minX: x - 1.15, maxX: x + 1.15, minZ: z - 1.15, maxZ: z + 1.15, topY: 4.6 });
   }
 
   return {
-    skatepark: Object.freeze({ minX: 17, maxX: 41, minZ: -16, maxZ: 16, topY: 0.44 }),
-    stadiumPitch: Object.freeze({ x: 31, z: 33, rx: 9.25, rz: 7.4, topY: 0.11 }),
+    skatepark: Object.freeze({ minX: -16.5, maxX: 15.5, minZ: -47.5, maxZ: -21.5, topY: 0.44 }),
+    stadiumPitch: Object.freeze({ x: 31, z: -1, rx: 8.9, rz: 7.4, topY: 0.11 }),
     blockCount: BLOCKS.length,
     colliders,
   };

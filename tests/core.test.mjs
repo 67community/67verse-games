@@ -2156,7 +2156,11 @@ test('town lobby ships the pedestrian city and nothing left over from the old hu
   assert.ok(world.group.getObjectByName('district:road-grid'));
   assert.ok(world.group.getObjectByName('district:cross-roads')?.isInstancedMesh);
   assert.ok(world.group.getObjectByName('district:crosswalks')?.isInstancedMesh);
+  assert.ok(world.group.getObjectByName('district:lane-dashes')?.isInstancedMesh);
   assert.ok(world.group.getObjectByName('district:street-cars')?.isInstancedMesh);
+  assert.ok(world.group.getObjectByName('district:marina-boats')?.isInstancedMesh);
+  assert.ok(world.group.getObjectByName('district:beach'));
+  assert.ok(world.group.getObjectByName('district:lighthouse'));
   assert.ok(world.group.getObjectByName('district:plaza'));
   assert.ok(world.group.getObjectByName('district:plaza-towers')?.isInstancedMesh);
   assert.ok(world.group.getObjectByName('district:skatepark-slab'));
@@ -2193,10 +2197,14 @@ test('town lobby ships the pedestrian city and nothing left over from the old hu
     assert.equal(world.group.getObjectByName(removed), undefined, removed);
   }
 
-  // The 67 World terrain is analytic and covers the bound, so the clamp always
-  // lands the player on a surface.
-  assert.equal(world.boundsCircle, true);
+  // The reference plan is a square city, so the reachable area is the square
+  // clamp; the analytic terrain covers it, so the clamp always lands the
+  // player on a surface — flat inside the plan, rolling only beyond it.
+  assert.equal(world.boundsCircle, false);
   assert.ok(typeof world.sampleGround === 'function');
+  for (const [x, z] of [[0, 0], [61, 61], [-61, 61], [61, -61], [-61, -61]]) {
+    assert.equal(Number.isFinite(world.sampleGround(x, z).y), true, `${x},${z}`);
+  }
 
   world.group.traverse((object) => {
     object.geometry?.dispose?.();

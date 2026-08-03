@@ -88,16 +88,16 @@ function openHeight(x, z) {
 }
 
 export function getHeight(x, z) {
-  // 2026-08-04 island city: dead flat inside the boardwalk ring so every
-  // district (kart track, athletics, funfair, stadium, river, suburbs) sits
-  // on true ground; a shelving sea bed off the east coast under the water
-  // plane; the countryside rolls only beyond both.
-  if (x > 44 && x < 78 && Math.abs(z) < 52) {
-    return -0.8 * sstep(Math.min(1, (x - 44) / 5));
+  // 2026-08-04 city plan: the reference is a SQUARE city, not a round island.
+  // Everything inside the plan is dead flat so the grid, the districts and
+  // the suburbs sit true; the sea bed shelves under the water plane on the
+  // right margin; the countryside rolls only beyond the plan.
+  if (x > 46 && Math.abs(z) < 70) {
+    return -0.9 * sstep(Math.min(1, (x - 46) / 5));
   }
-  const d = Math.hypot(x, z);
-  if (d < 52) return 0;
-  const islandBlend = sstep(Math.min(1, (d - 52) / 12));
+  const d = Math.max(Math.abs(x), Math.abs(z));
+  if (d < 62) return 0;
+  const islandBlend = sstep(Math.min(1, (d - 62) / 10));
   let h;
   if (d < HOME_R) h = homeHeight(x, z);
   else {
@@ -125,11 +125,12 @@ export function buildTerrainMesh(size = 150, segments = 120) {
     const x = positions.getX(i);
     const z = positions.getZ(i);
     positions.setY(i, getHeight(x, z));
-    // Island interior wears the reference render's sage lawn (#aaa88c),
-    // expressed as a tint over the material's 0x84c05e base. The rolling
-    // countryside beyond keeps the biome table.
-    const insideIsland = Math.hypot(x, z) < 52 || (x > 44 && x < 78 && Math.abs(z) < 52);
-    const tint = insideIsland ? [1.29, 0.875, 1.49] : BIOMES[biomeAt(x, z)].tint;
+    // The whole visible plane wears the reference render's sage lawn: the
+    // player is clamped inside the plan, so a differently-tinted countryside
+    // beyond it only reads as a bright green frame around the city.
+    // Measured against the reference: this lands on #8b876d once the hub
+    // lighting has had its say.
+    const tint = [1.053, 0.703, 1.16];
     colors[i * 3] = tint[0];
     colors[i * 3 + 1] = tint[1];
     colors[i * 3 + 2] = tint[2];
