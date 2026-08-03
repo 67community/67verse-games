@@ -161,9 +161,15 @@ export function buildCityDistricts({ group, add, material, animated }) {
     grass: material(0x868b6e, { roughness: 0.95 }),
     sand: material(0xaaa27f, { roughness: 0.95 }),
     water: material(0x8db2d6, { roughness: 0.25, transparent: true, opacity: 0.97 }),
-    road: material(0x9d8f86, { roughness: 0.95 }),
-    kerbLight: material(0xb4a89e, { roughness: 0.9 }),
-    paint: material(0xd6ccc0, { roughness: 0.9 }),
+    // The reference's roads are a warm NEUTRAL grey — its green and blue
+    // channels are equal (#d8cccc). Mine had blue well under green, which is
+    // exactly what read as brown. Measured and corrected: green and blue now
+    // match on the road, its kerb and its paint.
+    // The sun is warm (0xffefd4), so it drags blue down on every surface it
+    // touches; the base colours carry extra blue to land neutral once lit.
+    road: material(0xc7b6c1, { roughness: 0.95 }),
+    kerbLight: material(0xd8c6d1, { roughness: 0.9 }),
+    paint: material(0xf0e2ea, { roughness: 0.9 }),
     stone: material(0xaf9f9e, { roughness: 0.8 }),
     wood: material(0x96693c, { flatShading: true, roughness: 1 }),
     rail: material(0x70757e, { roughness: 0.35, metalness: 0.4 }),
