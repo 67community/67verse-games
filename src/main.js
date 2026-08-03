@@ -14,7 +14,7 @@ import { cameraRelativeDirection, createInput } from './input.js';
 import { createPlayerState, stepPlayer } from './player.js';
 import { createCtx } from './core/ctx.js';
 import { runHooks } from './core/registry.js';
-import { FEATURED_MODES } from './core/navigation.js';
+import { FEATURED_MODES, HUB_SPOTS } from './core/navigation.js';
 import {
   ensureGameLoaded,
   ensureSystemLoaded,
@@ -725,6 +725,25 @@ ctx.replayGame = (id, result) => {
   sessionTelemetry.record('game_replay', { gameId: id });
   return mountGame(id, { source: 'replay' });
 };
+// Fast travel to an authored hub spot. The panel only opens from the hub, so
+// no game can be active here; the guard keeps that assumption explicit. An
+// activity is never auto-started — the player still opts in at the marker.
+function travelToSpot(spot) {
+  if (gameLifecycle.getActive()) return;
+  if (hubActivities.snapshot().active) hubActivities.cancel('spot-travel');
+  sim.pos.x = spot.x;
+  sim.pos.z = spot.z;
+  sim.pos.y = 0;
+  sim.vel.x = 0;
+  sim.vel.y = 0;
+  sim.vel.z = 0;
+  sim.grounded = true;
+  sim.yaw = spot.yaw;
+  camOrbit.yaw = spot.yaw;
+  ctx.bus.emit('sfx', 'launch');
+  sessionTelemetry.record('spot_travel', { spotId: spot.id });
+  ctx.ui.toast(`${spot.name} · ${spot.place}`);
+}
 function openGameSelect() {
   if (hubActivities.snapshot().active) hubActivities.cancel('panel-open');
   const p = ctx.ui.panel({ title: 'Play in Skypark' });
@@ -754,7 +773,32 @@ function openGameSelect() {
     card.append(icon, name, description, status, play);
     grid.appendChild(card);
   }
-  p.body.append(intro, grid);
+  const spotsHeading = document.createElement('h3');
+  spotsHeading.className = 'uv-spot-heading';
+  spotsHeading.textContent = 'Skypark spots';
+  const spotsIntro = document.createElement('p');
+  spotsIntro.className = 'uv-play-intro';
+  spotsIntro.textContent = 'Fast travel inside the hub. Activities still start at their own marker with E / GRAB.';
+  const spotList = document.createElement('div');
+  spotList.className = 'uv-spot-list';
+  for (const spot of HUB_SPOTS) {
+    const row = document.createElement('article');
+    row.className = 'uv-spot-row';
+    const info = document.createElement('div');
+    info.className = 'uv-spot-info';
+    const name = document.createElement('h4');
+    name.textContent = `${spot.name} · ${spot.place}`;
+    const description = document.createElement('p');
+    description.textContent = spot.description;
+    info.append(name, description);
+    const go = ctx.ui.button(`Go to ${spot.name}`, () => {
+      p.close();
+      travelToSpot(spot);
+    });
+    row.append(info, go);
+    spotList.appendChild(row);
+  }
+  p.body.append(intro, grid, spotsHeading, spotsIntro, spotList);
 }
 // The public proof has one promise: play the course. Secondary systems remain
 // registered and reachable through explicit dev/QA routes, but do not compete

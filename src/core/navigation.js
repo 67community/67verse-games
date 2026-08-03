@@ -51,6 +51,54 @@ export const FEATURED_MODES = Object.freeze([
   }),
 ]);
 
+// Fast-travel targets for the same panel: real, authored places in today's
+// hub — the two activity starts plus rebuilt landmarks with exact authored
+// coordinates. A spot only teleports; activities still begin at their own
+// marker with E / GRAB, so the opt-in contract in design/hub-activities.md
+// ("walking past never starts an activity") stays intact. The pre-rebuild
+// landmarks (Skyloom Beacon, Ripple Pavilion, Sunstep Terrace) are not listed
+// because arrival-rebuild-v1 removed them from the world.
+export const HUB_SPOTS = Object.freeze([
+  Object.freeze({
+    id: 'beacon-line',
+    name: 'Beacon Line',
+    place: 'Skate Plaza',
+    description: 'Five-gate skate run in 24 seconds. Start at the marker with E / GRAB.',
+    x: 4,
+    z: 7.5,
+    // Face the first gate (East Turn, 11.7/-1.6) so the route reads instantly.
+    yaw: Math.atan2(11.7 - 4, -1.6 - 7.5),
+  }),
+  Object.freeze({
+    id: 'ripple-steps',
+    name: 'Ripple Steps',
+    place: 'Water Garden',
+    description: 'Jump the three ripple stones, then reach the far bridge. Starts with E / GRAB.',
+    x: 11,
+    z: 10.5,
+    // Face the first ripple stone (8.9/12.8).
+    yaw: Math.atan2(8.9 - 11, 12.8 - 10.5),
+  }),
+  Object.freeze({
+    id: 'flow-steps',
+    name: 'Flow Steps',
+    place: 'Arrival route',
+    description: 'The jump steps on the way down to Confluence Plaza.',
+    x: -4.5,
+    z: 16.5,
+    yaw: Math.PI,
+  }),
+  Object.freeze({
+    id: 'skyfold-canopy',
+    name: 'Skyfold Canopy',
+    place: 'Skypark landmark',
+    description: 'The folded canopy over the arrival court.',
+    x: 0,
+    z: 20,
+    yaw: -2.76,
+  }),
+]);
+
 export function availableFeaturedModes(games) {
   return FEATURED_MODES.flatMap((mode) => {
     const game = games.get(mode.id);

@@ -36,6 +36,13 @@ body.in-game .uv-hudbar{display:none}
 .uv-game-card p{margin:0;min-height:54px;color:#707070;font-size:13px;line-height:1.4}
 .uv-game-card .uv-chip{font-size:9px}
 .uv-game-card .uv-btn{width:100%;margin-top:auto}
+.uv-spot-heading{margin:20px 0 6px;font-size:15px;font-weight:600;letter-spacing:-.01em}
+.uv-spot-list{display:grid;gap:8px}
+.uv-spot-row{display:flex;min-width:0;align-items:center;justify-content:space-between;gap:12px;padding:11px 13px;border:1px solid #e5e5ea;border-radius:10px;background:#fff}
+.uv-spot-info{min-width:0}
+.uv-spot-row h4{margin:0;font-size:14px;font-weight:600;letter-spacing:-.01em}
+.uv-spot-row p{margin:2px 0 0;color:#707070;font-size:12px;line-height:1.35}
+.uv-spot-row .uv-btn{flex-shrink:0}
 @media(max-width:620px){
   .uv-panel{width:100%;max-height:100%;border-radius:14px}
   .uv-panel header{padding:15px 16px 8px;font-size:18px}
@@ -48,6 +55,8 @@ body.in-game .uv-hudbar{display:none}
   .uv-game-card p{grid-column:2 / 4;min-height:0}
   .uv-game-card .uv-chip{grid-column:2 / 4}
   .uv-game-card .uv-btn{grid-column:1 / 4}
+  .uv-spot-row{flex-wrap:wrap}
+  .uv-spot-row .uv-btn{width:100%;min-height:44px}
 }
 `;
 

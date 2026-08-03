@@ -33,7 +33,7 @@ import {
 import { attachCosmetic, COSMETICS } from '../src/systems/cosmetics.js';
 import { createRateLimiter, normalizeControlMessage, sanitizePlayerName } from '../src/core/guard.js';
 import { createPlayerState, stepPlayer } from '../src/player.js';
-import { FEATURED_MODES, availableFeaturedModes } from '../src/core/navigation.js';
+import { FEATURED_MODES, HUB_SPOTS, availableFeaturedModes } from '../src/core/navigation.js';
 import { createGameLifecycle } from '../src/core/game-lifecycle.js';
 import { createBus } from '../src/core/bus.js';
 import {
@@ -503,6 +503,40 @@ test('normal play navigation exposes the six honest on-device modes', () => {
   const available = availableFeaturedModes(games);
   assert.deepEqual(available.map((mode) => mode.id), ['tag', 'balloon', 'show67']);
   assert.ok(available.every((mode) => mode.game === games.get(mode.id)));
+});
+
+test('hub fast-travel spots are authored, finite, and distinct from game modes', () => {
+  assert.deepEqual(
+    HUB_SPOTS.map((spot) => spot.id),
+    ['beacon-line', 'ripple-steps', 'flow-steps', 'skyfold-canopy'],
+  );
+  assert.ok(Object.isFrozen(HUB_SPOTS));
+  const modeIds = new Set(FEATURED_MODES.map((mode) => mode.id));
+  for (const spot of HUB_SPOTS) {
+    assert.ok(Object.isFrozen(spot));
+    assert.ok(!modeIds.has(spot.id), `${spot.id} must not collide with a game mode`);
+    for (const key of ['x', 'z', 'yaw']) {
+      assert.ok(Number.isFinite(spot[key]), `${spot.id}.${key} must be finite`);
+    }
+    for (const key of ['name', 'place', 'description']) {
+      assert.ok(
+        typeof spot[key] === 'string' && spot[key].length > 0,
+        `${spot.id}.${key} must be non-empty copy`,
+      );
+    }
+  }
+  // The two activity spots must sit exactly on their authored start markers so
+  // arriving there always shows the opt-in prompt instead of a nearby miss.
+  // Asserted against the definitions, not copied numbers: if an activity start
+  // moves, this forces the travel spot to move with it.
+  const startOf = (id) => {
+    const definition = HUB_ACTIVITY_DEFINITIONS.find((entry) => entry.id === id);
+    return { x: definition.start.x, z: definition.start.z };
+  };
+  const beacon = HUB_SPOTS.find((spot) => spot.id === 'beacon-line');
+  assert.deepEqual({ x: beacon.x, z: beacon.z }, startOf('skate-line'));
+  const ripple = HUB_SPOTS.find((spot) => spot.id === 'ripple-steps');
+  assert.deepEqual({ x: ripple.x, z: ripple.z }, startOf('garden-steps'));
 });
 
 test('local progression reads one shared result schema across all proven modes', () => {
