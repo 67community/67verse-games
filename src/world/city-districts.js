@@ -16,7 +16,6 @@
 //   edges      river + bridges + suburb houses
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-
 const COPING = Object.freeze({ red: 0xe0745e, blue: 0x5a80d6, yellow: 0xf6c445 });
 
 // Landmark buildings generated from the map itself: single-object crops of
@@ -689,6 +688,13 @@ export function buildCityDistricts({ group, add, material, animated }) {
   const blockNotchLong = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.blockDark, BLOCKS.length);
   const blockNotchShort = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.blockDark, BLOCKS.length);
   const awnings = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.22, 0.55), mats.white, BLOCKS.length);
+  // Glazing, in the building's own language: a cream surround with the glass
+  // set into it, mullions so it reads as a door rather than a mirror, and an
+  // upper window band in the same glass the gym roof uses.
+  const doorFrames = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.white, BLOCKS.length);
+  const doorGlass = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.glass, BLOCKS.length);
+  const doorMullions = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.white, BLOCKS.length * 2);
+  const windowBands = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.glass, BLOCKS.length);
   const AWNING_TONE = [COPING.red, COPING.blue, 0xd7cfc2];
   const bm = new THREE.Matrix4();
   BLOCKS.forEach(([x, z, w, h, d], i) => {
@@ -716,8 +722,27 @@ export function buildCityDistricts({ group, add, material, animated }) {
     bm.setPosition(x, 0.62, z + d / 2 + 0.2);
     awnings.setMatrixAt(i, bm);
     awnings.setColorAt(i, new THREE.Color(AWNING_TONE[i % AWNING_TONE.length]));
+    // Glazed shopfront under the awning.
+    bm.makeScale(w * 0.46, 1.9, 0.14);
+    bm.setPosition(x, 0.95, z + d / 2 + 0.03);
+    doorFrames.setMatrixAt(i, bm);
+    bm.makeScale(w * 0.38, 1.6, 0.1);
+    bm.setPosition(x, 0.9, z + d / 2 + 0.12);
+    doorGlass.setMatrixAt(i, bm);
+    bm.makeScale(0.09, 1.6, 0.08);
+    bm.setPosition(x - w * 0.1, 0.9, z + d / 2 + 0.16);
+    doorMullions.setMatrixAt(i * 2, bm);
+    bm.setPosition(x + w * 0.1, 0.9, z + d / 2 + 0.16);
+    doorMullions.setMatrixAt(i * 2 + 1, bm);
+    // Upper-floor window band.
+    bm.makeScale(w * 0.66, 0.55, 0.09);
+    bm.setPosition(x, h * 0.66, z + d / 2 + 0.06);
+    windowBands.setMatrixAt(i, bm);
   });
-  for (const mesh of [blockBodies, blockPlinths, blockLips, blockNotchLong, blockNotchShort, awnings]) {
+  for (const mesh of [
+    blockBodies, blockPlinths, blockLips, blockNotchLong, blockNotchShort,
+    awnings, doorFrames, doorGlass, doorMullions, windowBands,
+  ]) {
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }
@@ -728,6 +753,11 @@ export function buildCityDistricts({ group, add, material, animated }) {
   add(blockNotchLong, { camera: false, cast: false });
   add(blockNotchShort, { camera: false, cast: false });
   add(awnings, { camera: false, cast: true });
+  doorGlass.name = 'district:block-glass';
+  add(doorFrames, { camera: false, cast: false });
+  add(doorGlass, { camera: false, cast: false });
+  add(doorMullions, { camera: false, cast: false });
+  add(windowBands, { camera: false, cast: false });
 
   // --- Basketball court, built from the close-up reference ---
   // A painted court on a rounded concrete apron, ringed by rounded-corner
