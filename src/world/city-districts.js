@@ -15,8 +15,53 @@
 //   S center   market square; SW/SE blocks and the playground with pools
 //   edges      river + bridges + suburb houses
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const COPING = Object.freeze({ red: 0xe0745e, blue: 0x5a80d6, yellow: 0xf6c445 });
+
+// Landmark buildings generated from the map itself: single-object crops of
+// Oscar's reference were run through Meshy image-to-3D, so the geometry comes
+// from his own drawing rather than from a text prompt. Only the three that
+// actually reproduced their crop are here — crops holding more than one
+// building came back as nonsense and were discarded. Textures are resized to
+// 256px and meshes simplified, which took each from ~2MB to under 200KB; no
+// mesh compression, because this project ships neither a DRACO nor a meshopt
+// decoder and meshopt fails silently.
+const LANDMARK_MODELS = Object.freeze({
+  // [file, target height, sites]
+  gozlemevi: { height: 5.2, sites: [{ x: -46, z: -10, yaw: 0 }] },
+  'bina-krmz': { height: 4.4, sites: [{ x: -32, z: 10, yaw: Math.PI }, { x: 9, z: 24, yaw: 0 }] },
+  'bina-mavi': { height: 4, sites: [{ x: -42, z: 8, yaw: Math.PI / 2 }, { x: -12, z: 40, yaw: 0 }] },
+});
+
+function normalizeLandmark(gltf, targetHeight) {
+  const model = gltf.scene;
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  if (size.y > 0) model.scale.setScalar(targetHeight / size.y);
+  const scaled = new THREE.Box3().setFromObject(model);
+  const centre = scaled.getCenter(new THREE.Vector3());
+  model.position.set(-centre.x, -scaled.min.y, -centre.z);
+  // Meshy renders its own lighting into the texture, so these arrive brighter
+  // than the procedural blocks beside them. Tinting the material multiplies
+  // the map down into the same cream family without flattening the awning
+  // stripes, which are the part worth keeping.
+  model.traverse((object) => {
+    if (!object.isMesh) return;
+    object.castShadow = true;
+    object.receiveShadow = true;
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    for (const item of materials) {
+      if (!item) continue;
+      item.color?.setHex(0xb9aaa5);
+      item.roughness = 0.75;
+      item.metalness = 0;
+    }
+  });
+  const wrap = new THREE.Group();
+  wrap.add(model);
+  return wrap;
+}
 
 function copingArc(material, radius, tube, arc) {
   const mesh = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 8, 24, arc), material);
@@ -1057,12 +1102,43 @@ export function buildCityDistricts({ group, add, material, animated }) {
   add(houseRoofs, { camera: false, cast: true });
 
   // -------------------------------------------------------------------
+  // LANDMARK BUILDINGS — drop the map-derived models onto their corners.
+  // These are additions, not replacements: the procedural blocks still carry
+  // the city's mass, so a failed fetch costs nothing. Skipped headlessly, as
+  // the attribution tests measure the primitives.
+  // -------------------------------------------------------------------
+  const landmarkFootprints = [];
+  for (const [, spec] of Object.entries(LANDMARK_MODELS)) {
+    for (const site of spec.sites) {
+      landmarkFootprints.push({
+        minX: site.x - 3, maxX: site.x + 3, minZ: site.z - 3, maxZ: site.z + 3, topY: spec.height,
+      });
+    }
+  }
+  if (typeof document !== 'undefined') {
+    const loader = new GLTFLoader();
+    for (const [name, spec] of Object.entries(LANDMARK_MODELS)) {
+      loader.load(`/assets/city67/${name}.glb`, (gltf) => {
+        const proto = normalizeLandmark(gltf, spec.height);
+        for (const site of spec.sites) {
+          const instance = proto.clone();
+          instance.position.set(site.x, 0, site.z);
+          instance.rotation.y = site.yaw || 0;
+          instance.name = `city67:${name}`;
+          group.add(instance);
+        }
+      }, undefined, () => { /* procedural blocks already hold the city */ });
+    }
+  }
+
+  // -------------------------------------------------------------------
   // Solid footprints for the player sim.
   // -------------------------------------------------------------------
   const colliders = BLOCKS.map(([x, z, w, h, d]) => (
     { minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, topY: h }
   ));
   colliders.push({ minX: -36.5, maxX: -25.5, minZ: -45.5, maxZ: -38.5, topY: 4.2 });
+  colliders.push(...landmarkFootprints);
   for (const [dx, dz, w, d, h] of COURT_BLOCKS) {
     const x = COURT.x + dx;
     const z = COURT.z + dz;
