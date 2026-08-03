@@ -556,6 +556,10 @@ export function buildCityDistricts({ group, add, material, animated }) {
   }
   const PLAZA_TREES = [[-11, -10, 0.8], [7, -10, 0.8], [-11, 7, 0.8], [7, 7, 0.8],
     [-2, -12, 0.75], [-2, 9, 0.75], [-14, -1.5, 0.8], [10, -1.5, 0.8]];
+  // Sage-olive canopy, matched against the reference by eye after a numeric
+  // pass proved unreliable: the "darkest green" sampler kept landing on
+  // shadowed lawn rather than foliage, so its answer pulled the trees toward
+  // a dark teal the reference never had.
   const crownMat = material(0x87946f, { roughness: 0.95, flatShading: true });
   const TOWERS = [[-15.5, -15], [11.5, -15], [-15.5, 12], [11.5, 12]];
   const towerShafts = new THREE.InstancedMesh(new THREE.CylinderGeometry(1.05, 1.15, 4.6, 12), mats.white, TOWERS.length);
