@@ -48,6 +48,26 @@ function flatLabel(text, size) {
 // broccoli-canopy read. One InstancedMesh holds every blob on the map, so the
 // whole planting is a single draw call. Layout is deterministic (hashed from
 // the tree's own coordinates) so the world is reproducible.
+// The reference's buildings are squircles, not boxes: soft rounded corners
+// with a flat top. One unit-sized geometry, scaled per instance.
+function roundedBoxGeometry(w, d, h, r) {
+  const shape = new THREE.Shape();
+  const hw = w / 2;
+  const hd = d / 2;
+  shape.moveTo(-hw + r, -hd);
+  shape.lineTo(hw - r, -hd);
+  shape.quadraticCurveTo(hw, -hd, hw, -hd + r);
+  shape.lineTo(hw, hd - r);
+  shape.quadraticCurveTo(hw, hd, hw - r, hd);
+  shape.lineTo(-hw + r, hd);
+  shape.quadraticCurveTo(-hw, hd, -hw, hd - r);
+  shape.lineTo(-hw, -hd + r);
+  shape.quadraticCurveTo(-hw, -hd, -hw + r, -hd);
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false, curveSegments: 4 });
+  geometry.rotateX(-Math.PI / 2);
+  return geometry;
+}
+
 const BLOBS_PER_TREE = 6;
 function treeBlobs(positions, THREE_, blobMaterial) {
   const blobs = new THREE_.InstancedMesh(
@@ -613,17 +633,56 @@ export function buildCityDistricts({ group, add, material, animated }) {
     // top-right small pair by the funfair entrance
     [20, -14, 4, 2.4, 4], [38, 8, 4, 2.6, 5],
   ];
-  const blockBodies = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.white, BLOCKS.length);
+  // Blocks carry the reference building's actual anatomy, read off a 4x crop
+  // of the map: a soft squircle body on a wider plinth, a raised lip framing
+  // the roof, an L-shaped recess inside that lip, and a striped awning at the
+  // street face. Five instanced meshes cover every block in the city.
+  const blockGeo = roundedBoxGeometry(1, 1, 1, 0.16);
+  const blockBodies = new THREE.InstancedMesh(blockGeo, mats.white, BLOCKS.length);
+  const blockPlinths = new THREE.InstancedMesh(roundedBoxGeometry(1, 1, 1, 0.22), mats.concrete, BLOCKS.length);
+  const blockLips = new THREE.InstancedMesh(roundedBoxGeometry(1, 1, 1, 0.16), mats.white, BLOCKS.length);
+  const blockNotchLong = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.blockDark, BLOCKS.length);
+  const blockNotchShort = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.blockDark, BLOCKS.length);
+  const awnings = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.22, 0.55), mats.white, BLOCKS.length);
+  const AWNING_TONE = [COPING.red, COPING.blue, 0xd7cfc2];
+  const bm = new THREE.Matrix4();
   BLOCKS.forEach(([x, z, w, h, d], i) => {
-    const m = new THREE.Matrix4().makeScale(w, h, d);
-    m.setPosition(x, h / 2, z);
-    blockBodies.setMatrixAt(i, m);
-    blockBodies.setColorAt(i, new THREE.Color(i % 3 === 0 ? 0xc4b4ae : 0xd5c7c4));
+    bm.makeScale(w, h, d);
+    bm.setPosition(x, h / 2, z);
+    blockBodies.setMatrixAt(i, bm);
+    blockBodies.setColorAt(i, new THREE.Color(i % 3 === 0 ? 0xb9aaa5 : 0xc9bcb8));
+    // Plinth: a slightly wider, very low pad the body sits on.
+    bm.makeScale(w + 1.1, 0.26, d + 1.1);
+    bm.setPosition(x, 0.13, z);
+    blockPlinths.setMatrixAt(i, bm);
+    // Roof lip: a thin raised frame just inside the roof edge.
+    bm.makeScale(w * 0.9, 0.16, d * 0.9);
+    bm.setPosition(x, h + 0.06, z);
+    blockLips.setMatrixAt(i, bm);
+    // The L recess inside the lip: one long arm, one short.
+    bm.makeScale(w * 0.5, 0.07, 0.16);
+    bm.setPosition(x - w * 0.14, h + 0.15, z - d * 0.22);
+    blockNotchLong.setMatrixAt(i, bm);
+    bm.makeScale(0.16, 0.07, d * 0.34);
+    bm.setPosition(x - w * 0.36, h + 0.15, z - d * 0.06);
+    blockNotchShort.setMatrixAt(i, bm);
+    // Awning across the street face.
+    bm.makeScale(w * 0.62, 1, 1);
+    bm.setPosition(x, 0.62, z + d / 2 + 0.2);
+    awnings.setMatrixAt(i, bm);
+    awnings.setColorAt(i, new THREE.Color(AWNING_TONE[i % AWNING_TONE.length]));
   });
-  blockBodies.instanceMatrix.needsUpdate = true;
-  if (blockBodies.instanceColor) blockBodies.instanceColor.needsUpdate = true;
+  for (const mesh of [blockBodies, blockPlinths, blockLips, blockNotchLong, blockNotchShort, awnings]) {
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }
   blockBodies.name = 'district:blocks';
   add(blockBodies, { camera: true, cast: true });
+  add(blockPlinths, { camera: false, cast: false });
+  add(blockLips, { camera: false, cast: true });
+  add(blockNotchLong, { camera: false, cast: false });
+  add(blockNotchShort, { camera: false, cast: false });
+  add(awnings, { camera: false, cast: true });
 
   // --- Basketball court, built from the close-up reference ---
   // A painted court on a rounded concrete apron, ringed by rounded-corner
@@ -725,30 +784,13 @@ export function buildCityDistricts({ group, add, material, animated }) {
 
   // The ring of rounded-corner blocks that frames the court in the close-up,
   // half of them domed. Extruded rounded rectangles, one draw for the bodies.
-  function roundedBox(w, d, h, r) {
-    const shape = new THREE.Shape();
-    const hw = w / 2;
-    const hd = d / 2;
-    shape.moveTo(-hw + r, -hd);
-    shape.lineTo(hw - r, -hd);
-    shape.quadraticCurveTo(hw, -hd, hw, -hd + r);
-    shape.lineTo(hw, hd - r);
-    shape.quadraticCurveTo(hw, hd, hw - r, hd);
-    shape.lineTo(-hw + r, hd);
-    shape.quadraticCurveTo(-hw, hd, -hw, hd - r);
-    shape.lineTo(-hw, -hd + r);
-    shape.quadraticCurveTo(-hw, -hd, -hw + r, -hd);
-    const geometry = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false, curveSegments: 4 });
-    geometry.rotateX(-Math.PI / 2);
-    return geometry;
-  }
   const COURT_BLOCKS = [
     // [dx, dz, w, d, h, domed]
     [-9.5, -8, 6, 4.5, 3.2, true], [-1, -10.5, 5, 4, 2.8, false], [7, -9, 5.5, 4.5, 3, false],
     [-10.5, 0, 5, 5, 2.6, true], [10, 1.5, 5, 5.5, 3.4, false],
     [-8.5, 9, 6.5, 4.5, 2.9, false], [0.5, 10.5, 5.5, 4, 3.1, true], [8.5, 9.5, 5, 4.5, 2.7, false],
   ];
-  const courtBlockGeo = roundedBox(1, 1, 1, 0.22);
+  const courtBlockGeo = roundedBoxGeometry(1, 1, 1, 0.22);
   const courtBlocks = new THREE.InstancedMesh(courtBlockGeo, mats.white, COURT_BLOCKS.length);
   const domeCount = COURT_BLOCKS.filter(([, , , , , domed]) => domed).length;
   const courtDomes = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 14, 10), mats.white, domeCount);
