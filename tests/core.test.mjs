@@ -485,17 +485,23 @@ test('player jump forgiveness supports coyote time and pre-landing buffering', (
   assert.equal(buffered.vel.y, 4.5);
 });
 
-test('normal play navigation exposes only the four honest on-device modes', () => {
-  assert.deepEqual(FEATURED_MODES.map((mode) => mode.id), ['obstacle', 'tag', 'balloon', 'skate']);
+test('normal play navigation exposes the six honest on-device modes', () => {
+  assert.deepEqual(
+    FEATURED_MODES.map((mode) => mode.id),
+    ['obstacle', 'tag', 'balloon', 'skate', 'show67', 'creator'],
+  );
   assert.ok(FEATURED_MODES.every((mode) => mode.status.startsWith('On this device')));
 
+  // The menu is the intersection of featured order and registered games:
+  // unregistered featured modes stay hidden, unknown registrations never leak in.
   const games = new Map([
     ['tag', { id: 'tag' }],
     ['balloon', { id: 'balloon' }],
     ['show67', { id: 'show67' }],
+    ['debug-arena', { id: 'debug-arena' }],
   ]);
   const available = availableFeaturedModes(games);
-  assert.deepEqual(available.map((mode) => mode.id), ['tag', 'balloon']);
+  assert.deepEqual(available.map((mode) => mode.id), ['tag', 'balloon', 'show67']);
   assert.ok(available.every((mode) => mode.game === games.get(mode.id)));
 });
 

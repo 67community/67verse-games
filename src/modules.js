@@ -11,8 +11,9 @@ const GAME_LOADERS = Object.freeze({
   obstacle: () => import('./games/obstacle.js'),
   skate: () => import('./games/skate-race.js'),
   creator: () => import('./ugc/editor.js'),
-  // 67Show is a development-only route today. Preload its local rounds so the
-  // gauntlet keeps its existing behavior if QA opens it with ?game=show67.
+  // 67Show chains Tag -> Balloon Battle -> Skyway Sprint, so its three rounds
+  // load up front: a mid-gauntlet import stall would land between rounds, where
+  // the player is already committed and a pause reads as a freeze.
   show67: async () => {
     await Promise.all([
       import('./games/tag.js'),

@@ -422,6 +422,14 @@ ctx.bus.on('character-equipped', ({ id } = {}) => mountHubCharacter(id));
 const entryGate = document.getElementById('entry-gate');
 const enterButton = document.getElementById('enter-game');
 const entrySummary = document.getElementById('entry-summary');
+// The tagline is derived from the same list that builds the play chooser, so
+// the public promise on the entry gate can never drift from what the menu
+// actually offers. The static index.html text is only a pre-boot fallback.
+if (entrySummary) {
+  entrySummary.textContent = `INSTANT LOCAL PLAY · ${
+    FEATURED_MODES.map((mode) => mode.name.toUpperCase()).join(' · ')
+  }`;
+}
 const primaryPlayButton = document.getElementById('primary-play');
 const primaryChatButton = document.getElementById('primary-chat');
 const returnSkyparkButton = document.getElementById('return-skypark');
