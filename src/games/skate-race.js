@@ -21,6 +21,7 @@
 // same env shape { sampleGround(x,z,fromY)->{y,box2|null}, bounds }.
 
 import { registerGame } from '../core/registry.js';
+import { createSkywayMinimap } from '../core/skyway-minimap.js';
 import { loadWorldItems } from '../world-items.js';
 import { angleLerp } from '../player.js';
 import { SKYWAY_FIXED_DT } from '../core/skyway-simulation.js';
@@ -2059,8 +2060,24 @@ registerGame({
     if (skywayQa) window.__67VERSE_SKYWAY_QA__ = skywayQa;
     let guideTime = 8;
     let lastHudSignature = '';
+    // bird's-eye course map (Oscar: 'mini game icin kusbakisi harita')
+    const minimap = createSkywayMinimap({
+      waypoints: SKYWAY_AUTOPLAY_WAYPOINTS,
+      checkpoints: SKYWAY_CHECKPOINT_WAYPOINTS,
+      finishZ: SKYWAY_FINISH_Z,
+      label: 'SKATE RACE',
+    });
     const stop = ctx.loop.add((dt) => {
       if (!alive) return;
+      minimap.update([
+        ...racers.map((r, i) => ({
+          x: r.sim.pos.x, z: r.sim.pos.z, isPlayer: !!r.isPlayer,
+          color: r.isPlayer ? 0xffffff : BOT_ACCENTS[(i + BOT_ACCENTS.length - 1) % BOT_ACCENTS.length],
+        })),
+        ...[...remoteRacers.values()].filter((r) => r.group).map((r) => ({
+          x: r.group.position.x, z: r.group.position.z, color: 0x9fb4d8,
+        })),
+      ]);
 
       if (impactUntil > 0 && courseSimulation.time > impactUntil) {
         hud.classList.remove('is-impact');
@@ -2250,6 +2267,7 @@ registerGame({
         playerCharacter?.dispose();
         playerCharacter = null;
         scene.remove(playerRig);
+        minimap.dispose();
         hud.remove();
         document.body.classList.remove('skyway-mode');
         if (ctx.view.current && ctx.view.current.scene === scene) ctx.view.current = null;
