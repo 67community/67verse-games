@@ -88,14 +88,26 @@ function openHeight(x, z) {
 }
 
 export function getHeight(x, z) {
-  const d = Math.hypot(x, z);
-  if (d < HOME_R) return homeHeight(x, z);
-  const hOpen = openHeight(x, z);
-  if (d < HOME_R + HOME_BLEND) {
-    const t = sstep((d - HOME_R) / HOME_BLEND);
-    return homeHeight(x, z) * (1 - t) + hOpen * t;
+  // 2026-08-04 island city: dead flat inside the boardwalk ring so every
+  // district (kart track, athletics, funfair, stadium, river, suburbs) sits
+  // on true ground; a shelving sea bed off the east coast under the water
+  // plane; the countryside rolls only beyond both.
+  if (x > 44 && x < 78 && Math.abs(z) < 52) {
+    return -0.8 * sstep(Math.min(1, (x - 44) / 5));
   }
-  return hOpen;
+  const d = Math.hypot(x, z);
+  if (d < 52) return 0;
+  const islandBlend = sstep(Math.min(1, (d - 52) / 12));
+  let h;
+  if (d < HOME_R) h = homeHeight(x, z);
+  else {
+    const hOpen = openHeight(x, z);
+    if (d < HOME_R + HOME_BLEND) {
+      const t = sstep((d - HOME_R) / HOME_BLEND);
+      h = homeHeight(x, z) * (1 - t) + hOpen * t;
+    } else h = hOpen;
+  }
+  return h * islandBlend;
 }
 
 /**

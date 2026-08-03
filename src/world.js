@@ -107,7 +107,7 @@ export function buildWorld(scene) {
 
   // Low kerb ring at the world edge: the invisible bound needs something
   // visible, or players walk into a wall that is not there.
-  const EDGE_COUNT = 88;
+  const EDGE_COUNT = 124;
   const edge = new THREE.InstancedMesh(
     new THREE.BoxGeometry(2.25, 0.5, 0.3),
     MAT.kerb,
@@ -122,7 +122,7 @@ export function buildWorld(scene) {
       e.set(0, -(angle + Math.PI / 2), 0);
       q.setFromEuler(e);
       m.compose(
-        new THREE.Vector3(Math.cos(angle) * 43.5, 0.25 + getHeight(Math.cos(angle) * 43.5, Math.sin(angle) * 43.5), Math.sin(angle) * 43.5),
+        new THREE.Vector3(Math.cos(angle) * 61.5, 0.25 + getHeight(Math.cos(angle) * 61.5, Math.sin(angle) * 61.5), Math.sin(angle) * 61.5),
         q,
         new THREE.Vector3(1, 1, 1),
       );
@@ -173,6 +173,12 @@ export function buildWorld(scene) {
     if (x > park.minX && x < park.maxX && z > park.minZ && z < park.maxZ) {
       return { y: park.topY, box2: null };                 // skatepark slab
     }
+    const pitch = districts.stadiumPitch;
+    const pdx = (x - pitch.x) / pitch.rx;
+    const pdz = (z - pitch.z) / pitch.rz;
+    if (pdx * pdx + pdz * pdz <= 1) {
+      return { y: pitch.topY, box2: null };                // stadium pitch
+    }
     return { y: getHeight(x, z), box2: null };
   }
 
@@ -188,7 +194,9 @@ export function buildWorld(scene) {
     registerWalkable,
     registerCameraCollider,
     applyItems,
-    bounds: 44,
+    // Enlarged from 44 for the 2026-08-04 island-city references: the funfair,
+    // coast, stadium and suburbs need the extra ring.
+    bounds: 62,
     boundsCircle: true,
     // The street runs along -z, so the far end of the avenue is where players
     // head for. Audio and the optional hub-plus layer read this.
