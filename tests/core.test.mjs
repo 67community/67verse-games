@@ -2149,34 +2149,46 @@ test('town lobby ships the pedestrian city and nothing left over from the old hu
   const scene = new THREE.Scene();
   const world = buildWorld(scene);
 
-  // What the lobby is: the promenade, the shops, and the authored districts
-  // from the 2026-08-04 island-city references — skatepark east, blocks west,
-  // market south, pond park south-east.
+  // What the lobby is: the faithful island city from the 2026-08-04 rich
+  // reference — street grid with crosswalks and street cars, the framed 67
+  // plaza with towers, and every district in its referenced position.
   assert.ok(world.group.getObjectByName('town:ground'));
-  assert.ok(world.group.getObjectByName('city:avenue-road'));
-  assert.ok(world.group.getObjectByName('city:shop-body')?.isInstancedMesh);
+  assert.ok(world.group.getObjectByName('district:road-grid'));
+  assert.ok(world.group.getObjectByName('district:cross-roads')?.isInstancedMesh);
+  assert.ok(world.group.getObjectByName('district:crosswalks')?.isInstancedMesh);
+  assert.ok(world.group.getObjectByName('district:street-cars')?.isInstancedMesh);
+  assert.ok(world.group.getObjectByName('district:plaza'));
+  assert.ok(world.group.getObjectByName('district:plaza-towers')?.isInstancedMesh);
   assert.ok(world.group.getObjectByName('district:skatepark-slab'));
   assert.ok(world.group.getObjectByName('district:skatepark-bowl'));
   assert.ok(world.group.getObjectByName('district:basketball-court'));
   assert.ok(world.group.getObjectByName('district:market-tower'));
   assert.ok(world.group.getObjectByName('district:pond'));
+  assert.ok(world.group.getObjectByName('district:stadium'));
+  assert.ok(world.group.getObjectByName('district:ferris-wheel'));
+  assert.ok(world.group.getObjectByName('district:sea'));
+  assert.ok(world.group.getObjectByName('district:river'));
 
-  // What it is not: traffic is gone by explicit order (no cars, no lane
-  // paint, no crossing), and every landmark or route prop from the old
-  // civic-plaza hub stays gone rather than merely hidden.
+  // What it is not: nothing from the old town ships on the main map by
+  // explicit order — no shop strip, no old avenue, no benches — and every
+  // landmark or route prop from the older civic-plaza hub stays gone too.
   for (const removed of [
+    'city:avenue-road',
+    'city:shop-body',
+    'city:pavement',
+    'city:kerb',
+    'city:plaza',
+    'city:fountain',
+    'city:bench-seats',
+    'city:bench-backs',
     'city:traffic-bodies',
     'city:traffic-wheels',
     'city:lane-dashes',
     'city:crossing',
     'hierarchy:confluence-plaza',
     'hierarchy:arrival-court',
-    'hierarchy:background-civic-terraces',
     'landmark:skyfold-canopy',
-    'route:gold-spine-guide-posts',
-    'route:gold-spine-guide-lights',
     'district:beacon-skate-garden',
-    'high-density-facade-details',
   ]) {
     assert.equal(world.group.getObjectByName(removed), undefined, removed);
   }

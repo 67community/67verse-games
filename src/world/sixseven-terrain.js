@@ -125,7 +125,11 @@ export function buildTerrainMesh(size = 150, segments = 120) {
     const x = positions.getX(i);
     const z = positions.getZ(i);
     positions.setY(i, getHeight(x, z));
-    const tint = BIOMES[biomeAt(x, z)].tint;
+    // Island interior wears the reference render's sage lawn (#aaa88c),
+    // expressed as a tint over the material's 0x84c05e base. The rolling
+    // countryside beyond keeps the biome table.
+    const insideIsland = Math.hypot(x, z) < 52 || (x > 44 && x < 78 && Math.abs(z) < 52);
+    const tint = insideIsland ? [1.29, 0.875, 1.49] : BIOMES[biomeAt(x, z)].tint;
     colors[i * 3] = tint[0];
     colors[i * 3 + 1] = tint[1];
     colors[i * 3 + 2] = tint[2];

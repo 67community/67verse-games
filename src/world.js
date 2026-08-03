@@ -10,7 +10,6 @@
 // player actually looks at is authored geometry loaded by world/city-avenue.js.
 
 import * as THREE from 'three';
-import { AVENUE, buildCityAvenue } from './world/city-avenue.js';
 import { buildCityDistricts } from './world/city-districts.js';
 import { buildTerrainMesh, getHeight } from './world/sixseven-terrain.js';
 
@@ -95,15 +94,12 @@ export function buildWorld(scene) {
   add(terrain, { camera: false, cast: false });
 
   // ---------------------------------------------------------------------
-  // MAIN STREET
-  // ---------------------------------------------------------------------
-  const avenue = buildCityAvenue({ group, add, material, animated });
-  const solids = avenue.colliders ?? [];
-
-  // ---------------------------------------------------------------------
-  // CITY DISTRICTS — skatepark east, blocks west, market south, pond park
+  // CITY DISTRICTS — the whole island city (2026-08-04 references). The old
+  // main-street module (shops, benches, promenade) is gone by explicit order:
+  // nothing from the previous town ships on the main map.
   // ---------------------------------------------------------------------
   const districts = buildCityDistricts({ group, add, material, animated });
+  const solids = districts.colliders ?? [];
 
   // Low kerb ring at the world edge: the invisible bound needs something
   // visible, or players walk into a wall that is not there.
@@ -134,10 +130,10 @@ export function buildWorld(scene) {
   add(edge, { camera: false, cast: false });
 
   group.userData.visualSystem = Object.freeze({
-    id: 'town-street',
-    materialMetaphor: 'a plain town avenue: grass, asphalt, shopfronts',
+    id: 'island-city',
+    materialMetaphor: 'a pastel island city: sage lawns, taupe streets, cream blocks',
     palette: Object.freeze(Object.values(PALETTE)),
-    hierarchy: Object.freeze(['town:lawn', 'city:avenue-road', 'city:shop-body']),
+    hierarchy: Object.freeze(['town:lawn', 'district:road-grid', 'district:blocks']),
   });
 
   // ---------------------------------------------------------------------
@@ -156,18 +152,6 @@ export function buildWorld(scene) {
           box2: { minX: solid.minX, maxX: solid.maxX, minZ: solid.minZ, maxZ: solid.maxZ },
         };
       }
-    }
-    const onAvenueZ = z >= AVENUE.startZ && z <= AVENUE.endZ;
-    if (onAvenueZ && Math.abs(x) <= AVENUE.kerbX) {
-      return { y: AVENUE.y + 0.08, box2: null };           // carriageway
-    }
-    if (onAvenueZ && Math.abs(x) <= 8.8) {
-      return { y: AVENUE.y + 0.14, box2: null };           // pavement
-    }
-    const plazaDx = x;
-    const plazaDz = z - AVENUE.plazaZ;
-    if (Math.hypot(plazaDx, plazaDz) <= AVENUE.plazaR) {
-      return { y: AVENUE.y + 0.12, box2: null };           // plaza disc
     }
     const park = districts.skatepark;
     if (x > park.minX && x < park.maxX && z > park.minZ && z < park.maxZ) {
@@ -200,7 +184,8 @@ export function buildWorld(scene) {
     boundsCircle: true,
     // The street runs along -z, so the far end of the avenue is where players
     // head for. Audio and the optional hub-plus layer read this.
-    portalPos: new THREE.Vector3(0, 0, -22),
+    // North gate of the boulevard — the reference city's top exit.
+    portalPos: new THREE.Vector3(0, 0, -50),
     animated,
     cameraColliders,
     destinations: [],
