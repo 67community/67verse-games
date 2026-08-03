@@ -43,6 +43,43 @@ function flatLabel(text, size) {
   return mesh;
 }
 
+// Trees in the reference are not single spheres: each is a cluster of five to
+// eight overlapping blobs of varying size, which is what gives the park its
+// broccoli-canopy read. One InstancedMesh holds every blob on the map, so the
+// whole planting is a single draw call. Layout is deterministic (hashed from
+// the tree's own coordinates) so the world is reproducible.
+const BLOBS_PER_TREE = 6;
+function treeBlobs(positions, THREE_, blobMaterial) {
+  const blobs = new THREE_.InstancedMesh(
+    new THREE_.SphereGeometry(1, 9, 7),
+    blobMaterial,
+    positions.length * BLOBS_PER_TREE,
+  );
+  const m = new THREE_.Matrix4();
+  positions.forEach(([x, z, scale = 1], t) => {
+    // Cheap deterministic hash per tree, so clusters differ but never drift.
+    let seed = Math.abs(Math.round(x * 73856093) ^ Math.round(z * 19349663));
+    const rand = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return (seed % 1000) / 1000;
+    };
+    for (let b = 0; b < BLOBS_PER_TREE; b += 1) {
+      const angle = (b / BLOBS_PER_TREE) * Math.PI * 2 + rand() * 0.9;
+      const spread = b === 0 ? 0 : (0.5 + rand() * 0.55) * scale;
+      const radius = (b === 0 ? 0.95 : 0.5 + rand() * 0.4) * scale;
+      m.makeScale(radius, radius * 0.86, radius);
+      m.setPosition(
+        x + Math.cos(angle) * spread,
+        (b === 0 ? 1.35 : 1.05 + rand() * 0.75) * scale,
+        z + Math.sin(angle) * spread,
+      );
+      blobs.setMatrixAt(t * BLOBS_PER_TREE + b, m);
+    }
+  });
+  blobs.instanceMatrix.needsUpdate = true;
+  return blobs;
+}
+
 export function buildCityDistricts({ group, add, material, animated }) {
   // Calibrated, not guessed: the first pass was measured against the
   // reference by sampling matching zones in both renders. The hub lighting
@@ -517,18 +554,9 @@ export function buildCityDistricts({ group, add, material, animated }) {
     plazaLabel.position.set(-2, 0.17, 6.5);
     group.add(plazaLabel);
   }
-  const PLAZA_TREES = [[-11, -10], [7, -10], [-11, 7], [7, 7], [-2, -12], [-2, 9], [-14, -1.5], [10, -1.5]];
-  const plazaTrunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.14, 0.2, 1, 6), mats.wood, PLAZA_TREES.length);
-  const crownMat = material(0x7a8564, { roughness: 0.95, flatShading: true });
-  const plazaCrowns = new THREE.InstancedMesh(new THREE.SphereGeometry(0.8, 10, 8), crownMat, PLAZA_TREES.length);
-  PLAZA_TREES.forEach(([x, z], i) => {
-    plazaTrunks.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.6, z));
-    plazaCrowns.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 1.6, z));
-  });
-  plazaTrunks.instanceMatrix.needsUpdate = true;
-  plazaCrowns.instanceMatrix.needsUpdate = true;
-  add(plazaTrunks, { camera: false, cast: true });
-  add(plazaCrowns, { camera: false, cast: true });
+  const PLAZA_TREES = [[-11, -10, 0.8], [7, -10, 0.8], [-11, 7, 0.8], [7, 7, 0.8],
+    [-2, -12, 0.75], [-2, 9, 0.75], [-14, -1.5, 0.8], [10, -1.5, 0.8]];
+  const crownMat = material(0x87946f, { roughness: 0.95, flatShading: true });
   const TOWERS = [[-15.5, -15], [11.5, -15], [-15.5, 12], [11.5, 12]];
   const towerShafts = new THREE.InstancedMesh(new THREE.CylinderGeometry(1.05, 1.15, 4.6, 12), mats.white, TOWERS.length);
   const towerCaps = new THREE.InstancedMesh(new THREE.SphereGeometry(1.05, 12, 8), mats.cream, TOWERS.length);
@@ -787,18 +815,103 @@ export function buildCityDistricts({ group, add, material, animated }) {
   lawn.position.set(31, 0.05, 31);
   lawn.name = 'district:pond-lawn';
   add(lawn, { walkable: true, camera: false, cast: false });
-  const pondShape = new THREE.Shape();
-  pondShape.absellipse(0, 0, 3, 2, 0, Math.PI * 2);
-  const pond = new THREE.Mesh(new THREE.ShapeGeometry(pondShape, 24), mats.water);
+
+  // Kidney pond, straight off the close-up: a peanut outline with a raised
+  // concrete rim, stepping stones across its waist and a deck on the east
+  // bank, ringed by a looping park path with benches along it.
+  const POND = { x: 30, z: 33 };
+  function kidneyShape(scale) {
+    const s = new THREE.Shape();
+    s.moveTo(0 * scale, 5.6 * scale);
+    s.bezierCurveTo(3.4 * scale, 5.6 * scale, 4.6 * scale, 3.6 * scale, 4.4 * scale, 1.4 * scale);
+    s.bezierCurveTo(4.2 * scale, -0.6 * scale, 2.2 * scale, -0.8 * scale, 2.4 * scale, -2.6 * scale);
+    s.bezierCurveTo(2.6 * scale, -4.8 * scale, 1.2 * scale, -6.4 * scale, -1.2 * scale, -6.4 * scale);
+    s.bezierCurveTo(-3.8 * scale, -6.4 * scale, -5.2 * scale, -4.4 * scale, -4.8 * scale, -2 * scale);
+    s.bezierCurveTo(-4.5 * scale, -0.2 * scale, -3.2 * scale, 0.6 * scale, -3.4 * scale, 2.2 * scale);
+    s.bezierCurveTo(-3.6 * scale, 4.2 * scale, -2.4 * scale, 5.6 * scale, 0 * scale, 5.6 * scale);
+    return s;
+  }
+  const pondRim = new THREE.Mesh(new THREE.ShapeGeometry(kidneyShape(1.16), 20), mats.concrete);
+  pondRim.rotation.x = -Math.PI / 2;
+  pondRim.position.set(POND.x, 0.13, POND.z);
+  pondRim.name = 'district:pond-rim';
+  add(pondRim, { camera: false, cast: false });
+  const pond = new THREE.Mesh(new THREE.ShapeGeometry(kidneyShape(1), 20), mats.water);
   pond.rotation.x = -Math.PI / 2;
-  pond.position.set(28, 0.14, 36);
+  pond.position.set(POND.x, 0.16, POND.z);
   pond.name = 'district:pond';
   add(pond, { camera: false, cast: false });
-  const pond2 = new THREE.Mesh(new THREE.ShapeGeometry(pondShape, 24), mats.water);
-  pond2.rotation.x = -Math.PI / 2;
-  pond2.scale.setScalar(0.7);
-  pond2.position.set(24, 0.14, 26);
-  add(pond2, { camera: false, cast: false });
+
+  // Stepping stones across the waist.
+  const stones = new THREE.InstancedMesh(new THREE.BoxGeometry(0.85, 0.14, 0.72), mats.concrete, 5);
+  [[-2.2, 0.9], [-1.1, 0.4], [0, 0.1], [1.1, 0.35], [2.2, 0.8]].forEach(([sx, sz], i) => {
+    stones.setMatrixAt(i, new THREE.Matrix4().makeTranslation(POND.x + sx, 0.2, POND.z + sz));
+  });
+  stones.instanceMatrix.needsUpdate = true;
+  stones.name = 'district:pond-stones';
+  add(stones, { camera: false, cast: false });
+
+  // East-bank deck.
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.2, 3), mats.concrete);
+  deck.position.set(POND.x + 5.4, 0.2, POND.z + 0.6);
+  deck.name = 'district:pond-deck';
+  add(deck, { walkable: true, camera: false, cast: false });
+
+  // The looping park path: a rounded-rectangle ring around the pond, plus a
+  // branch running west across the lawn.
+  const pathRing = new THREE.Shape();
+  {
+    const w = 9.5;
+    const d = 11;
+    const r = 4;
+    pathRing.moveTo(-w + r, -d);
+    pathRing.lineTo(w - r, -d);
+    pathRing.quadraticCurveTo(w, -d, w, -d + r);
+    pathRing.lineTo(w, d - r);
+    pathRing.quadraticCurveTo(w, d, w - r, d);
+    pathRing.lineTo(-w + r, d);
+    pathRing.quadraticCurveTo(-w, d, -w, d - r);
+    pathRing.lineTo(-w, -d + r);
+    pathRing.quadraticCurveTo(-w, -d, -w + r, -d);
+  }
+  const ringPoints = pathRing.getPoints(56).map((p) => new THREE.Vector3(POND.x + p.x, 0.11, POND.z + p.y));
+  const ringPath = new THREE.Mesh(
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(ringPoints, true), 96, 0.72, 4),
+    mats.road,
+  );
+  ringPath.scale.y = 0.09;
+  ringPath.position.y = 0.1;
+  ringPath.name = 'district:park-path';
+  add(ringPath, { camera: false, cast: false });
+  const branchCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(POND.x - 9.5, 0.11, POND.z - 2),
+    new THREE.Vector3(POND.x - 14, 0.11, POND.z - 5),
+    new THREE.Vector3(POND.x - 18, 0.11, POND.z + 1),
+    new THREE.Vector3(POND.x - 21, 0.11, POND.z + 8),
+  ]);
+  const branchPath = new THREE.Mesh(new THREE.TubeGeometry(branchCurve, 40, 0.72, 4), mats.road);
+  branchPath.scale.y = 0.09;
+  branchPath.position.y = 0.1;
+  add(branchPath, { camera: false, cast: false });
+
+  // Benches: the little colored bars dotted along the paths.
+  const BENCHES = [
+    [POND.x - 3, POND.z - 12.5, 0], [POND.x + 1, POND.z - 12.5, 0],
+    [POND.x + 10.5, POND.z - 8, Math.PI / 2], [POND.x + 10.5, POND.z + 6, Math.PI / 2],
+    [POND.x - 5.5, POND.z - 1.5, 0.5], [POND.x - 6.5, POND.z + 1, 0.5],
+    [POND.x + 5, POND.z + 12.5, 0],
+  ];
+  const benches = new THREE.InstancedMesh(new THREE.BoxGeometry(1.5, 0.3, 0.5), mats.white, BENCHES.length);
+  BENCHES.forEach(([bx, bz, rot], i) => {
+    const m = new THREE.Matrix4().makeRotationY(rot);
+    m.setPosition(bx, 0.28, bz);
+    benches.setMatrixAt(i, m);
+    benches.setColorAt(i, new THREE.Color([COPING.red, COPING.blue, COPING.yellow][i % 3]));
+  });
+  benches.instanceMatrix.needsUpdate = true;
+  if (benches.instanceColor) benches.instanceColor.needsUpdate = true;
+  benches.name = 'district:park-benches';
+  add(benches, { camera: false, cast: true });
   function teddyAt(x, z, materialTone) {
     const teddy = new THREE.Group();
     const tBody = new THREE.Mesh(new THREE.SphereGeometry(1.1, 12, 10), materialTone);
@@ -823,23 +936,35 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // -------------------------------------------------------------------
   // TREES — playground cluster, suburb and coast greens, one instanced set
   // -------------------------------------------------------------------
+  // Park groves match the close-up: clumps of two or three clustered trees at
+  // the corners of the pond lawn, singles along the walks, and the belts that
+  // line the suburbs and the coast.
   const TREES = [
-    [38, 22], [42, 27], [41, 34], [38, 41], [30, 43], [22, 42], [19, 34],
-    [44, 42], [20, 22],
-    [-56, -44], [-57, -20], [-58, 2], [-57, 22], [-56, 40],
-    [-14, 52], [2, 53], [18, 52], [34, 50],
-    [48, -20], [46, 10],
+    // pond-park groves
+    [40, 21, 1.15], [42, 23.5, 0.9], [38.5, 24, 1], [43.5, 40, 1.1], [41, 42, 0.95],
+    [21, 22, 1.05], [19.5, 24.5, 0.85], [20, 41, 1.1], [22.5, 43, 0.9],
+    [31, 45.5, 1], [34, 44, 0.85], [45, 31, 1.05], [44.5, 34.5, 0.9],
+    // suburb + coast belts
+    [-56, -44, 1], [-57, -20, 1.1], [-58, 2, 0.95], [-57, 22, 1.05], [-56, 40, 1],
+    [-14, 52, 1], [2, 53, 1.1], [18, 52, 0.95], [34, 50, 1.05],
+    [48, -20, 0.9], [46, 10, 0.95], [-46, 50, 1], [-30, 55, 0.9],
   ];
-  const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.14, 0.2, 1, 6), mats.wood, TREES.length);
-  const crowns = new THREE.InstancedMesh(new THREE.SphereGeometry(0.9, 10, 8), crownMat, TREES.length);
-  TREES.forEach(([x, z], i) => {
-    trunks.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.55, z));
-    crowns.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 1.6, z));
+  const allTrees = [...TREES, ...PLAZA_TREES];
+  const canopy = treeBlobs(allTrees, THREE, crownMat);
+  canopy.name = 'district:tree-canopy';
+  add(canopy, { camera: false, cast: true });
+  const trunks = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(0.16, 0.22, 1.2, 6),
+    mats.wood,
+    allTrees.length,
+  );
+  allTrees.forEach(([x, z, scale = 1], i) => {
+    const m = new THREE.Matrix4().makeScale(scale, scale, scale);
+    m.setPosition(x, 0.6 * scale, z);
+    trunks.setMatrixAt(i, m);
   });
   trunks.instanceMatrix.needsUpdate = true;
-  crowns.instanceMatrix.needsUpdate = true;
   add(trunks, { camera: false, cast: true });
-  add(crowns, { camera: false, cast: true });
 
   // -------------------------------------------------------------------
   // EDGES — river down the left and along the bottom, bridges, suburbs
