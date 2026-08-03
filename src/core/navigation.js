@@ -43,6 +43,13 @@ export const FEATURED_MODES = Object.freeze([
     status: 'On this device · Local bracket',
   }),
   Object.freeze({
+    id: 'squid67',
+    name: 'Squid 67',
+    icon: 'SQUID',
+    description: 'Red light, green light — then the glass bridge. Freeze on red, pick the pane that holds.',
+    status: 'On this device · Local gauntlet',
+  }),
+  Object.freeze({
     id: 'creator',
     name: 'Creator',
     icon: 'MAKE',

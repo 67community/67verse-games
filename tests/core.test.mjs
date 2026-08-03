@@ -485,10 +485,10 @@ test('player jump forgiveness supports coyote time and pre-landing buffering', (
   assert.equal(buffered.vel.y, 4.5);
 });
 
-test('normal play navigation exposes the six honest on-device modes', () => {
+test('normal play navigation exposes the seven honest on-device modes', () => {
   assert.deepEqual(
     FEATURED_MODES.map((mode) => mode.id),
-    ['obstacle', 'tag', 'balloon', 'skate', 'show67', 'creator'],
+    ['obstacle', 'tag', 'balloon', 'skate', 'show67', 'squid67', 'creator'],
   );
   assert.ok(FEATURED_MODES.every((mode) => mode.status.startsWith('On this device')));
 
@@ -1646,7 +1646,7 @@ test('an unmount exception is reported without blocking the next local mode', as
 });
 
 test('playable routes load on demand and share concurrent registration work', async () => {
-  assert.deepEqual(GAME_ROUTE_IDS, ['tag', 'balloon', 'obstacle', 'skate', 'creator', 'show67']);
+  assert.deepEqual(GAME_ROUTE_IDS, ['tag', 'balloon', 'obstacle', 'skate', 'creator', 'show67', 'squid67']);
   assert.equal(hasGameRoute('obstacle'), true);
   assert.equal(hasGameRoute('missing'), false);
 

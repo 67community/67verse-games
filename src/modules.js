@@ -22,6 +22,7 @@ const GAME_LOADERS = Object.freeze({
     ]);
     return import('./games/show67.js');
   },
+  squid67: () => import('./games/squid67.js'),
 });
 
 const SYSTEM_LOADERS = Object.freeze({
