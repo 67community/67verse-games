@@ -15,8 +15,40 @@
 //   S center   market square; SW/SE blocks and the playground with pools
 //   edges      river + bridges + suburb houses
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const COPING = Object.freeze({ red: 0xe0745e, blue: 0x5a80d6, yellow: 0xf6c445 });
+
+// Authored landmark models (Meshy, low-poly ~4k tris each) that replace their
+// procedural placeholders once they load. The placeholders stay in the scene
+// until then and simply remain if a fetch fails, so the city always reads
+// correctly — the same contract the avenue shops used.
+const CITY67_MODELS = Object.freeze({
+  'ferris-wheel': 12.5,
+  carousel: 4.4,
+  lighthouse: 7,
+  'sail-boat': 1.3,
+  'suburb-house': 3.6,
+  'teddy-statue': 3,
+});
+
+function normalizeModel(gltf, targetHeight) {
+  const model = gltf.scene;
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  if (size.y > 0) model.scale.setScalar(targetHeight / size.y);
+  const scaled = new THREE.Box3().setFromObject(model);
+  const centre = scaled.getCenter(new THREE.Vector3());
+  model.position.set(-centre.x, -scaled.min.y, -centre.z);
+  model.traverse((object) => {
+    if (!object.isMesh) return;
+    object.castShadow = true;
+    object.receiveShadow = true;
+  });
+  const wrap = new THREE.Group();
+  wrap.add(model);
+  return wrap;
+}
 
 function copingArc(material, radius, tube, arc) {
   const mesh = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 8, 24, arc), material);
@@ -930,8 +962,13 @@ export function buildCityDistricts({ group, add, material, animated }) {
     group.add(teddy);
     return teddy;
   }
-  teddyAt(23, 21, material(0xe8a45e, { roughness: 0.7 })).name = 'district:teddy';
-  teddyAt(26.5, 22.5, mats.pink).scale.setScalar(0.7);
+  const teddies = [
+    teddyAt(23, 21, material(0xe8a45e, { roughness: 0.7 })),
+    teddyAt(26.5, 22.5, mats.pink),
+  ];
+  teddies[0].name = 'district:teddy';
+  teddies[1].name = 'district:teddy-small';
+  teddies[1].scale.setScalar(0.7);
 
   // -------------------------------------------------------------------
   // TREES — playground cluster, suburb and coast greens, one instanced set
@@ -1009,6 +1046,50 @@ export function buildCityDistricts({ group, add, material, animated }) {
   houseBodies.name = 'district:suburb-houses';
   add(houseBodies, { camera: false, cast: true });
   add(houseRoofs, { camera: false, cast: true });
+
+  // -------------------------------------------------------------------
+  // AUTHORED MODEL SWAP — each landmark GLB replaces its placeholder.
+  // Skipped headlessly (the attribution tests measure the placeholders) and
+  // silent on failure, so a missing asset degrades instead of breaking.
+  // -------------------------------------------------------------------
+  if (typeof document !== 'undefined') {
+    const loader = new GLTFLoader();
+    const swapSites = {
+      'ferris-wheel': [{ x: 25, z: -42, y: 0 }],
+      carousel: [{ x: 33, z: -33, y: 0 }],
+      lighthouse: [{ x: 55, z: -16, y: 0 }],
+      'sail-boat': [
+        [50.6, -31.9], [54.2, -31.9], [50.6, -35.9], [54.2, -35.9],
+        [50.6, -39.9], [54.2, -39.9], [51, -44], [57, -27],
+      ].map(([x, z]) => ({ x, z, y: 0.1, yaw: Math.PI / 2 })),
+      'suburb-house': HOUSES.map(([x, z], i) => ({ x, z, y: 0, yaw: (i % 4) * (Math.PI / 2) })),
+      'teddy-statue': [{ x: 23, z: 21, y: 0 }, { x: 26.5, z: 22.5, y: 0, scale: 0.7 }],
+    };
+    const hideOnSwap = {
+      'ferris-wheel': [ferris],
+      carousel: [carousel],
+      lighthouse: [lighthouse],
+      'sail-boat': [boats],
+      'suburb-house': [houseBodies, houseRoofs],
+      'teddy-statue': teddies,
+    };
+    for (const [name, height] of Object.entries(CITY67_MODELS)) {
+      loader.load(`/assets/city67/${name}.glb`, (gltf) => {
+        const proto = normalizeModel(gltf, height);
+        for (const site of swapSites[name] || []) {
+          const instance = proto.clone();
+          instance.position.set(site.x, site.y || 0, site.z);
+          if (site.yaw) instance.rotation.y = site.yaw;
+          if (site.scale) instance.scale.setScalar(site.scale);
+          instance.name = `city67:${name}`;
+          group.add(instance);
+        }
+        for (const placeholder of hideOnSwap[name] || []) {
+          if (placeholder) placeholder.visible = false;
+        }
+      }, undefined, () => { /* keep the placeholder */ });
+    }
+  }
 
   // -------------------------------------------------------------------
   // Solid footprints for the player sim.
