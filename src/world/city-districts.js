@@ -829,7 +829,10 @@ export function buildCityDistricts({ group, add, material, animated }) {
   }
   const court = new THREE.Mesh(new THREE.PlaneGeometry(COURT.w, COURT.d), courtMaterial());
   court.rotation.x = -Math.PI / 2;
-  court.position.set(COURT.x, 0.09, COURT.z);
+  // Clear of the floor box's top face (0.05 + 0.08/2 = 0.09). Sitting exactly
+  // on it made the two surfaces coplanar, and the depth buffer flickered
+  // between them as the camera moved.
+  court.position.set(COURT.x, 0.14, COURT.z);
   court.name = 'district:basketball-court';
   add(court, { walkable: false, camera: false, cast: false });
   const courtFloor = new THREE.Mesh(new THREE.BoxGeometry(COURT.w, 0.08, COURT.d), mats.court);
