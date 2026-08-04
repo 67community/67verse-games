@@ -237,6 +237,63 @@ export const PLAN_SPOR = Object.freeze([
   [-22.38, -27.32, 3.58, 13.17, '#a9ad83'], // beysbol sahasi
 ]);
 
+// Sports quarter, re-measured off the render's own masks rather than traced by
+// eye. PLAN_SPOR above holds the coloured plates the drawing shows; these are
+// the pieces a builder needs — the band the track is painted on, the shapes
+// set into it, and the sand fan's own geometry. Every number below came from
+// a colour mask on referans-sehir.png:
+//   red track  (R-G > 22, R > 160) -> x -46.31..-36.62, z -37.88..-20.83
+//   olive infield                  -> x -44.18..-38.56, z -35.94..-22.86
+//   olive outfield                 -> x -33.23..-21.02, z -33.03..-20.92
+//   tan infield fan                -> x -29.74..-21.70, z -29.84..-21.51
+//   green diamond inside the fan   -> x -27.12..-22.77, z -27.12..-22.67
+export const PLAN_SPOR_OLCU = Object.freeze({
+  // [x, z, w, d] of the track's OUTER edge, and the width of the painted band.
+  // A cut at z = -29.4 crosses the west band at x -46.06..-44.37 and the north
+  // band at z -37.83..-36.09, so the band is 1.75 and carries four lanes:
+  // pale lines fall at -46.02, -45.53, -45.14, -44.76 and -44.37, spaced 0.39.
+  pist: [-41.37, -29.45, 9.69, 16.66],
+  pistBant: 1.75,
+  pistKose: 3.8,
+  pistSerit: 4,
+  // The west straight runs on north past the arc as a set of sprint lanes.
+  sprint: [-45.34, -34.8, 1.75, 5.6],
+  cim: [-41.37, -29.4, 5.62, 13.08, 2.4],
+  disSaha: [-27.13, -26.98, 12.21, 12.11, 2.9],
+  kum: { x: -21.7, z: -21.51, r: 8.15 },
+  elmas: [-24.95, -24.9, 4.35, 4.45],
+  tepe: [-24.99, -24.99, 0.49],
+});
+
+// North-west corner: a serpentine kart circuit on a lawn, not a river and a
+// housing estate. The centreline below is the skeleton of the render's own
+// track mask (pale surface, R > 188 and B > 163, closed and opened by a 3x3
+// kernel), thinned, pruned of spurs, walked as one loop and resampled every
+// two units. A cut at z = -50 crosses the surface at x -60.84..-59.29 and
+// -56.58..-55.02, so the ribbon is 1.55 wide with a dark kerb about 0.2 down
+// each side; the loop runs 53.8 long inside x -61.0..-45.4, z -60.1..-43.8.
+export const PLAN_KART = Object.freeze({
+  bant: 0.775,
+  bordur: 0.97,
+  hat: Object.freeze([
+    [-57.01, -59.13], [-58.67, -57.95], [-59.65, -56.14], [-59.93, -54.10],
+    [-59.97, -52.03], [-60.16, -49.98], [-60.26, -47.93], [-59.76, -45.93],
+    [-58.29, -44.59], [-56.31, -44.94], [-55.13, -46.58], [-55.23, -48.61],
+    [-56.15, -50.45], [-56.81, -52.40], [-56.71, -54.41], [-55.28, -55.81],
+    [-53.23, -55.99], [-51.18, -55.85], [-49.30, -55.00], [-47.31, -55.06],
+    [-46.17, -56.69], [-46.89, -58.56], [-48.79, -59.26], [-50.86, -59.27],
+    [-52.91, -59.02], [-54.96, -59.29],
+  ]),
+  // The lawn under it. Its east edge is where the render's olive stops, read
+  // row by row: -43.5 down to z -53, then in to -50.9 at z -51, -53.7 at
+  // z -47 and -56.7 at z -46, with the last of it under the south hairpin.
+  cim: Object.freeze([
+    [-62.0, -61.9], [-43.6, -61.9], [-43.6, -53.2], [-50.9, -51.0],
+    [-53.7, -47.2], [-54.3, -46.0], [-55.6, -44.6], [-55.6, -43.4],
+    [-62.0, -43.4],
+  ]),
+});
+
 export const PLAN_OYUN = Object.freeze([
   [30.13, -35.65, 19.76, 29.16, '#dec9c8'], // lunapark platformu
   [30.03, -22.77, 18.89, 3.88, '#d98f93'], // lunapark hiz treni

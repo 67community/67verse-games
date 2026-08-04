@@ -25,6 +25,7 @@ import {
 import { PLAN_BINALAR, PLAN_BINA_RENK, PLAN_AGACLAR, PLAN_ARABALAR } from './plan-verisi.js';
 import {
   PLAN_ANA_YOLLAR, PLAN_PATIKALAR, PLAN_ZEBRALAR, PLAN_KAVSAKLAR, PLAN_PAZAR,
+  PLAN_SPOR_OLCU, PLAN_KART,
 } from './plan-ek.js';
 import { buildFunfair } from './city-funfair.js';
 import {
@@ -90,6 +91,82 @@ function copingArc(material, radius, tube, arc) {
   const mesh = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 8, 24, arc), material);
   mesh.rotation.x = -Math.PI / 2;
   return mesh;
+}
+
+// A flat band laid along a centreline. u runs the length of the band and v
+// runs across it, so a texture of rows paints stripes parallel to the running
+// direction — which is what a lane-marked running track is. A torus cannot do
+// this: its tube wraps the wrong way and its footprint is a circle.
+// `repeat` is how many times the texture tiles along the length.
+function flatRibbonGeometry(line, half, y, repeat = 1, closed = true) {
+  const points = line.slice();
+  // Two windings are possible for the same loop and only one of them faces
+  // the sky. Normalise on the signed area so the triangle order below is
+  // always right way up.
+  let area = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const [x1, z1] = points[i];
+    const [x2, z2] = points[(i + 1) % points.length];
+    area += x1 * z2 - x2 * z1;
+  }
+  if (area < 0) points.reverse();
+  const count = points.length;
+  const last = closed ? count : count - 1;
+  const dist = [0];
+  for (let i = 1; i <= last; i += 1) {
+    const a = points[i - 1];
+    const b = points[i % count];
+    dist.push(dist[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1]));
+  }
+  const total = dist[last] || 1;
+  const rims = points.map((p, i) => {
+    const a = points[closed ? (i - 1 + count) % count : Math.max(0, i - 1)];
+    const b = points[closed ? (i + 1) % count : Math.min(count - 1, i + 1)];
+    let dx = b[0] - a[0];
+    let dz = b[1] - a[1];
+    const length = Math.hypot(dx, dz) || 1;
+    dx /= length;
+    dz /= length;
+    return [[p[0] - dz * half, p[1] + dx * half], [p[0] + dz * half, p[1] - dx * half]];
+  });
+  const position = [];
+  const normal = [];
+  const uv = [];
+  for (let i = 0; i < last; i += 1) {
+    const j = (i + 1) % count;
+    const [l0, r0] = rims[i];
+    const [l1, r1] = rims[j];
+    const u0 = (dist[i] / total) * repeat;
+    const u1 = (dist[i + 1] / total) * repeat;
+    position.push(l0[0], y, l0[1], r1[0], y, r1[1], r0[0], y, r0[1]);
+    position.push(l0[0], y, l0[1], l1[0], y, l1[1], r1[0], y, r1[1]);
+    uv.push(u0, 0, u1, 1, u0, 1, u0, 0, u1, 0, u1, 1);
+    for (let k = 0; k < 6; k += 1) normal.push(0, 1, 0);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(position, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normal, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  return geometry;
+}
+
+// A shape from world-space [x, z] points. Shapes are authored in XY and laid
+// flat by a -90 degree turn about X, which maps shape y to world -z.
+function groundShape(points, Ctor = THREE.Shape) {
+  const shape = new Ctor();
+  points.forEach(([x, z], i) => (i === 0 ? shape.moveTo(x, -z) : shape.lineTo(x, -z)));
+  shape.closePath();
+  return shape;
+}
+
+// A flat slab from one or more ground shapes: one draw for the whole set.
+function slabGeometry(shapes, thickness, y) {
+  const geometry = new THREE.ExtrudeGeometry(shapes, {
+    depth: thickness, bevelEnabled: false, curveSegments: 16,
+  });
+  geometry.rotateX(-Math.PI / 2);
+  geometry.translate(0, y, 0);
+  return geometry;
 }
 
 function flatLabel(text, size) {
@@ -220,7 +297,25 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     blockDark: material(0xa39590, { roughness: 0.75 }),
     // The reference's court is a deep muted olive, 102,107,93 lit.
     court: material(0x5c6b48, { roughness: 0.9 }),
-    pitch: material(0x475142, { roughness: 0.92 }),
+    // Sports turf: the athletics infield, the baseball outfield and the
+    // diamond inside its sand fan. Sampled off the reference at (176,175,145)
+    // in the oval, (176,172,143) in the outfield and (184,168,134) in the
+    // diamond, so one olive carries all three. The old base captured
+    // (84,93,70) — a forest green nothing in the drawing is.
+    pitch: material(0x9c987d, { roughness: 0.92 }),
+    // Baseball dirt, sampled (227,198,164) on the fan and (234,200,165) on
+    // the pitcher's mound. mats.sand is the beach and stays where it is; this
+    // is a warmer, more saturated tan than wet sand.
+    ballDirt: material(0xdab18e, { roughness: 0.95 }),
+    // The kart circuit's lawn in the north-west corner, sampled (177,177,153)
+    // at (-53,-50) and (179,178,147) at (-58,-46).
+    kartLawn: material(0x9d9c80, { roughness: 0.95 }),
+    // Its kerbs: the dark line down each side of the ribbon, (103,108,104)
+    // and (91,91,89) at z = -50.
+    kartKerb: material(0x4d504d, { roughness: 0.9 }),
+    // The gym's roof light is glazing, not a white lid: the reference reads
+    // (145,151,175) and (161,168,196) across it, a cool blue-grey.
+    roofGlass: material(0x838aa1, { roughness: 0.35, metalness: 0.1 }),
     trackRed: material(0xa9736a, { roughness: 0.9 }),
     // The stadium's track reads 122,112,129 in the reference — a purple-grey,
     // most of it the bowl wall's own shadow, so the base sits above that and
@@ -838,24 +933,86 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // -------------------------------------------------------------------
   // NW — kart loop in the corner, parking + solar gym, athletics, baseball
   // -------------------------------------------------------------------
-  const kartCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-58, 0.1, -52), new THREE.Vector3(-50, 0.1, -55),
-    new THREE.Vector3(-44, 0.1, -51), new THREE.Vector3(-47, 0.1, -45),
-    new THREE.Vector3(-54, 0.1, -43), new THREE.Vector3(-59, 0.1, -47),
-  ], true);
-  const kart = new THREE.Mesh(new THREE.TubeGeometry(kartCurve, 72, 1.5, 8), mats.road);
-  kart.scale.y = 0.06;
-  kart.position.y = 0.08;
-  kart.name = 'district:kart-track';
-  add(kart, { camera: false, cast: false });
+  // The corner is a lawn with a serpentine kart circuit on it. It had been a
+  // six-point blob three units wide sitting on bare pavement, with the river
+  // running through the middle of it. Both the lawn outline and the circuit's
+  // centreline are traced off the render — see PLAN_KART.
+  const kartLawn = new THREE.Mesh(
+    slabGeometry([groundShape(PLAN_KART.cim)], 0.06, 0.015), mats.kartLawn,
+  );
+  kartLawn.name = 'district:kart-lawn';
+  add(kartLawn, { walkable: true, camera: false, cast: false });
 
-  const gym = new THREE.Mesh(new THREE.BoxGeometry(11, 4.2, 7), mats.block);
-  gym.position.set(-31, 2.1, -42);
+  const kartKerb = new THREE.Mesh(
+    flatRibbonGeometry(PLAN_KART.hat, PLAN_KART.bordur, 0.09), mats.kartKerb,
+  );
+  kartKerb.name = 'district:kart-kerbs';
+  add(kartKerb, { camera: false, cast: false });
+  const kart = new THREE.Mesh(
+    flatRibbonGeometry(PLAN_KART.hat, PLAN_KART.bant, 0.105), mats.road,
+  );
+  kart.name = 'district:kart-track';
+  add(kart, { walkable: true, camera: false, cast: false });
+
+  // Gym / leisure block. The old one was a hand-typed 11 x 7 box at (-31,-42)
+  // — under half the mass the drawing gives it, with no annex and no entrance
+  // canopy. All three footprints are PLAN_BINALAR's own measured rows.
+  const GYM_ANA = PLAN_BINALAR[1];
+  const GYM_EK = PLAN_BINALAR[2];
+  const GYM_SACAK = PLAN_BINALAR[3];
+  const gymParts = [
+    [GYM_ANA, 4.2], [GYM_EK, 3.6], [GYM_SACAK, 2.7],
+  ].map(([[x, z, w, d], h]) => {
+    const part = roundedBoxGeometry(w, d, h, 0.7, 0.18);
+    part.translate(x, 0, z);
+    return part;
+  });
+  const gym = new THREE.Mesh(mergeGeometries(gymParts, false), mats.block);
   gym.name = 'district:gym';
   add(gym, { camera: true, cast: true });
-  const gymRoof = new THREE.Mesh(new THREE.BoxGeometry(8, 0.3, 5), mats.glass);
-  gymRoof.position.set(-31, 4.35, -42);
+
+  // The roof light is glazing with a five-by-three mullion grid, not a blank
+  // white lid. Measured 6.97 x 3.68 at (-32.46, -44.66); the bars are painted
+  // into its texture so the whole panel is still one draw.
+  function mullionTexture() {
+    if (typeof document === 'undefined') return mats.roofGlass;
+    const canvas = document.createElement('canvas');
+    canvas.width = 160;
+    canvas.height = 96;
+    const c = canvas.getContext('2d');
+    c.fillStyle = '#838aa1';
+    c.fillRect(0, 0, 160, 96);
+    c.fillStyle = '#d4d5d5';
+    for (let i = 0; i <= 5; i += 1) c.fillRect((i * 160) / 5 - 2, 0, 4, 96);
+    for (let i = 0; i <= 3; i += 1) c.fillRect(0, (i * 96) / 3 - 2, 160, 4);
+    return new THREE.MeshStandardMaterial({
+      map: canvasTexture(canvas), roughness: 0.35, metalness: 0.1,
+    });
+  }
+  const gymRoof = new THREE.Mesh(new THREE.BoxGeometry(6.97, 0.3, 3.68), mullionTexture());
+  gymRoof.position.set(-32.46, 4.3, -44.66);
+  gymRoof.name = 'district:gym-roof-light';
   add(gymRoof, { camera: false, cast: false });
+
+  // A run of pink awnings down the annex's east face, measured at x -21.4
+  // where the render alternates (255,226,218) and (192,158,156) between
+  // z -48.05 and -40.88.
+  function awningTexture() {
+    if (typeof document === 'undefined') return mats.copingRed;
+    const canvas = document.createElement('canvas');
+    canvas.width = 8;
+    canvas.height = 64;
+    const c = canvas.getContext('2d');
+    c.fillStyle = '#e8b6ae';
+    c.fillRect(0, 0, 8, 64);
+    c.fillStyle = '#f6ddd4';
+    for (let i = 0; i < 8; i += 1) c.fillRect(0, i * 8, 8, 4);
+    return new THREE.MeshStandardMaterial({ map: canvasTexture(canvas), roughness: 0.85 });
+  }
+  const awnings = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.24, 7.17), awningTexture());
+  awnings.position.set(-21.3, 2.6, -44.47);
+  awnings.name = 'district:gym-awnings';
+  add(awnings, { camera: false, cast: true });
 
   // Measured: the oval sits at (-41.4, -29.4) and runs 9.7 x 16.7 — taller
   // than wide, which is why an oval scaled the other way looked wrong. Lane
