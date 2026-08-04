@@ -187,10 +187,15 @@ import {
 } from '../src/world/hub-plus.js';
 import { buildWorld } from '../src/world.js';
 import { buildCityDistricts } from '../src/world/city-districts.js';
+import { buildStadium, STADIUM_PITCH } from '../src/world/stadium.js';
 
-// The city ships as its own chunk, so buildWorld takes its builder rather than
-// importing it. Tests hand it over the same way the app does.
-const buildHubWorld = (scene) => buildWorld(scene, { buildCity: buildCityDistricts });
+// The city and the stadium ship as their own chunks, so buildWorld takes their
+// builders rather than importing them. Tests hand them over as the app does.
+const buildHubWorld = (scene) => buildWorld(scene, {
+  buildCity: buildCityDistricts,
+  buildStadium,
+  stadiumPitch: STADIUM_PITCH,
+});
 import {
   SKYPARK_LANDMARKS,
   SKYPARK_ROUTES,
@@ -1669,11 +1674,14 @@ test('panel-only systems load on demand without changing hub hook timing', async
     SYSTEM_ROUTE_IDS,
     [
       'cosmetics', 'settings', 'emotes', 'quests', 'season', 'collection', 'shop',
-      'social', 'chat', 'market', 'discovery', 'editor', 'character-lab',
+      'social', 'chat', 'harita', 'market', 'discovery', 'editor', 'character-lab',
       'device-playtest',
     ],
   );
   assert.equal(hasSystemRoute('chat'), true);
+  // The park map is a panel like any other, so it loads on demand too — the
+  // hub must not pay for a map nobody opened.
+  assert.equal(hasSystemRoute('harita'), true);
   assert.equal(hasSystemRoute('settings'), true);
 
   const [first, second, cosmetics, settings, emotes] = await Promise.all([

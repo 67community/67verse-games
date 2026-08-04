@@ -45,7 +45,7 @@ function bounds2Of(object) {
 // own chunk rather than in the first bundle. Its builder is therefore passed
 // in rather than imported here — and it is required, so a caller cannot end up
 // with a silently empty island.
-export function buildWorld(scene, { buildCity } = {}) {
+export function buildWorld(scene, { buildCity, buildStadium, stadiumPitch } = {}) {
   if (typeof buildCity !== 'function') {
     throw new TypeError('buildWorld needs the city builder: import world/city-districts.js and pass buildCity.');
   }
@@ -104,8 +104,9 @@ export function buildWorld(scene, { buildCity } = {}) {
   // main-street module (shops, benches, promenade) is gone by explicit order:
   // nothing from the previous town ships on the main map.
   // ---------------------------------------------------------------------
-  const districts = buildCity({ group, add, material, animated });
+  const districts = buildCity({ group, add, material, animated, buildStadium, stadiumPitch });
   const solids = districts.colliders ?? [];
+  const isWater = districts.isWater ?? (() => false);
 
   // Low kerb along the world edge: the invisible bound needs something
   // visible, or players walk into a wall that is not there. The plan is
@@ -185,6 +186,7 @@ export function buildWorld(scene, { buildCity } = {}) {
   return {
     group,
     sampleGround,
+    isWater,
     registerWalkable,
     registerCameraCollider,
     applyItems,

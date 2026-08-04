@@ -211,8 +211,15 @@ scene.add(rim, rim.target);
 // The city is its own chunk: keeping ninety kilobytes of measured plan data
 // out of the first bundle is worth one await here, and nothing renders before
 // this line anyway.
-const { buildCityDistricts } = await import('./world/city-districts.js');
-const world = buildWorld(scene, { buildCity: buildCityDistricts });
+const [{ buildCityDistricts }, { buildStadium, STADIUM_PITCH }] = await Promise.all([
+  import('./world/city-districts.js'),
+  import('./world/stadium.js'),
+]);
+const world = buildWorld(scene, {
+  buildCity: buildCityDistricts,
+  buildStadium,
+  stadiumPitch: STADIUM_PITCH,
+});
 // Authored Meshy props load in parallel and swap in when ready; the
 // procedural placeholders keep the hub fully visible in the meantime.
 loadWorldItems('/assets/items/')
@@ -466,6 +473,7 @@ if (entrySummary) {
   }`;
 }
 const primaryPlayButton = document.getElementById('primary-play');
+const primaryMapButton = document.getElementById('primary-map');
 const primaryChatButton = document.getElementById('primary-chat');
 const returnSkyparkButton = document.getElementById('return-skypark');
 const modeName = document.getElementById('mode-name');
@@ -779,6 +787,39 @@ function travelToSpot(spot) {
   sessionTelemetry.record('spot_travel', { spotId: spot.id });
   ctx.ui.toast(`${spot.name} · ${spot.place}`);
 }
+// Travelling to an arbitrary point, which is what tapping the map does. Named
+// spots go through travelToSpot and keep their authored facing; a map tap has
+// no facing to keep, so it holds the one the player already had. Water and
+// anything past the world edge are refused rather than silently clamped — a
+// teleport that lands somewhere else is worse than one that does not happen.
+function travelToPoint({ x, z, label = null }) {
+  if (gameLifecycle.getActive()) return false;
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return false;
+  const limit = (world.bounds ?? 62) - 2;
+  if (Math.abs(x) > limit || Math.abs(z) > limit) {
+    ctx.ui.toast('Outside the park.');
+    return false;
+  }
+  if (world.isWater?.(x, z)) {
+    ctx.ui.toast('That is open water.');
+    return false;
+  }
+  if (hubActivities.snapshot().active) hubActivities.cancel('map-travel');
+  sim.pos.x = x;
+  sim.pos.z = z;
+  sim.pos.y = 0;
+  sim.vel.x = 0;
+  sim.vel.y = 0;
+  sim.vel.z = 0;
+  sim.grounded = true;
+  ctx.bus.emit('sfx', 'launch');
+  sessionTelemetry.record('map_travel', { label: label || 'point' });
+  ctx.ui.toast(label || 'Travelled');
+  return true;
+}
+ctx.travelTo = travelToPoint;
+ctx.playerPosition = () => ({ x: sim.pos.x, z: sim.pos.z });
+
 function openGameSelect() {
   if (hubActivities.snapshot().active) hubActivities.cancel('panel-open');
   const p = ctx.ui.panel({ title: 'Play in 67 Park' });
@@ -877,6 +918,15 @@ async function requestReturnToSkypark() {
   if (!ctx.view.current || ctx.ui.hasAnyModal()) return;
   if (await ctx.ui.confirm('Return to 67 Park? Current round progress will be lost.')) ctx.goHome();
 }
+primaryMapButton?.addEventListener('click', async () => {
+  if (primaryMapButton.getAttribute('aria-busy') === 'true') return;
+  primaryMapButton.setAttribute('aria-busy', 'true');
+  try {
+    await openSystem('harita', 'Park map');
+  } finally {
+    primaryMapButton.removeAttribute('aria-busy');
+  }
+});
 returnSkyparkButton?.addEventListener('click', requestReturnToSkypark);
 window.addEventListener('keydown', (e) => {
   if (

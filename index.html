@@ -94,7 +94,8 @@
     }
     /* Secondary action: PN outline button — white surface, hairline border,
        ink label. Same height and radius as primary so they sit as one row. */
-    #primary-chat {
+    #primary-chat,
+    #primary-map {
       min-height: 44px;
       padding: 0 16px;
       border: 1px solid var(--separator);
@@ -107,8 +108,10 @@
       backdrop-filter: blur(12px) saturate(180%);
       transition: transform 150ms ease-out, background 150ms ease-out;
     }
-    #primary-chat:hover { background: #ffffff; border-color: var(--separator-strong, #a9a9b1); }
-    #primary-chat:active { transform: scale(0.98); }
+    #primary-chat:hover,
+    #primary-map:hover { background: #ffffff; border-color: var(--separator-strong, #a9a9b1); }
+    #primary-chat:active,
+    #primary-map:active { transform: scale(0.98); }
     body.in-game #hub-actions,
     body.entry-open #hub-actions { display: none; }
     body.in-game #wordmark,
@@ -369,7 +372,7 @@
     @media (max-width: 600px) {
       #wordmark { top: calc(var(--safe-top) + 14px); left: calc(var(--safe-left) + 16px); font-size: 17px; letter-spacing: .1em; }
       #hub-actions { top: calc(var(--safe-top) + 54px); left: calc(var(--safe-left) + 16px); gap: 6px; }
-      #primary-play, #primary-chat { min-height: 42px; padding: 0 13px; font-size: 12px; }
+      #primary-play, #primary-chat, #primary-map { min-height: 42px; padding: 0 13px; font-size: 12px; }
       body .uv-hudbar {
         top: calc(var(--safe-top) + 8px);
         right: calc(var(--safe-right) + 8px);
@@ -430,6 +433,7 @@
     <div id="wordmark">67<span>park</span></div>
     <div id="hub-actions" role="navigation" aria-label="Skypark actions">
       <button id="primary-play" type="button" aria-label="Choose a game">▶ PLAY GAMES</button>
+      <button id="primary-map" type="button" aria-label="Open the park map">MAP</button>
       <button id="primary-chat" type="button" aria-label="Open on-device chat">💬 LOCAL CHAT</button>
     </div>
     <section id="hub-activity" aria-label="Hub activity" hidden>

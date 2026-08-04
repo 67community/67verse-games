@@ -47,6 +47,7 @@ const SYSTEM_LOADERS = Object.freeze({
   shop: () => import('./systems/shop.js'),
   social: () => import('./systems/social.js'),
   chat: () => import('./systems/chat.js'),
+  harita: () => import('./systems/harita.js'),
   market: () => import('./systems/market.js'),
   discovery: () => import('./ugc/discovery.js'),
   // Creator also exposes the legacy `editor` system panel.

@@ -17,6 +17,11 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import {
+  canvasTexture, squirclePath, roundedBoxGeometry, insetPolygon, ribbonSides,
+  shapeFromPoints, wallStripGeometry, copingTube, tinted, tintedByHeight,
+} from './sekil.js';
+
 import { PLAN_BINALAR, PLAN_BINA_RENK, PLAN_AGACLAR, PLAN_ARABALAR } from './plan-verisi.js';
 import {
   PLAN_ANA_YOLLAR, PLAN_PATIKALAR, PLAN_ZEBRALAR, PLAN_KAVSAKLAR,
@@ -86,17 +91,6 @@ function copingArc(material, radius, tube, arc) {
   return mesh;
 }
 
-// Every canvas in this file is authored in sRGB — hex colours picked to match
-// the reference — but three treats a CanvasTexture as linear data unless it is
-// told otherwise, which reads every one of them back far too light and washed
-// out. The basketball court was rendering 170,181,146 against a reference of
-// 102,107,93 for exactly this reason.
-function canvasTexture(canvas) {
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
 function flatLabel(text, size) {
   if (typeof document === 'undefined') return null;
   const canvas = document.createElement('canvas');
@@ -123,189 +117,13 @@ function flatLabel(text, size) {
 // the tree's own coordinates) so the world is reproducible.
 // The reference's buildings are squircles, not boxes: soft rounded corners
 // with a flat top. One unit-sized geometry, scaled per instance.
-function squirclePath(w, d, r, Ctor = THREE.Shape) {
-  const path = new Ctor();
-  const hw = w / 2;
-  const hd = d / 2;
-  const rr = Math.max(0.01, Math.min(r, hw - 0.01, hd - 0.01));
-  path.moveTo(-hw + rr, -hd);
-  path.lineTo(hw - rr, -hd);
-  path.quadraticCurveTo(hw, -hd, hw, -hd + rr);
-  path.lineTo(hw, hd - rr);
-  path.quadraticCurveTo(hw, hd, hw - rr, hd);
-  path.lineTo(-hw + rr, hd);
-  path.quadraticCurveTo(-hw, hd, -hw, hd - rr);
-  path.lineTo(-hw, -hd + rr);
-  path.quadraticCurveTo(-hw, -hd, -hw + rr, -hd);
-  return path;
-}
-
-// The reference's blocks are not slabs — every top edge carries a fat fillet
-// that catches the key light as a bright rim, which is most of why they read
-// as soft clay rather than cut paper. `bevel` builds that fillet; the shape and
-// depth are shrunk by it first so the finished size is still exactly w x d x h
-// and the layout solver's footprints stay true. `hole` turns the result into a
-// frame, which is how a roof gets its tray.
-function roundedBoxGeometry(w, d, h, r, bevel = 0, hole = 0) {
-  const b = Math.max(0, Math.min(bevel, w / 4, d / 4, h / 3));
-  const shape = squirclePath(w - b * 2, d - b * 2, r - b);
-  if (hole > 0) {
-    shape.holes.push(squirclePath((w - b * 2) * hole, (d - b * 2) * hole, (r - b) * hole, THREE.Path));
-  }
-  const geometry = new THREE.ExtrudeGeometry(shape, {
-    depth: Math.max(0.01, h - b * 2),
-    bevelEnabled: b > 0,
-    bevelThickness: b,
-    bevelSize: b,
-    bevelOffset: 0,
-    bevelSegments: 2,
-    curveSegments: 4,
-  });
-  geometry.rotateX(-Math.PI / 2);
-  // Bevelled extrusion starts a bevel below zero; lift it so the box still
-  // spans 0..h and every caller's positioning is unchanged.
-  if (b > 0) geometry.translate(0, b, 0);
-  return geometry;
-}
-
-// --- skatepark geometry helpers -------------------------------------------
-// The park's shapes arrive from the drawing as outlines and centrelines, so
-// these turn an outline into the three surfaces a carved bowl actually needs:
-// a hole in the deck, a floor inset from the rim, and the wall between them.
-
-function polygonArea(points) {
-  let area = 0;
-  for (let i = 0; i < points.length; i += 1) {
-    const [x1, z1] = points[i];
-    const [x2, z2] = points[(i + 1) % points.length];
-    area += x1 * z2 - x2 * z1;
-  }
-  return area / 2;
-}
-
-function inwardNormal(a, b, sign) {
-  const dx = b[0] - a[0];
-  const dz = b[1] - a[1];
-  const length = Math.hypot(dx, dz) || 1;
-  return [(-sign * dz) / length, (sign * dx) / length];
-}
-
-// Miter offset towards the inside. The bowls are smooth and gently concave,
-// so a bisector offset is exact enough; the cosine floor stops a tight corner
-// from throwing its vertex across the shape.
-function insetPolygon(points, distance) {
-  const sign = polygonArea(points) > 0 ? 1 : -1;
-  const count = points.length;
-  return points.map((p1, i) => {
-    const p0 = points[(i - 1 + count) % count];
-    const p2 = points[(i + 1) % count];
-    const n1 = inwardNormal(p0, p1, sign);
-    const n2 = inwardNormal(p1, p2, sign);
-    let bx = n1[0] + n2[0];
-    let bz = n1[1] + n2[1];
-    const length = Math.hypot(bx, bz) || 1;
-    bx /= length;
-    bz /= length;
-    const cos = Math.max(0.4, bx * n1[0] + bz * n1[1]);
-    return [p1[0] + (bx * distance) / cos, p1[1] + (bz * distance) / cos];
-  });
-}
-
-// A centreline plus a half width becomes two rims; the run's outline is one
-// rim followed by the other, reversed.
-function ribbonSides(line, half) {
-  const left = [];
-  const right = [];
-  for (let i = 0; i < line.length; i += 1) {
-    const a = line[Math.max(0, i - 1)];
-    const b = line[Math.min(line.length - 1, i + 1)];
-    let dx = b[0] - a[0];
-    let dz = b[1] - a[1];
-    const length = Math.hypot(dx, dz) || 1;
-    dx /= length;
-    dz /= length;
-    left.push([line[i][0] - dz * half, line[i][1] + dx * half]);
-    right.push([line[i][0] + dz * half, line[i][1] - dx * half]);
-  }
-  return { left, right, outline: left.concat([...right].reverse()) };
-}
-
-function shapeFromPoints(points, Ctor) {
-  const shape = new Ctor();
-  // Shapes are authored in the XY plane and rotated flat, which maps shape y
-  // to world -z. Every conversion in this file goes through here.
-  points.forEach(([x, z], i) => (i === 0 ? shape.moveTo(x, -z) : shape.lineTo(x, -z)));
-  shape.closePath();
-  return shape;
-}
-
-function wallStripGeometry(rim, floor, rimY, floorY) {
-  const position = [];
-  const uv = [];
-  for (let i = 0; i < rim.length; i += 1) {
-    const j = (i + 1) % rim.length;
-    const a = [rim[i][0], rimY, rim[i][1]];
-    const b = [rim[j][0], rimY, rim[j][1]];
-    const c = [floor[j][0], floorY, floor[j][1]];
-    const d = [floor[i][0], floorY, floor[i][1]];
-    position.push(...a, ...d, ...c, ...a, ...c, ...b);
-    uv.push(0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1);
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(position, 3));
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-function copingTube(points, y, radius, closed) {
-  const curve = new THREE.CatmullRomCurve3(
-    points.map(([x, z]) => new THREE.Vector3(x, y, z)),
-    closed,
-    'catmullrom',
-    0.2,
-  );
-  const segments = Math.max(12, Math.round(curve.getLength() / 0.45));
-  return new THREE.TubeGeometry(curve, segments, radius, 6, closed);
-}
-
-// Colour rides on the vertices so every painted lip in the park — three
-// different colours across bowls, kerbs and ramps — is still one draw call.
-function tinted(geometry, hex) {
-  const colour = new THREE.Color(hex);
-  const count = geometry.getAttribute('position').count;
-  const colours = new Float32Array(count * 3);
-  for (let i = 0; i < count; i += 1) {
-    colours[i * 3] = colour.r;
-    colours[i * 3 + 1] = colour.g;
-    colours[i * 3 + 2] = colour.b;
-  }
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
-  return geometry;
-}
-
-// A bowl in the reference is not a darker floor — the floor is the same
-// concrete as the deck, and what you read as depth is the shade down its
-// wall. This paints that gradient onto the wall's own vertices, so the recess
-// reads from the air without a shadow map fine enough to resolve it.
-function tintedByHeight(geometry, topHex, bottomHex, topY, bottomY) {
-  const top = new THREE.Color(topHex);
-  const bottom = new THREE.Color(bottomHex);
-  const position = geometry.getAttribute('position');
-  const colours = new Float32Array(position.count * 3);
-  const mix = new THREE.Color();
-  const range = topY - bottomY || 1;
-  for (let i = 0; i < position.count; i += 1) {
-    const t = Math.min(1, Math.max(0, (position.getY(i) - bottomY) / range));
-    mix.copy(bottom).lerp(top, t);
-    colours[i * 3] = mix.r;
-    colours[i * 3 + 1] = mix.g;
-    colours[i * 3 + 2] = mix.b;
-  }
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
-  return geometry;
-}
-
+// The reference's ground is not one flat tone: beside a building it reads
+// 170,142,151 and out in the open 235,211,211, a sixty-five level spread that
+// is contact shading. Mine measured 217,204,199 everywhere, which is exactly
+// why the city looked like cut paper. A shadow map alone does not give this —
+// it is ambient occlusion, and AO is post-process and tier-gated here, so the
+// pool under each block is baked instead: one soft radial decal, one draw for
+// the whole city, present on every device.
 // Anything the plan puts seaward of the measured shore would be standing in
 // the water. One four-storey block was, a hundred metres offshore, because the
 // old sea was a slab nobody tested against. This is the test.
@@ -322,13 +140,6 @@ function kiyiX(z) {
 }
 const denizdeMi = (x, z) => x > kiyiX(z);
 
-// The reference's ground is not one flat tone: beside a building it reads
-// 170,142,151 and out in the open 235,211,211, a sixty-five level spread that
-// is contact shading. Mine measured 217,204,199 everywhere, which is exactly
-// why the city looked like cut paper. A shadow map alone does not give this —
-// it is ambient occlusion, and AO is post-process and tier-gated here, so the
-// pool under each block is baked instead: one soft radial decal, one draw for
-// the whole city, present on every device.
 function contactShadowTexture() {
   if (typeof document === 'undefined') return null;
   const canvas = document.createElement('canvas');
@@ -380,7 +191,7 @@ function treeBlobs(positions, THREE_, blobMaterial) {
   return blobs;
 }
 
-export function buildCityDistricts({ group, add, material, animated }) {
+export function buildCityDistricts({ group, add, material, animated, buildStadium, stadiumPitch }) {
   // Calibrated, not guessed: the first pass was measured against the
   // reference by sampling matching zones in both renders. The hub lighting
   // lifts everything ~1.22x, so each base color is the reference color
@@ -399,6 +210,10 @@ export function buildCityDistricts({ group, add, material, animated }) {
     court: material(0x5c6b48, { roughness: 0.9 }),
     pitch: material(0x475142, { roughness: 0.92 }),
     trackRed: material(0xa9736a, { roughness: 0.9 }),
+    // The stadium's track reads 122,112,129 in the reference — a purple-grey,
+    // most of it the bowl wall's own shadow, so the base sits above that and
+    // lets the shadow do the rest.
+    stadiumTrack: material(0x645c6a, { roughness: 0.92 }),
     grass: material(0x868b6e, { roughness: 0.95 }),
     sand: material(0xd8bcae, { roughness: 0.95 }),
     water: material(0x8caddf, { roughness: 0.25, transparent: true, opacity: 0.97 }),
@@ -938,7 +753,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
     [-36.0, -30.0, 32.2, 20.1],
     [-30.2, -57.4, 19.8, 8.7],
     [-44.8, -43.6, 11.8, 9.9],
-    [29.7, 0.3, 19.2, 33.1],
+    [29.85, -1.55, 21.3, 34.1],
   ];
   const decks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.12, 1), mats.concreteDeep, DECKS.length);
   const dm = new THREE.Matrix4();
@@ -967,7 +782,6 @@ export function buildCityDistricts({ group, add, material, animated }) {
 
   const STANDS = [
     [-47.4, -30.5, 1.6, 8.5], [-35.5, -30.0, 1.4, 7.9],   // athletics
-    [22.6, -1.6, 2.4, 9.5], [39.1, -1.4, 2.3, 10.0],      // stadium
     [-52.4, -32.4, 0.9, 7.2],                              // tram platform
   ];
   // Grandstands share the pale concrete box with the street furniture below,
@@ -1446,27 +1260,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // -------------------------------------------------------------------
   // E CELL — the 67 stadium in its reference position right of the plaza
   // -------------------------------------------------------------------
-  const stadium = new THREE.Group();
-  stadium.name = 'district:stadium';
-  // Measured: the stadium footprint is 19.2 x 33.1, so its ring runs long
-  // north-south rather than the near-circle I had.
-  const stand = copingArc(mats.blockDark, 8.6, 1.6, Math.PI * 2);
-  stand.scale.set(1.12, 1, 1.92);
-  stand.position.y = 0.7;
-  stadium.add(stand);
-  const pitch = new THREE.Mesh(new THREE.CylinderGeometry(7.4, 7.4, 0.1, 22), mats.pitch);
-  pitch.scale.set(1.15, 1, 1.9);
-  pitch.position.y = 0.16;
-  pitch.name = 'district:stadium-pitch';
-  stadium.add(pitch);
-  const pitchLabel = flatLabel('67', 6);
-  if (pitchLabel) {
-    pitchLabel.position.y = 0.13;
-    stadium.add(pitchLabel);
-  }
-  stadium.position.set(29.7, 0, 0.3);
-  stadium.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
-  group.add(stadium);
+  group.add(buildStadium(mats));
 
   // -------------------------------------------------------------------
   // WEST + SOUTH CELLS — dense blocks, the basketball court, the market
@@ -2203,8 +1997,11 @@ export function buildCityDistricts({ group, add, material, animated }) {
 
   return {
     skatepark: Object.freeze({ minX: -15.5, maxX: 16.76, minZ: -49.21, maxZ: -20.34, topY: 0.44 }),
-    stadiumPitch: Object.freeze({ x: 29.7, z: 0.3, rx: 8.5, rz: 14, topY: 0.21 }),
+    stadiumPitch,
     blockCount: BLOCKS.length,
+    // The map lets you tap anywhere, so it needs the same shore test the
+    // city uses to keep buildings out of the bay.
+    isWater: denizdeMi,
     colliders,
   };
 }
