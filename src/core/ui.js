@@ -157,7 +157,7 @@ export function createUi(ctx) {
   const hudbar = document.createElement('div');
   hudbar.className = 'uv-hudbar';
   hudbar.setAttribute('role', 'navigation');
-  hudbar.setAttribute('aria-label', 'Skypark menu');
+  hudbar.setAttribute('aria-label', '67 Park menu');
   document.body.appendChild(hudbar);
 
   const ui = {

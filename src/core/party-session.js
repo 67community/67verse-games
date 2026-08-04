@@ -112,7 +112,7 @@ export function createPartySession(ctx) {
       note = 'Local practice',
       details = null,
       replayLabel = 'Play Again',
-      homeLabel = 'Return to Skypark',
+      homeLabel = 'Return to 67 Park',
       onReplay = null,
       onHome,
     }) {

@@ -98,7 +98,7 @@ export const HUB_SPOTS = Object.freeze([
   Object.freeze({
     id: 'skyfold-canopy',
     name: 'Skyfold Canopy',
-    place: 'Skypark landmark',
+    place: '67 Park landmark',
     description: 'The folded canopy over the arrival court.',
     x: 0,
     z: 20,

@@ -621,7 +621,7 @@ registerGame({
           { label: 'Coins earned', value: localGameRewardStat(result) },
         ],
         onReplay: nestedShowRound ? null : replay,
-        homeLabel: nestedShowRound ? 'Continue 67 Show' : 'Return to Skypark',
+        homeLabel: nestedShowRound ? 'Continue 67 Show' : 'Return to 67 Park',
         onHome: finish,
       });
       ctx.sessionTelemetry?.record('game_phase', { gameId: 'squid67', phase: 'results' });

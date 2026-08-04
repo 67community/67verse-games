@@ -491,7 +491,7 @@ registerGame({
         addDom('div', 'sv-coins', card,
           '+' + COINS_BY_PLACE[place - 1] + ' local Coins · no cash value or online reward');
         addAction(card, 'Play Again', () => finalize(place, { replay: true }));
-        addAction(card, 'Return to Skypark', () => finalize(place, {}));
+        addAction(card, 'Return to 67 Park', () => finalize(place, {}));
       }, 1600);
     }
 
@@ -539,7 +539,7 @@ registerGame({
       addDom('div', 'sv-title', card, ROUND_META[id].name + ' could not start');
       addDom('div', 'sv-sub', card,
         '67 Show only uses Tag, Balloon Battle, and Skyway Sprint. No substitute result or online match was created.');
-      addAction(card, 'Return to Skypark', () => realGoHome());
+      addAction(card, 'Return to 67 Park', () => realGoHome());
     }
 
     function mountSubGame(id) {

@@ -238,7 +238,7 @@ function installCompactProofHub(ctx, scene, world, getSim) {
       // visit. Keep the toast channel free for the only extra fact that matters:
       // a failed write means the hint may repeat.
       if (!arrival.committed) {
-        ctx.ui.toast('Welcome to Skypark · first-visit status was not saved, so this hint may repeat');
+        ctx.ui.toast('Welcome to 67 Park · first-visit status was not saved, so this hint may repeat');
       }
     }
   }

@@ -279,7 +279,7 @@ function commitHubActivityReward(event) {
   const next = { ...claimed, [event.activityId]: true };
   const total = ctx.save.commitCoins(
     event.reward,
-    `Skypark activity: ${event.title}`,
+    `67 Park activity: ${event.title}`,
     () => ctx.save.set('hubActivityRewards', next),
   );
   return total == null ? 0 : event.reward;
@@ -670,7 +670,7 @@ ctx.goHome = (result) => {
   if (hubStatus) hubStatus.textContent = '';
   requestAnimationFrame(() => {
     if (hubStatus) {
-      hubStatus.textContent = 'Returned to Skypark. Choose a local game or explore the hub.';
+      hubStatus.textContent = 'Returned to 67 Park. Choose a local game or explore the hub.';
     }
     primaryPlayButton?.focus();
   });
@@ -756,7 +756,7 @@ function travelToSpot(spot) {
 }
 function openGameSelect() {
   if (hubActivities.snapshot().active) hubActivities.cancel('panel-open');
-  const p = ctx.ui.panel({ title: 'Play in Skypark' });
+  const p = ctx.ui.panel({ title: 'Play in 67 Park' });
   const intro = document.createElement('p');
   intro.className = 'uv-play-intro';
   intro.textContent = 'Choose a game. Training rivals run on this device; online rooms are off in this build.';
@@ -785,7 +785,7 @@ function openGameSelect() {
   }
   const spotsHeading = document.createElement('h3');
   spotsHeading.className = 'uv-spot-heading';
-  spotsHeading.textContent = 'Skypark spots';
+  spotsHeading.textContent = '67 Park spots';
   const spotsIntro = document.createElement('p');
   spotsIntro.className = 'uv-play-intro';
   spotsIntro.textContent = 'Fast travel inside the hub. Activities still start at their own marker with E / GRAB.';
@@ -850,7 +850,7 @@ runHooks('boot', ctx);
 scheduleIdleModules();
 async function requestReturnToSkypark() {
   if (!ctx.view.current || ctx.ui.hasAnyModal()) return;
-  if (await ctx.ui.confirm('Return to Skypark? Current round progress will be lost.')) ctx.goHome();
+  if (await ctx.ui.confirm('Return to 67 Park? Current round progress will be lost.')) ctx.goHome();
 }
 returnSkyparkButton?.addEventListener('click', requestReturnToSkypark);
 window.addEventListener('keydown', (e) => {

@@ -179,7 +179,7 @@ async function assertHubCleanup(page, modeClass, hudSelector) {
   await page.waitForFunction(() => (
     document.activeElement?.id === 'primary-play'
     && document.querySelector('#hub-status')?.textContent
-      === 'Returned to Skypark. Choose a local game or explore the hub.'
+      === 'Returned to 67 Park. Choose a local game or explore the hub.'
   ));
   const state = await page.evaluate(({ mode, hud }) => ({
     inGame: document.body.classList.contains('in-game'),
@@ -201,7 +201,7 @@ async function assertHubCleanup(page, modeClass, hudSelector) {
     canvases: 1,
     modeName: 'Game modeLocal play · training rivals',
     activeId: 'primary-play',
-    hubStatus: 'Returned to Skypark. Choose a local game or explore the hub.',
+    hubStatus: 'Returned to 67 Park. Choose a local game or explore the hub.',
     hubStatusRole: 'status',
     hubStatusLive: 'polite',
   });
@@ -214,13 +214,13 @@ async function assertNoBrowserErrors(errors) {
 test('development navigation keeps legacy local modes and session-only chat reachable', { timeout: 20_000 }, async () => {
   const { page, errors } = await openPage('/?dev=1');
   try {
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     assert.equal(
       await page.evaluate(() => typeof window.__67VERSE_PERF__),
       'object',
     );
     await clickButton(page, '▶ PLAY GAMES');
-    await waitForDialog(page, 'Play in Skypark');
+    await waitForDialog(page, 'Play in 67 Park');
 
     const playPanel = await page.$eval('[role="dialog"]', (dialog) => dialog.textContent);
     assert.match(playPanel, /online rooms are off in this build/i);
@@ -261,7 +261,7 @@ test('Character Acceptance Lab stays dev-only and reports a real local GLB rejec
 
   const { page, errors } = await openPage('/?dev=1');
   try {
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await page.click('button[aria-label="Character Acceptance Lab"]');
     await waitForDialog(page, 'Character Acceptance Lab');
     assert.match(
@@ -353,7 +353,7 @@ test('Physical-device playtest harness is dev-only, memory-only, and exports exp
 
   const { page, errors } = await openPage('/?dev=1');
   try {
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await page.waitForFunction(() => window.__67VERSE_PERF__?.snapshot);
     // Let the app's independent idle progression hydration finish before
     // tracing only the harness interactions below.
@@ -486,7 +486,7 @@ test('entry and shared dialogs expose modal semantics and isolate the game shell
     await page.keyboard.press('Tab');
     assert.equal(await page.evaluate(() => document.activeElement?.id), 'enter-game');
 
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await page.waitForFunction(() => !document.body.classList.contains('modal-open'));
     assert.deepEqual(await page.evaluate(() => {
       const hud = document.querySelector('#hud');
@@ -530,7 +530,7 @@ test('entry and shared dialogs expose modal semantics and isolate the game shell
 test('friend code initialization stays session-stable and visibly retryable after rejected persistence', { timeout: 25_000 }, async () => {
   const { page, errors } = await openPage('/?qa=1&dev=1');
   try {
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await page.evaluate(() => {
       const original = Storage.prototype.setItem;
       window.__qaFriendCodeWriteBlocked = true;
@@ -599,7 +599,7 @@ test('guest profile fallback stays identical across Social, Chat, Creator, and l
     };
   });
   try {
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await clickButton(page, '💬 LOCAL CHAT');
     await page.waitForSelector('[aria-label="On-device chat"]');
     const sessionChat = await page.$eval('.uvchat-local', (element) => element.textContent);
@@ -650,14 +650,14 @@ test('guest profile fallback stays identical across Social, Chat, Creator, and l
     await page.waitForFunction(() => !document.body.classList.contains('in-game'));
 
     await clickButton(page, '▶ PLAY GAMES');
-    await waitForDialog(page, 'Play in Skypark');
+    await waitForDialog(page, 'Play in 67 Park');
     await clickButton(page, 'Play Tag');
     await waitForBodyClass(page, 'tag-mode');
     const modeIdentity = await page.$eval('#mode-name small', (element) => element.textContent);
     assert.match(modeIdentity, new RegExp(guestName));
     assert.match(modeIdentity, /saved guest/);
-    await clickButton(page, '← Return to Skypark');
-    await waitForDialog(page, 'Return to Skypark?');
+    await clickButton(page, '← Return to 67 Park');
+    await waitForDialog(page, 'Return to 67 Park?');
     await clickButton(page, 'Yes');
     await page.waitForFunction(() => !document.body.classList.contains('in-game'));
     await assertHubCleanup(page, 'tag-mode', '.tag-hud');
@@ -782,7 +782,7 @@ test('Skypark welcome reports an unsaved first visit and stops repeating after a
     };
   });
   try {
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await waitForText(page, '#hint', 'Progress is not saved · follow the gold lozenges');
     assert.equal(
       await page.evaluate(() => localStorage.getItem('67v.seenSkyparkArrival')),
@@ -791,7 +791,7 @@ test('Skypark welcome reports an unsaved first visit and stops repeating after a
 
     await page.evaluate(() => sessionStorage.setItem('__qaAllowArrivalWrite', '1'));
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await waitForText(page, '#hint', 'Follow the gold lozenges to Confluence Plaza');
     assert.equal(
       await page.evaluate(() => JSON.parse(localStorage.getItem('67v.seenSkyparkArrival'))),
@@ -799,7 +799,7 @@ test('Skypark welcome reports an unsaved first visit and stops repeating after a
     );
 
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await waitForText(page, '#hint', 'Follow the gold lozenges to SKYWAY');
     assert.equal(await page.$$('.uv-toast').then((items) => items.length), 0);
     await assertNoBrowserErrors(errors);
@@ -929,7 +929,7 @@ test('local chat block, unblock, and report UI stays truthful after rejected wri
 test('modal focus wraps inside the top panel and restores across a stacked confirmation', { timeout: 20_000 }, async () => {
   const { page, errors } = await openPage('/');
   try {
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await clickButton(page, 'SETTINGS');
     await waitForDialog(page, 'Settings');
     assert.equal(await page.evaluate(() => document.activeElement?.classList.contains('uv-x')), true);
@@ -1007,9 +1007,9 @@ test('lazy Settings and Emotes preserve immediate chooser access and restore tri
   const requestedAfterEntry = [];
   page.on('request', (request) => requestedAfterEntry.push(request.url()));
   try {
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await clickButton(page, '▶ PLAY GAMES');
-    await waitForDialog(page, 'Play in Skypark');
+    await waitForDialog(page, 'Play in 67 Park');
     assert.equal(
       requestedAfterEntry.some((url) => /\/src\/games\/(?:tag|balloon|obstacle)\.js/.test(url)),
       false,
@@ -1084,7 +1084,7 @@ test('lazy Settings and Emotes preserve immediate chooser access and restore tri
 test('Discover uses keyboard tabs and uniquely named world-card actions', { timeout: 20_000 }, async () => {
   const { page, errors } = await openPage('/?panel=discovery&qa=1');
   try {
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await waitForDialog(page, 'Discover Worlds');
     const initial = await page.evaluate(() => ({
       tabs: [...document.querySelectorAll('[role="tab"]')].map((tab) => ({
@@ -1148,7 +1148,7 @@ test('appearance and settings controls keep the last verified selection after re
   try {
     await page.evaluate(() => localStorage.setItem('67v.equipped', JSON.stringify('ghost')));
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await page.waitForFunction(() => window.__67VERSE_QA__?.animation()?.characterId === 'qa-runner');
     await page.evaluate(() => {
       const original = Storage.prototype.setItem;
@@ -1321,7 +1321,7 @@ test('desktop and mobile drag-look rotate the hub camera and movement remains ca
   const { page, errors } = await openPage('/?qa=1');
   try {
     await page.waitForFunction(() => window.__67VERSE_QA__?.camera);
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await page.waitForFunction(() => !document.body.classList.contains('entry-open'));
     const before = await page.evaluate(() => ({
       camera: window.__67VERSE_QA__.camera(),
@@ -1390,7 +1390,7 @@ test('compact hub destination focus gives an explicit prompt and launches Skyway
     hasTouch: true,
   });
   try {
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await waitForText(page, '#hint.destination', 'Enter Skyway · Tap ENTER to enter');
 
     const hubDistrict = await page.evaluate(() => (
@@ -1424,7 +1424,7 @@ test('Creator Terrace destination launches the existing local Creator route', { 
     hasTouch: true,
   });
   try {
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await waitForText(
       page,
       '#hint.destination',
@@ -1441,7 +1441,7 @@ test('Creator Terrace destination launches the existing local Creator route', { 
 test('Skypark exposes the reviewed landmark and route composition without blocking first play', { timeout: 20_000 }, async () => {
   const { page, errors } = await openPage('/?qa=1&perf=1');
   try {
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await page.waitForFunction(() => window.__67VERSE_QA__?.composition);
     const composition = await page.evaluate(() => window.__67VERSE_QA__.composition());
     assert.deepEqual(composition, {
@@ -1479,7 +1479,7 @@ test('hub activities keep completion and reward honest when a new local best can
     hasTouch: true,
   });
   try {
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await waitForText(page, '#hint.destination', 'Run Beacon Line · Tap ENTER to enter');
     await page.click('#btn-grab', { delay: 180 });
     await page.waitForFunction(() => window.__67VERSE_QA__.activity().active);
@@ -1537,7 +1537,7 @@ test('hub activities keep completion and reward honest when a new local best can
 test('Quick Start storage failure keeps onboarding retryable and never claims its Coin reward', { timeout: 25_000 }, async () => {
   const { page, errors } = await openPage('/?qa=1');
   try {
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await page.waitForFunction(() => window.__67VERSE_QA__?.startOnboarding);
     await page.evaluate(() => {
       const original = Storage.prototype.setItem;
@@ -1594,7 +1594,7 @@ test('developer session diagnostics remain local, bounded, and hidden behind per
   });
   try {
     await page.waitForFunction(() => window.__67VERSE_PERF__?.sessionSummary);
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await waitForText(page, '#hint.destination', 'Run Beacon Line · Tap ENTER to enter');
     await page.click('#btn-grab', { delay: 180 });
     await page.waitForFunction(() => (
@@ -1824,7 +1824,7 @@ test('Tag replays and returns without stale UI or view state', { timeout: 40_000
     });
     assert.deepEqual(access, {
       activeAction: true,
-      closeLabel: 'Return to Skypark',
+      closeLabel: 'Return to 67 Park',
       actionInsideViewport: true,
     });
     await clickButtonTwice(page, 'Play Again');
@@ -1909,7 +1909,7 @@ test('failed local coin reward is honest and does not advance Quest or Season pr
       5_000,
     );
 
-    await clickButton(page, 'Return to Skypark');
+    await clickButton(page, 'Return to 67 Park');
     await page.waitForFunction(() => !document.body.classList.contains('in-game'));
     await assertHubCleanup(page, 'tag-mode', '.tag-hud');
     const progression = await page.evaluate(() => {
@@ -2264,8 +2264,8 @@ test('UGC Like retries after a rejected counter write while Play remains an inde
       seasonXp: 20,
     });
 
-    await clickButton(page, '← Return to Skypark');
-    await waitForDialog(page, 'Return to Skypark?');
+    await clickButton(page, '← Return to 67 Park');
+    await waitForDialog(page, 'Return to 67 Park?');
     assert.deepEqual(await page.$eval('[role="dialog"]', (dialog) => (
       [...dialog.querySelectorAll('button')].map((button) => {
         const rect = button.getBoundingClientRect();
@@ -2599,7 +2599,7 @@ test('near-max local UGC resets its phone performance scope and survives fall, r
     assert.deepEqual(result.actions, [
       'Back to Discover',
       'My Worlds',
-      'Return to Skypark',
+      'Return to 67 Park',
     ]);
     assert.equal(await page.evaluate(() => window.__67VERSE_PERF__.snapshot().scope), 'ugc');
 
@@ -2715,8 +2715,8 @@ test('local round time pauses behind the return confirmation', { timeout: 20_000
       document.body.dataset.tagPhase === 'playing'
       && /^\d+:\d{2}$/.test(document.querySelector('.tag-timer')?.textContent || '')
     ), { timeout: 12_000 });
-    await clickButton(page, '← Return to Skypark');
-    await waitForDialog(page, 'Return to Skypark?');
+    await clickButton(page, '← Return to 67 Park');
+    await waitForDialog(page, 'Return to 67 Park?');
     const pausedAt = await page.$eval('.tag-timer', (timer) => timer.textContent);
     await new Promise((resolve) => setTimeout(resolve, 1_250));
     assert.equal(await page.$eval('.tag-timer', (timer) => timer.textContent), pausedAt);
@@ -2724,8 +2724,8 @@ test('local round time pauses behind the return confirmation', { timeout: 20_000
     await page.waitForFunction((value) => (
       document.querySelector('.tag-timer')?.textContent !== value
     ), { timeout: 3_000 }, pausedAt);
-    await clickButton(page, '← Return to Skypark');
-    await waitForDialog(page, 'Return to Skypark?');
+    await clickButton(page, '← Return to 67 Park');
+    await waitForDialog(page, 'Return to 67 Park?');
     await clickButton(page, 'Yes');
     await page.waitForFunction(() => !document.body.classList.contains('in-game'));
     await assertHubCleanup(page, 'tag-mode', '.tag-hud');
@@ -2784,8 +2784,8 @@ test('mobile touch input releases on interruption and stays isolated behind retu
       jumpHeld: document.querySelector('#btn-jump').classList.contains('held'),
     })), { stickVisible: false, jumpHeld: false });
 
-    await clickButton(page, '← Return to Skypark');
-    await waitForDialog(page, 'Return to Skypark?');
+    await clickButton(page, '← Return to 67 Park');
+    await waitForDialog(page, 'Return to 67 Park?');
     const modalState = await page.evaluate(() => {
       const touch = document.querySelector('#touch-ui');
       const nav = document.querySelector('#mode-nav').getBoundingClientRect();
@@ -2867,7 +2867,7 @@ test('Balloon Battle reaches results and returns without stale UI or view state'
     });
     assert.deepEqual(access, {
       activeAction: true,
-      closeLabel: 'Return to Skypark',
+      closeLabel: 'Return to 67 Park',
       actionInsideViewport: true,
     });
     await page.$eval('.uv-panel-veil', (veil) => veil.dispatchEvent(new PointerEvent(
@@ -3098,7 +3098,7 @@ test('fresh mobile visitor reaches Skyway results through the honest public path
       /INSTANT LOCAL PLAY · SKYWAY SPRINT/,
     );
     const entryStartedAt = await page.evaluate(() => performance.now());
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await page.waitForFunction(() => (
       !document.body.classList.contains('entry-open')
       && document.querySelector('#entry-gate')?.hidden
@@ -3198,7 +3198,7 @@ test('fresh mobile visitor reaches Skyway results through the honest public path
     assert.match(resultsCopy, /crossed the Crown Gate/);
     assert.match(resultsCopy, /Local bot race/);
     assert.match(resultsCopy, /Race again/);
-    assert.match(resultsCopy, /Return to Skypark/);
+    assert.match(resultsCopy, /Return to 67 Park/);
     // X previously removed the panel but stranded the player in a frozen
     // finished course. It now follows the same result-aware return path.
     await clickButton(page, '✕');
@@ -3223,7 +3223,7 @@ test('fresh desktop visitor can finish, replay, and return through the public Sk
       /INSTANT LOCAL PLAY · SKYWAY SPRINT/,
     );
     const entryStartedAt = await page.evaluate(() => performance.now());
-    await clickButton(page, 'ENTER SKYPARK');
+    await clickButton(page, 'ENTER 67 PARK');
     await page.waitForFunction(() => (
       !document.body.classList.contains('entry-open')
       && document.querySelector('#entry-gate')?.hidden
@@ -3280,7 +3280,7 @@ test('fresh desktop visitor can finish, replay, and return through the public Sk
     const secondReward = await resultCoins(page);
     assert.ok(secondReward > 0);
     assert.equal(await savedCoins(page), firstReward + secondReward);
-    await clickButtonTwice(page, 'Return to Skypark');
+    await clickButtonTwice(page, 'Return to 67 Park');
     await page.waitForFunction(() => !document.body.classList.contains('in-game'));
     await assertHubCleanup(page, 'skyway-mode', '.sw-hud');
     assert.equal(await savedCoins(page), firstReward + secondReward);
@@ -3322,8 +3322,8 @@ test('67 Show global return exits a nested local round instead of fabricating a 
     await waitForText(page, '.sv-card', 'Round 1 of 3');
     await clickButton(page, 'Play local round');
     await waitForBodyClass(page, 'tag-mode');
-    await clickButton(page, '← Return to Skypark');
-    await waitForDialog(page, 'Return to Skypark?');
+    await clickButton(page, '← Return to 67 Park');
+    await waitForDialog(page, 'Return to 67 Park?');
     await clickButton(page, 'Yes');
     await page.waitForFunction(() => !document.body.classList.contains('in-game'));
     await assertHubCleanup(page, 'tag-mode', '.sv-hud');
@@ -3400,7 +3400,7 @@ test('67 Show preserves its completed local gauntlet and reward when local stats
         return original.call(this, key, value);
       };
     });
-    await clickButtonTwice(page, 'Return to Skypark');
+    await clickButtonTwice(page, 'Return to 67 Park');
     await waitForText(
       page,
       '.uv-toast',
@@ -3796,7 +3796,7 @@ test('Creator mobile editor exposes every tool and an honest test-to-publish flo
     assert.deepEqual(resultLayout.actions.map(({ copy }) => copy), [
       'Back to Discover',
       'My Worlds',
-      'Return to Skypark',
+      'Return to 67 Park',
     ]);
     assert.ok(resultLayout.actions.every(({ width, height }) => width >= 44 && height >= 44));
     assert.equal(resultLayout.touchControlsHidden, true);
@@ -3962,8 +3962,8 @@ test('Creator play-test publishes locally, appears in Discover, replays, and cle
     await page.waitForSelector('.uvd-playhud');
     assert.match(await page.$eval('.uvd-playhud', (hud) => hud.textContent), /Reach the glowing goal/);
     assert.match(await page.$eval('#mode-name', (element) => element.textContent), new RegExp(worldName));
-    await clickButton(page, '← Return to Skypark');
-    await waitForDialog(page, 'Return to Skypark?');
+    await clickButton(page, '← Return to 67 Park');
+    await waitForDialog(page, 'Return to 67 Park?');
     await clickButton(page, 'Yes');
     await page.waitForFunction(() => !document.body.classList.contains('in-game'));
     // Discover playback observes the cleared shared view on the next game-loop

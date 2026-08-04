@@ -1911,7 +1911,7 @@ registerGame({
           ctx.bus.emit('game-result', result);
           resetRace();
         },
-        homeLabel: nestedShowRound ? 'Continue 67 Show' : 'Return to Skypark',
+        homeLabel: nestedShowRound ? 'Continue 67 Show' : 'Return to 67 Park',
         onHome: () => {
           resultsPanel = null;
           exitGame();

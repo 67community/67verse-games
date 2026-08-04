@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-  <title>67VERSE — Skate Park Hub</title>
+  <title>67 Park</title>
   <script>
     // The Vite app needs an HTTP origin for ES modules and its GLB asset.
     // Opening index.html directly now enters the live local build instead of
@@ -251,19 +251,28 @@
       transition: opacity 240ms ease, visibility 240ms ease;
     }
     #entry-gate.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+    #entry-brand {
+      display: block;
+      width: min(440px, 80vw);
+      height: auto;
+      margin: 0 auto 14px;
+      pointer-events: none;
+    }
+    /* The logo carries the name visually; this keeps it in the accessibility
+       tree and in the page title for anyone not seeing the animation. */
+    .visually-hidden {
+      position: absolute;
+      width: 1px; height: 1px;
+      margin: -1px; padding: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
     #entry-content {
       text-align: center;
       color: var(--ink);
       text-shadow: none;
       padding: calc(var(--safe-top) + 24px) calc(var(--safe-right) + 24px) calc(var(--safe-bottom) + 24px) calc(var(--safe-left) + 24px);
-    }
-    #entry-kicker {
-      margin-bottom: 12px;
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: var(--ink-muted);
     }
     #entry-title {
       font-size: clamp(48px, 9vw, 96px);
@@ -418,7 +427,7 @@
 </head>
 <body class="entry-open">
   <div id="hud">
-    <div id="wordmark">67<span>VERSE</span></div>
+    <div id="wordmark">67<span>park</span></div>
     <div id="hub-actions" role="navigation" aria-label="Skypark actions">
       <button id="primary-play" type="button" aria-label="Choose a game">▶ PLAY GAMES</button>
       <button id="primary-chat" type="button" aria-label="Open on-device chat">💬 LOCAL CHAT</button>
@@ -440,16 +449,22 @@
     aria-describedby="entry-summary"
   >
     <div id="entry-content">
-      <div id="entry-kicker">SKYPARK</div>
-      <h1 id="entry-title">67<span>VERSE</span></h1>
+      <!-- The wordmark is Oscar's own 67park artwork, lifted out of his clip
+           and keyed to transparency by saturation: the letters are vivid, the
+           backdrop is not, so the pale blue-grey it was shot against is gone
+           rather than blended. A PNG rather than the video because alpha video
+           is not honoured everywhere and autoplay is not granted everywhere —
+           either failure would put that grey card back behind the letters. -->
+      <img id="entry-brand" src="/brand/67park-logo.png" alt="67 Park" />
+      <h1 id="entry-title" class="visually-hidden">67 Park</h1>
       <p id="entry-summary">INSTANT LOCAL PLAY · SKYWAY SPRINT · TAG · BALLOON BATTLE · SKATE RACE · 67 SHOW · CREATOR</p>
-      <button id="enter-game" type="button">ENTER SKYPARK</button>
+      <button id="enter-game" type="button">ENTER 67 PARK</button>
     </div>
   </div>
   <div id="dev-overlay"></div>
   <nav id="mode-nav" aria-label="Current game">
     <div id="mode-name" role="status" aria-live="polite" aria-atomic="true">Game mode<small>Local play · training rivals</small></div>
-    <button id="return-skypark" type="button">← Return to Skypark</button>
+    <button id="return-skypark" type="button">← Return to 67 Park</button>
   </nav>
   <div id="hub-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
   <div id="touch-ui" inert aria-hidden="true">

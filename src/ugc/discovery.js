@@ -884,7 +884,7 @@ function playWorld(ctx, rawWorld) {
           }
         });
       })),
-      ctx.ui.button('Return to Skypark', () => leaveResult(() => ctx.goHome())),
+      ctx.ui.button('Return to 67 Park', () => leaveResult(() => ctx.goHome())),
     );
     resultPanel.body.append(p, row);
     hud._resultPanel = resultPanel;
