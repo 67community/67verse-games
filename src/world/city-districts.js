@@ -566,21 +566,53 @@ export function buildCityDistricts({ group, add, material, animated }) {
   gymRoof.position.set(-31, 4.35, -42);
   add(gymRoof, { camera: false, cast: false });
 
-  const oval = copingArc(mats.trackRed, 6, 1.5, Math.PI * 2);
-  oval.scale.set(1.3, 1, 0.05);
-  oval.position.set(-38, 0.1, -28);
+  // Measured: the oval sits at (-41.4, -29.4) and runs 9.7 x 16.7 — taller
+  // than wide, which is why an oval scaled the other way looked wrong. Lane
+  // lines are painted into the ring's texture, one draw for the whole track.
+  function lanesTexture() {
+    if (typeof document === 'undefined') return mats.trackRed;
+    const canvas = document.createElement('canvas');
+    canvas.width = 8;
+    canvas.height = 64;
+    const c = canvas.getContext('2d');
+    c.fillStyle = '#a9736a';
+    c.fillRect(0, 0, 8, 64);
+    c.strokeStyle = '#d8ccc4';
+    c.lineWidth = 1;
+    for (let i = 1; i < 6; i += 1) {
+      c.beginPath();
+      c.moveTo(0, (i * 64) / 6);
+      c.lineTo(8, (i * 64) / 6);
+      c.stroke();
+    }
+    return new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(canvas), roughness: 0.9 });
+  }
+  const oval = copingArc(lanesTexture(), 4.85, 2.4, Math.PI * 2);
+  oval.scale.set(1, 1, 0.06);
+  oval.position.set(-41.4, 0.12, -29.4);
+  oval.rotation.z = Math.PI / 2;
   oval.name = 'district:athletics-track';
   add(oval, { camera: false, cast: false });
-  const infield = new THREE.Mesh(new THREE.CylinderGeometry(5.4, 5.4, 0.08, 20), mats.pitch);
-  infield.scale.x = 1.3;
-  infield.position.set(-38, 0.08, -28);
+  const infield = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.6, 0.08, 20), mats.pitch);
+  infield.scale.z = 1.9;
+  infield.position.set(-41.4, 0.1, -29.4);
   add(infield, { walkable: true, camera: false, cast: false });
 
-  const fan = new THREE.Mesh(new THREE.CylinderGeometry(5.4, 5.4, 0.08, 14, 1, false, 0, Math.PI / 2), mats.sand);
-  fan.position.set(-25, 0.08, -27);
-  fan.rotation.y = Math.PI * 0.78;
-  fan.name = 'district:baseball';
-  add(fan, { camera: false, cast: false });
+  // Baseball, measured at (-26.7, -27.4): a green outfield wedge with the
+  // sand infield fan set into its corner, the way the plan draws it.
+  const outfield = new THREE.Mesh(
+    new THREE.CylinderGeometry(6.5, 6.5, 0.08, 16, 1, false, 0, Math.PI / 2), mats.court,
+  );
+  outfield.position.set(-26.7, 0.08, -27.4);
+  outfield.rotation.y = Math.PI * 0.75;
+  outfield.name = 'district:baseball';
+  add(outfield, { camera: false, cast: false });
+  const infieldFan = new THREE.Mesh(
+    new THREE.CylinderGeometry(3.4, 3.4, 0.06, 14, 1, false, 0, Math.PI / 2), mats.sand,
+  );
+  infieldFan.position.set(-24.6, 0.11, -24.6);
+  infieldFan.rotation.y = Math.PI * 0.75;
+  add(infieldFan, { camera: false, cast: false });
 
   // -------------------------------------------------------------------
   // NE — funfair, and the marina against the coast road
@@ -815,8 +847,9 @@ export function buildCityDistricts({ group, add, material, animated }) {
     [-52, 38, 7, 0.4, 2.6, 0], [-30, 54.5, 7, 0.4, 2.6, 0.35], [-6, 56, 7, 0.4, 2.6, 0.1],
     [16, 55, 7, 0.4, 2.6, -0.1],
   ];
+  const AHSAP_BASLANGIC = 4 + AHSAP_KOPRU.length;
   const docks = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(1, 1, 1), mats.wood, 4 + AHSAP_KOPRU.length,
+    new THREE.BoxGeometry(1, 1, 1), mats.wood, AHSAP_BASLANGIC + 5,
   );
   const dkm = new THREE.Matrix4();
   [[48.8, -47.5], [49.2, -38.9], [49.0, -29.0], [49.0, -20.0]].forEach(([x, z], i) => {
@@ -1194,18 +1227,20 @@ export function buildCityDistricts({ group, add, material, animated }) {
   tower.name = 'district:market-tower';
   group.add(tower);
   const STALLS = [[-7, 28], [-6.5, 34.5], [3, 34], [3.5, 28], [-2, 25.5]];
-  const stallTables = new THREE.InstancedMesh(new THREE.BoxGeometry(1.6, 0.8, 1.1), mats.wood, STALLS.length);
+  // Market tables are the same timber as the piers and bridges, so they join
+  // that instanced mesh rather than opening a fourth wood draw.
   const stallAwnings = new THREE.InstancedMesh(new THREE.BoxGeometry(1.9, 0.12, 1.4), mats.white, STALLS.length);
   const AWNING = [COPING.red, COPING.blue, COPING.yellow];
   STALLS.forEach(([x, z], i) => {
-    stallTables.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.4, z));
+    dkm.makeScale(1.6, 0.8, 1.1);
+    dkm.setPosition(x, 0.4, z);
+    docks.setMatrixAt(AHSAP_BASLANGIC + i, dkm);
     stallAwnings.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 1.5, z));
     stallAwnings.setColorAt(i, new THREE.Color(AWNING[i % 3]));
   });
-  stallTables.instanceMatrix.needsUpdate = true;
   stallAwnings.instanceMatrix.needsUpdate = true;
+  docks.instanceMatrix.needsUpdate = true;
   if (stallAwnings.instanceColor) stallAwnings.instanceColor.needsUpdate = true;
-  add(stallTables, { camera: false, cast: true });
   add(stallAwnings, { camera: false, cast: false });
 
   // -------------------------------------------------------------------
