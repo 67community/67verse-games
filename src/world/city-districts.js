@@ -490,11 +490,13 @@ export function buildCityDistricts({ group, add, material, animated }) {
   for (let i = 0; i < 8; i += 1) gondolas.setColorAt(i, new THREE.Color(CAR_PAINT[i % CAR_PAINT.length]));
   if (gondolas.instanceColor) gondolas.instanceColor.needsUpdate = true;
   ferris.add(gondolas);
-  ferris.position.set(25, 6.4, -42);
-  for (const legX of [24.2, 25.8]) {
+  // Measured off the reference: its centre lands at world (27, -46.8) once
+  // the 1280px plan is mapped onto the +/-62 world.
+  ferris.position.set(27, 6.4, -46.8);
+  for (const legX of [26.2, 27.8]) {
     const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.28, 6.6, 8), mats.rail);
-    leg.position.set(legX, 3.3, -42);
-    leg.rotation.z = legX < 25 ? 0.12 : -0.12;
+    leg.position.set(legX, 3.3, -46.8);
+    leg.rotation.z = legX < 27 ? 0.12 : -0.12;
     add(leg, { camera: false, cast: true });
   }
   group.add(ferris);
@@ -512,20 +514,64 @@ export function buildCityDistricts({ group, add, material, animated }) {
     gondolas.instanceMatrix.needsUpdate = true;
   });
 
-  const carousel = new THREE.Group();
-  carousel.name = 'district:carousel';
-  const carBase = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.8, 0.5, 14), mats.white);
-  carBase.position.y = 0.25;
-  carousel.add(carBase);
-  const carRoof = new THREE.Mesh(new THREE.ConeGeometry(3, 1.6, 14), mats.copingRed);
-  carRoof.position.y = 3.4;
-  carousel.add(carRoof);
-  const carPole = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 2.8, 8), mats.rail);
-  carPole.position.y = 1.8;
-  carousel.add(carPole);
-  carousel.position.set(33, 0, -33);
-  carousel.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-  group.add(carousel);
+  // Both carousels in the reference wear a segmented canopy — alternating
+  // wedges, not a flat cone. Painting the wedges into a texture keeps that
+  // read at one draw instead of a dozen.
+  function wedgeCanopy(toneA, toneB, wedges) {
+    if (typeof document === 'undefined') return mats.copingRed;
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 16;
+    const c = canvas.getContext('2d');
+    for (let i = 0; i < wedges; i += 1) {
+      c.fillStyle = i % 2 === 0 ? toneA : toneB;
+      c.fillRect((i * 256) / wedges, 0, 256 / wedges + 1, 16);
+    }
+    return new THREE.MeshStandardMaterial({
+      map: new THREE.CanvasTexture(canvas),
+      roughness: 0.6,
+    });
+  }
+  // Measured off the plan: the big red-and-white carousel at (36.6, -45.8),
+  // the smaller orange one on its green lawn at (34.1, -36.1). Their shared
+  // parts — decks, poles, seat rings — ride single instanced meshes so two
+  // rides cost barely more than one; only the canopies differ, each carrying
+  // its own wedge texture.
+  const RIDES = [
+    { x: 36.6, z: -45.8, r: 2.8, canopy: wedgeCanopy('#c0564a', '#e6dcd0', 12) },
+    { x: 34.1, z: -36.1, r: 2.1, canopy: wedgeCanopy('#d08a4a', '#e6dcd0', 12) },
+  ];
+  const rideDecks = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1.06, 0.5, 16), mats.white, RIDES.length);
+  const ridePoles = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.14, 0.14, 2.4, 8), mats.rail, RIDES.length);
+  const rideSeats = new THREE.InstancedMesh(new THREE.BoxGeometry(0.42, 0.5, 0.42), mats.white, RIDES.length * 8);
+  const rm4 = new THREE.Matrix4();
+  RIDES.forEach((ride, i) => {
+    rm4.makeScale(ride.r * 0.88, 1, ride.r * 0.88);
+    rm4.setPosition(ride.x, 0.25, ride.z);
+    rideDecks.setMatrixAt(i, rm4);
+    ridePoles.setMatrixAt(i, new THREE.Matrix4().makeTranslation(ride.x, 1.6, ride.z));
+    for (let s = 0; s < 8; s += 1) {
+      const a = (s / 8) * Math.PI * 2;
+      rideSeats.setMatrixAt(i * 8 + s, new THREE.Matrix4().makeTranslation(
+        ride.x + Math.cos(a) * ride.r * 0.66, 0.78, ride.z + Math.sin(a) * ride.r * 0.66,
+      ));
+      rideSeats.setColorAt(i * 8 + s, new THREE.Color(CAR_PAINT[s % CAR_PAINT.length]));
+    }
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(ride.r * 1.12, 1.5, 16), ride.canopy);
+    roof.position.set(ride.x, 3.15, ride.z);
+    add(roof, { camera: false, cast: true });
+  });
+  for (const mesh of [rideDecks, ridePoles, rideSeats]) {
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }
+  rideDecks.name = 'district:carousel';
+  add(rideDecks, { camera: false, cast: true });
+  add(ridePoles, { camera: false, cast: false });
+  add(rideSeats, { camera: false, cast: true });
+  const lawnDisc = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 5.2, 0.1, 22), mats.grass);
+  lawnDisc.position.set(34.1, 0.05, -36.1);
+  add(lawnDisc, { camera: false, cast: false });
 
   // The swirling ride in the reference is not a rail coaster: it is a wide
   // skate CHANNEL — a flat grey floor you could ride, with an orange lip
@@ -600,7 +646,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
   slidePosts.instanceMatrix.needsUpdate = true;
   add(slidePosts, { camera: false, cast: false });
   const tent = new THREE.Mesh(new THREE.ConeGeometry(2.6, 2.6, 12), mats.copingRed);
-  tent.position.set(38, 1.3, -36);
+  tent.position.set(41, 1.3, -41);
   tent.name = 'district:big-top';
   add(tent, { camera: false, cast: true });
 
@@ -650,7 +696,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
   const lhLamp = new THREE.Mesh(new THREE.SphereGeometry(0.45, 10, 8), mats.copingYellow);
   lhLamp.position.y = 6.1;
   lighthouse.add(lhLamp);
-  lighthouse.position.set(55, 0, -16);
+  lighthouse.position.set(55.1, 0, -19.9);
   lighthouse.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   group.add(lighthouse);
 
