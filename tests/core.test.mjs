@@ -1759,7 +1759,10 @@ test('idle progression pair registers through a deterministic scheduler', async 
     },
   });
   assert.equal(scheduled, true);
-  assert.equal(results.length, 2);
+  // Three settled entries, not two: the idle pass now also carries the audio
+  // system, which is synthesized rather than fetched and inaudible until the
+  // player is through the entry gate, so it does not belong in the first load.
+  assert.equal(results.length, 3);
   assert.ok(results.every((result) => result.status === 'fulfilled'));
   assert.equal(typeof await ensureSystemLoaded('quests').then((system) => system?.open), 'function');
   assert.equal(typeof await ensureSystemLoaded('season').then((system) => system?.open), 'function');

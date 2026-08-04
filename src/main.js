@@ -913,30 +913,10 @@ for (const [id, badge, label] of HUD) {
   }
 }
 runHooks('boot', ctx);
-// Oscar's fRiENDSiES, walking the park. Guests are decorative and cost about
-// five draws each, so they arrive once the player is actually in the world and
-// only where the quality tier can afford them — a phone gets the park without
-// them. Waiting for the entry gate also means the tier has resolved by then;
-// reading it at boot got 'low' every time, before the controller had applied.
-function summonGuests() {
-  if (ctx.quality?.getState?.()?.tier !== 'high') return;
-  import('./world/friendsies.js')
-    .then(({ loadFriendsies }) => loadFriendsies({
-      group: world.group,
-      animated: world.animated,
-      sampleGround: world.sampleGround,
-    }))
-    .then((count) => sessionTelemetry.record('guests_loaded', { count }))
-    .catch(() => {});
-}
-if (document.body.classList.contains('entry-open')) {
-  const stopWaitingForGuests = ctx.bus.on('world-entered', () => {
-    stopWaitingForGuests();
-    summonGuests();
-  });
-} else {
-  summonGuests();
-}
+// Oscar's fRiENDSiES, walking the park. Everything about them — the tier
+// check, the wait for the entry gate, the routes — lives in their own chunk,
+// so the first load carries one line for a feature it may never fetch.
+import('./world/friendsies.js').then(({ mountFriendsies }) => mountFriendsies(ctx, world));
 
 scheduleIdleModules();
 async function requestReturnToSkypark() {

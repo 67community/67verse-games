@@ -82,3 +82,27 @@ export function loadFriendsies({ group, animated, sampleGround }) {
     }, undefined, () => resolve(0));
   }))).then((loaded) => loaded.reduce((sum, one) => sum + one, 0));
 }
+
+// Mounted from main.js with one line, because everything that decides whether
+// these appear belongs in the chunk that carries them.
+//
+// The tier is read after the entry gate, not at boot: at boot the quality
+// controller has not applied yet and the answer is always "low".
+export function mountFriendsies(ctx, world) {
+  const summon = () => {
+    if (ctx.quality?.getState?.()?.tier !== 'high') return;
+    loadFriendsies({
+      group: world.group,
+      animated: world.animated,
+      sampleGround: world.sampleGround,
+    }).catch(() => {});
+  };
+  if (document.body.classList.contains('entry-open')) {
+    const stop = ctx.bus.on('world-entered', () => {
+      stop();
+      summon();
+    });
+    return;
+  }
+  summon();
+}

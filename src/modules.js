@@ -2,7 +2,6 @@
 // only when the player asks for them. Keeping the loaders explicit gives Vite
 // stable split points without changing the modules' self-registration contract.
 import { GAMES, SYSTEMS } from './core/registry.js';
-import './systems/audio.js';
 import './world/hub-plus.js';
 
 const GAME_LOADERS = Object.freeze({
@@ -108,7 +107,13 @@ export async function ensureSystemLoaded(id) {
 
 export function loadIdleModules() {
   if (!idleLoadPromise) {
-    idleLoadPromise = Promise.allSettled(IDLE_MODULE_IDS.map((id) => ensureSystemLoaded(id)))
+    // Sound is synthesized, not fetched, and nothing is audible before the
+    // player is through the entry gate, so it rides the idle pass rather than
+    // the first bundle. It self-registers on import exactly as before.
+    idleLoadPromise = Promise.allSettled([
+      import('./systems/audio.js'),
+      ...IDLE_MODULE_IDS.map((id) => ensureSystemLoaded(id)),
+    ])
       .then((results) => {
         results.forEach((result, index) => {
           if (result.status === 'rejected') {
