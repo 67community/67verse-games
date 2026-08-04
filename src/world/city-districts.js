@@ -1860,7 +1860,72 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     [52, 40], [54, 50], [50, 30],
   ];
   // The north-east row ran past the shore, so one house stood in the bay.
-  const KARADAKI_EVLER = HOUSES.filter(([x, z]) => !denizdeMi(x, z));
+  // The suburb belt goes through the same placement the blocks do, which it
+  // never did before: the row above was a hand-written list that nothing
+  // checked, so twenty-four of these stood in a carriageway and ten sat inside
+  // a block. Every house is pushed clear of the roads, then apart from its
+  // neighbours and from the blocks already placed, and anything that still
+  // cannot fit is dropped rather than shipped inside something else.
+  //
+  // The footprint is the roof, not the walls: the body is 3 x 3.4 but the
+  // pyramid over it reaches 2.5 to the corner, so a house measured by its
+  // walls still hangs over the kerb.
+  const EV_G = 3.7;
+  const EV_D = 4.1;
+  const KARADAKI_EVLER = (() => {
+    const yerlesik = BLOCKS.map(([x, z, w, , d]) => ({ x, z, w, d, sabit: true }));
+    const evler = HOUSES
+      .filter(([x, z]) => !denizdeMi(x, z))
+      .map(([x, z]) => ({ x, z, w: EV_G, d: EV_D, sabit: false }));
+    const hepsi = [...yerlesik, ...evler];
+    for (let tur = 0; tur < 40; tur += 1) {
+      let oynadi = false;
+      for (const ev of evler) {
+        const [nx, nz] = yoldanKaydir(ev.x, ev.z, ev.w, ev.d);
+        if (nx !== ev.x || nz !== ev.z) { ev.x = nx; ev.z = nz; oynadi = true; }
+      }
+      for (const ev of evler) {
+        for (const other of hepsi) {
+          if (other === ev) continue;
+          const bindirX = (ev.w + other.w) / 2 + 0.15 - Math.abs(ev.x - other.x);
+          const bindirZ = (ev.d + other.d) / 2 + 0.15 - Math.abs(ev.z - other.z);
+          if (bindirX <= 0 || bindirZ <= 0) continue;
+          oynadi = true;
+          // A block never yields; two houses share the correction.
+          const pay = other.sabit ? 1 : 0.5;
+          if (bindirX < bindirZ) {
+            const yon = ev.x <= other.x ? -1 : 1;
+            ev.x += yon * bindirX * pay;
+            if (!other.sabit) other.x -= yon * bindirX * pay;
+          } else {
+            const yon = ev.z <= other.z ? -1 : 1;
+            ev.z += yon * bindirZ * pay;
+            if (!other.sabit) other.z -= yon * bindirZ * pay;
+          }
+        }
+      }
+      if (!oynadi) break;
+    }
+    // Relaxation alone does not finish the job: pushing a house off a road can
+    // shove it into a block, and the next round pushes it back. So the last
+    // word is a sweep — a house that is still on a carriageway, still inside a
+    // block, or still inside another house is dropped. The belt is decorative
+    // and forty-odd houses long; losing a few beats shipping one inside a
+    // building, which is what "the houses have got into each other" was.
+    const tutulan = [];
+    for (const ev of evler) {
+      if (Math.abs(ev.x) > 61 || Math.abs(ev.z) > 61) continue;
+      if (denizdeMi(ev.x, ev.z)) continue;
+      if (yolUstunde(ev.x, ev.z, ev.w, ev.d)) continue;
+      const cakisiyor = [...yerlesik, ...tutulan].some((o) => (
+        Math.abs(ev.x - o.x) < (ev.w + o.w) / 2 - 0.2
+        && Math.abs(ev.z - o.z) < (ev.d + o.d) / 2 - 0.2
+      ));
+      if (cakisiyor) continue;
+      tutulan.push(ev);
+    }
+    return tutulan.map((ev) => [ev.x, ev.z]);
+  })();
   const houseBodies = new THREE.InstancedMesh(new THREE.BoxGeometry(3, 2.2, 3.4), mats.block, KARADAKI_EVLER.length);
   const houseRoofs = new THREE.InstancedMesh(new THREE.ConeGeometry(2.5, 1.5, 4), mats.copingRed, KARADAKI_EVLER.length);
   KARADAKI_EVLER.forEach(([x, z], i) => {
