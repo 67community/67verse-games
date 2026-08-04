@@ -76,7 +76,11 @@ export const MARINA_YELKENLI = Object.freeze({
   yelken: '#8f4b4b',
 });
 
-// Parasols along the promenade sand, north of the cape.
+// Parasols along the promenade sand, north of the cape. Superseded and no
+// longer read: two of these six sit at x 37.0, which is inside the fairground
+// rather than on the promenade, and one of those lands on the big carousel.
+// The build takes the run from PLAN_SEMSIYELER, whose four rows were measured
+// off the drawing at x 41.2.
 export const MARINA_SEMSIYELER = Object.freeze([
   [1022, 148, '#d98a9a'], [1055, 162, '#d8cba8'], [1067, 205, '#8fa8ce'],
   [1050, 250, '#cf7d78'], [1052, 292, '#cfc3bb'], [1022, 378, '#7f8cb0'],

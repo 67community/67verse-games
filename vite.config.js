@@ -26,6 +26,13 @@ export default defineConfig(({ command }) => ({
           if (id.includes('/src/world/plan-verisi.js') || id.includes('/src/world/plan-ek.js')) {
             return 'city-plan-yapi';
           }
+          // The fairground: three rides built off a traced coaster centre
+          // line and its own measured colours, which no longer fits inside
+          // the city's chunk alongside everything else. It takes THREE and
+          // its one geometry helper as arguments rather than importing them,
+          // because a named chunk that imports three has the whole library
+          // folded into it and lands in the initial graph.
+          if (id.includes('/src/world/city-funfair.js')) return 'city-funfair';
           if (
             id.includes('/src/world/plan-oge.js')
             || id.includes('/src/world/plan-skate.js')

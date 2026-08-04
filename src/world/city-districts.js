@@ -26,6 +26,7 @@ import { PLAN_BINALAR, PLAN_BINA_RENK, PLAN_AGACLAR, PLAN_ARABALAR } from './pla
 import {
   PLAN_ANA_YOLLAR, PLAN_PATIKALAR, PLAN_ZEBRALAR, PLAN_KAVSAKLAR, PLAN_PAZAR,
 } from './plan-ek.js';
+import { buildFunfair } from './city-funfair.js';
 import {
   PLAN_BANKLAR, PLAN_SEMSIYELER, PLAN_LAMBALAR, PLAN_HEYKELLER,
   PLAN_COPLER, PLAN_UFAKLAR,
@@ -33,7 +34,7 @@ import {
 import {
   MARINA_KIYI, MARINA_KUM_GENISLIK, MARINA_DOGU_KENAR, MARINA_PROMENAD,
   MARINA_ISKELELER, MARINA_PARMAKLAR, MARINA_TEKNELER, MARINA_TEKNE_BOY,
-  MARINA_YELKENLI, MARINA_SEMSIYELER, MARINA_FENER,
+  MARINA_YELKENLI, MARINA_FENER,
 } from './plan-marina.js';
 import {
   SKATE_PLAZA, SKATE_BOWL, SKATE_TROUGHS, SKATE_KERBS, SKATE_RAMPS,
@@ -261,6 +262,19 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     glass: material(0xcfe9f5, { roughness: 0.3, emissive: 0x88b8cc, emissiveIntensity: 0.25 }),
   };
   const CAR_PAINT = [0xe0745e, 0x5a80d6, 0xf6c445, 0x6fae72, 0xd8d3c8, 0xa78bda];
+
+  // The hub lighting lifts every surface by the same measured 1.22, and an
+  // instanced mesh multiplies its per-instance colour by the material's own.
+  // The plan files store colours as they were sampled off the lit reference,
+  // so anything going onto a mats.white instance has to be divided back
+  // through both or it lands dark. Written once here rather than at each site.
+  const ISIK_KAZANCI = 1.22;
+  const beyazTers = new THREE.Color(
+    1 / (ISIK_KAZANCI * mats.white.color.r),
+    1 / (ISIK_KAZANCI * mats.white.color.g),
+    1 / (ISIK_KAZANCI * mats.white.color.b),
+  );
+  const olculenRenk = (renk) => new THREE.Color(renk).multiply(beyazTers);
 
   // -------------------------------------------------------------------
   // STREET GRID — reference-exact: light warm asphalt, dashed center
@@ -894,177 +908,10 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // -------------------------------------------------------------------
   // NE — funfair, and the marina against the coast road
   // -------------------------------------------------------------------
-  const ferris = new THREE.Group();
-  ferris.name = 'district:ferris-wheel';
-  const wheelRing = new THREE.Mesh(new THREE.TorusGeometry(5.2, 0.22, 10, 36), mats.copingYellow);
-  ferris.add(wheelRing);
-  const spokes = new THREE.InstancedMesh(new THREE.BoxGeometry(0.16, 10.2, 0.16), mats.rail, 4);
-  for (let i = 0; i < 4; i += 1) spokes.setMatrixAt(i, new THREE.Matrix4().makeRotationZ((i / 4) * Math.PI));
-  spokes.instanceMatrix.needsUpdate = true;
-  ferris.add(spokes);
-  const gondolas = new THREE.InstancedMesh(new THREE.BoxGeometry(0.9, 0.7, 0.7), mats.white, 8);
-  for (let i = 0; i < 8; i += 1) gondolas.setColorAt(i, new THREE.Color(CAR_PAINT[i % CAR_PAINT.length]));
-  if (gondolas.instanceColor) gondolas.instanceColor.needsUpdate = true;
-  ferris.add(gondolas);
-  // Measured off the reference: its centre lands at world (27, -46.8) once
-  // the 1280px plan is mapped onto the +/-62 world.
-  ferris.position.set(27, 6.4, -46.8);
-  for (const legX of [26.2, 27.8]) {
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.28, 6.6, 8), mats.rail);
-    leg.position.set(legX, 3.3, -46.8);
-    leg.rotation.z = legX < 27 ? 0.12 : -0.12;
-    add(leg, { camera: false, cast: true });
-  }
-  group.add(ferris);
-  const gondolaSpin = new THREE.Matrix4();
-  const gondolaAt = new THREE.Matrix4();
-  animated?.push((time) => {
-    const theta = time * 0.14;
-    ferris.rotation.z = theta;
-    gondolaSpin.makeRotationZ(-theta);
-    for (let i = 0; i < 8; i += 1) {
-      const angle = (i / 8) * Math.PI * 2 + theta;
-      gondolaAt.makeTranslation(Math.cos(angle) * 5.2, Math.sin(angle) * 5.2 - 0.55, 0);
-      gondolas.setMatrixAt(i, gondolaAt.premultiply(gondolaSpin));
-    }
-    gondolas.instanceMatrix.needsUpdate = true;
+  buildFunfair({
+    THREE, group, add, material, animated, mats,
+    olculenRenk, ISIK_KAZANCI, CAR_PAINT, canvasTexture,
   });
-
-  // Both carousels in the reference wear a segmented canopy — alternating
-  // wedges, not a flat cone. Painting the wedges into a texture keeps that
-  // read at one draw instead of a dozen.
-  function wedgeCanopy(toneA, toneB, wedges) {
-    if (typeof document === 'undefined') return mats.copingRed;
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 16;
-    const c = canvas.getContext('2d');
-    for (let i = 0; i < wedges; i += 1) {
-      c.fillStyle = i % 2 === 0 ? toneA : toneB;
-      c.fillRect((i * 256) / wedges, 0, 256 / wedges + 1, 16);
-    }
-    return new THREE.MeshStandardMaterial({
-      map: canvasTexture(canvas),
-      roughness: 0.6,
-    });
-  }
-  // Measured off the plan: the big red-and-white carousel at (36.6, -45.8),
-  // the smaller orange one on its green lawn at (34.1, -36.1). Their shared
-  // parts — decks, poles, seat rings — ride single instanced meshes so two
-  // rides cost barely more than one; only the canopies differ, each carrying
-  // its own wedge texture.
-  const RIDES = [
-    { x: 36.6, z: -45.8, r: 2.8, canopy: wedgeCanopy('#c0564a', '#e6dcd0', 12) },
-    { x: 34.1, z: -36.1, r: 2.1, canopy: wedgeCanopy('#d08a4a', '#e6dcd0', 12) },
-  ];
-  const rideDecks = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1.06, 0.5, 16), mats.white, RIDES.length);
-  const ridePoles = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.14, 0.14, 2.4, 8), mats.rail, RIDES.length);
-  const rideSeats = new THREE.InstancedMesh(new THREE.BoxGeometry(0.42, 0.5, 0.42), mats.white, RIDES.length * 8);
-  const rm4 = new THREE.Matrix4();
-  RIDES.forEach((ride, i) => {
-    rm4.makeScale(ride.r * 0.88, 1, ride.r * 0.88);
-    rm4.setPosition(ride.x, 0.25, ride.z);
-    rideDecks.setMatrixAt(i, rm4);
-    ridePoles.setMatrixAt(i, new THREE.Matrix4().makeTranslation(ride.x, 1.6, ride.z));
-    for (let s = 0; s < 8; s += 1) {
-      const a = (s / 8) * Math.PI * 2;
-      rideSeats.setMatrixAt(i * 8 + s, new THREE.Matrix4().makeTranslation(
-        ride.x + Math.cos(a) * ride.r * 0.66, 0.78, ride.z + Math.sin(a) * ride.r * 0.66,
-      ));
-      rideSeats.setColorAt(i * 8 + s, new THREE.Color(CAR_PAINT[s % CAR_PAINT.length]));
-    }
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(ride.r * 1.12, 1.5, 16), ride.canopy);
-    roof.position.set(ride.x, 3.15, ride.z);
-    add(roof, { camera: false, cast: true });
-  });
-  for (const mesh of [rideDecks, ridePoles, rideSeats]) {
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }
-  rideDecks.name = 'district:carousel';
-  add(rideDecks, { camera: false, cast: true });
-  add(ridePoles, { camera: false, cast: false });
-  add(rideSeats, { camera: false, cast: true });
-  const lawnDisc = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 5.2, 0.1, 22), mats.grass);
-  lawnDisc.position.set(34.1, 0.05, -36.1);
-  add(lawnDisc, { camera: false, cast: false });
-
-  // The swirling ride in the reference is not a rail coaster: it is a wide
-  // skate CHANNEL — a flat grey floor you could ride, with an orange lip
-  // running down both sides — that folds back over itself in a long loop.
-  // Built as a ribbon: sample the curve, step left and right along its
-  // horizontal normal, and stitch the floor; the lips ride the same offsets.
-  const slideCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(22, 0.7, -30), new THREE.Vector3(28, 1.5, -32.5),
-    new THREE.Vector3(35, 0.9, -30), new THREE.Vector3(39, 1.7, -26),
-    new THREE.Vector3(35, 1.0, -22.5), new THREE.Vector3(29, 1.9, -24),
-    new THREE.Vector3(25, 1.1, -27), new THREE.Vector3(30, 1.6, -28.5),
-    new THREE.Vector3(36, 0.8, -27),
-  ], true);
-  const SLIDE_HALF = 1.5;
-  function ribbonGeometry(curve, halfWidth, segments) {
-    const positions = [];
-    const indices = [];
-    const up = new THREE.Vector3(0, 1, 0);
-    const point = new THREE.Vector3();
-    const tangent = new THREE.Vector3();
-    const side = new THREE.Vector3();
-    for (let i = 0; i <= segments; i += 1) {
-      const t = i / segments;
-      curve.getPointAt(t, point);
-      curve.getTangentAt(t, tangent);
-      side.crossVectors(tangent, up).normalize().multiplyScalar(halfWidth);
-      positions.push(point.x - side.x, point.y, point.z - side.z);
-      positions.push(point.x + side.x, point.y, point.z + side.z);
-      if (i < segments) {
-        const a = i * 2;
-        indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
-      }
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geometry.setIndex(indices);
-    geometry.computeVertexNormals();
-    return geometry;
-  }
-  const slideFloor = new THREE.Mesh(ribbonGeometry(slideCurve, SLIDE_HALF, 220), mats.concrete);
-  slideFloor.material.side = THREE.DoubleSide;
-  slideFloor.name = 'district:funfair-slide';
-  add(slideFloor, { camera: false, cast: false });
-  // Orange lips: one tube down each edge, offset by tracing a parallel curve.
-  for (const dir of [-1, 1]) {
-    const edgePoints = [];
-    const up = new THREE.Vector3(0, 1, 0);
-    const point = new THREE.Vector3();
-    const tangent = new THREE.Vector3();
-    const side = new THREE.Vector3();
-    for (let i = 0; i < 160; i += 1) {
-      const t = i / 160;
-      slideCurve.getPointAt(t, point);
-      slideCurve.getTangentAt(t, tangent);
-      side.crossVectors(tangent, up).normalize().multiplyScalar(SLIDE_HALF * dir);
-      edgePoints.push(new THREE.Vector3(point.x + side.x, point.y + 0.16, point.z + side.z));
-    }
-    const lip = new THREE.Mesh(
-      new THREE.TubeGeometry(new THREE.CatmullRomCurve3(edgePoints, true), 200, 0.17, 6),
-      mats.copingRed,
-    );
-    add(lip, { camera: false, cast: false });
-  }
-  // Slim supports under the raised sections.
-  const slidePosts = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.1, 0.13, 1, 6), mats.concreteDeep, 12);
-  for (let i = 0; i < 12; i += 1) {
-    const p = slideCurve.getPointAt(i / 12);
-    const m = new THREE.Matrix4().makeScale(1, Math.max(0.2, p.y), 1);
-    m.setPosition(p.x, p.y / 2, p.z);
-    slidePosts.setMatrixAt(i, m);
-  }
-  slidePosts.instanceMatrix.needsUpdate = true;
-  add(slidePosts, { camera: false, cast: false });
-  const tent = new THREE.Mesh(new THREE.ConeGeometry(2.6, 2.6, 12), mats.copingRed);
-  tent.position.set(41, 1.3, -41);
-  tent.name = 'district:big-top';
-  add(tent, { camera: false, cast: true });
 
   // -------------------------------------------------------------------
   // EAST MARGIN — the SEA fills the whole right edge; beach cape with
@@ -1117,17 +964,22 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   cape.name = 'district:beach';
   add(cape, { walkable: true, camera: false, cast: false });
 
-  const UMBRELLA_SITES = [
-    ...MARINA_SEMSIYELER.map(({ x, z, renk }) => [x, z, renk]),
-    // The cape's own parasols, which the promenade row does not cover.
-    [50, -10, '#d98a9a'], [53, -5, '#cfc3bb'], [54, 1, '#8fa8ce'], [52, 7, '#cf7d78'],
-  ];
+  // Parasols, from the plan's own measured row. The promenade run it draws
+  // sits at x 41.2 all the way down — sampled (220,182,163) cream, (161,160,174)
+  // blue-white, (211,153,149) pink and (186,202,217) pale blue — where the
+  // marina list had two of its six at x 37.0, which lands them inside the
+  // fairground, one of them on top of the carousel. The cone rides a neutral
+  // base now: on mats.copingRed every instance colour came out crimson, which
+  // is why the promenade was a row of red mushrooms.
+  const UMBRELLA_SITES = PLAN_SEMSIYELER
+    .map(([x, z, , , , renk]) => [x, z, renk])
+    .filter(([x, z]) => !denizdeMi(x, z));
   const umbrellas = new THREE.InstancedMesh(
-    new THREE.ConeGeometry(0.9, 0.5, 10), mats.copingRed, UMBRELLA_SITES.length,
+    new THREE.ConeGeometry(0.85, 0.5, 10), mats.white, UMBRELLA_SITES.length,
   );
   UMBRELLA_SITES.forEach(([x, z, renk], i) => {
     umbrellas.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 1.15, z));
-    umbrellas.setColorAt(i, new THREE.Color(renk));
+    umbrellas.setColorAt(i, olculenRenk(renk));
   });
   umbrellas.instanceMatrix.needsUpdate = true;
   if (umbrellas.instanceColor) umbrellas.instanceColor.needsUpdate = true;
@@ -2208,7 +2060,10 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     return [nx, nz, ...rest];
   };
   const ufakMi = ([x, z, g, d]) => g <= 3.2 && d <= 3.2 && !skateIcinde(x, z) && !denizdeMi(x, z);
-  const RENKLI = [...PLAN_BANKLAR, ...PLAN_SEMSIYELER, ...PLAN_HEYKELLER]
+  // PLAN_SEMSIYELER is deliberately not in here: the parasols are drawn as
+  // cones by the beach and promenade run above, and dropping a coloured slab
+  // on each of them as well stacked a box under every umbrella.
+  const RENKLI = [...PLAN_BANKLAR, ...PLAN_HEYKELLER]
     .map(yerlestir).filter(ufakMi);
   const SOLUK = [...PLAN_LAMBALAR, ...PLAN_COPLER, ...PLAN_UFAKLAR]
     .map(yerlestir).filter(ufakMi);

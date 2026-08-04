@@ -131,6 +131,95 @@ export const PLAN_TESISLER = Object.freeze([
   [0.1, -34.2, 32.16, 29.16, '#e6d2ca'], // skatepark platformu (67 parki)
 ]);
 
+// Funfair, re-measured off the 1280 px reference for this build. PLAN_TESISLER
+// already carries the ride footprints but nothing reads them, so the rows the
+// builder needs are named here, beside the table, instead of being retyped into
+// city-districts.js. Same conversion as everything else: w = (px/1280 - .5)*124.
+export const PLAN_LUNAPARK = Object.freeze({
+  // [x, z, width, depth] straight out of the table above.
+  dolapCark: PLAN_TESISLER[10], // [26.64, -46.79, 10.17, 6.49] wheel envelope
+  dolapTaban: PLAN_TESISLER[11], // [25.96, -42.92, 8.14, 1.84] base platform
+  atlikarinca: PLAN_TESISLER[12], // [36.33, -45.82, 6.49, 7.07] big carousel
+  hizTreni: PLAN_TESISLER[14], // [30.13, -26.06, 17.24, 9.88] coaster footprint
+
+  // The wheel is not a ring standing on nothing. Under it the drawing has a
+  // pale beam along z -42.4 with an upright landing on each end at x 22.4 and
+  // x 29.6, and a pink boarding deck in front of that: a pink mask (R-G > 22
+  // with B > G) over the patch reads x 23.25..27.81 by z -42.35..-40.70, so
+  // 4.56 x 1.65 centred (25.53, -41.53), sampled (207,171,183) on its lit half.
+  dolapPeron: Object.freeze([25.53, -41.53, 4.56, 1.65, '#cfa5b1']),
+  dolapAyak: Object.freeze({ solX: 22.4, sagX: 29.6, z: -42.4 }),
+  // Rim and spokes are a near-white with a pink cast, not the saturated yellow
+  // they were built in: sampled round the rim at (207,180,187), (212,188,188),
+  // (228,214,227), (225,196,200) and (219,212,206).
+  dolapCemberRenk: '#dac6ca',
+  // Twelve gondolas are countable round the rim and every one is a pastel —
+  // no channel under 139. Sampled clockwise from the west shoulder; these are
+  // lit values, so the builder divides them back through the lighting gain.
+  dolapKabinRenk: Object.freeze([
+    '#d0bec0', '#a8a1c9', '#caba9a', '#b59c92', '#b8a3b9', '#e3bcbe',
+    '#a9bbd0', '#ba8b9b', '#d9b0a3', '#ece1d2', '#b7bcc2', '#ceb2ba',
+  ]),
+
+  // The big carousel's canopy is pink and cream, not brick red. A ring sampled
+  // at r 1.5, 1.9, 2.1 and 2.3 around (36.9, -46.5) counts twelve transitions
+  // every time — six pink wedges against six cream — with the pink landing on
+  // (218,140,146) and the cream on (222,207,197). Under the canopy there is a
+  // drum: a warm cut at x 36.4 runs from z -49.2 down to -42.2 against a canopy
+  // only 5.4 deep, so about 1.3 of the drawing's depth is standing wall, which
+  // at the render's measured 0.56 depth-per-height is 2.3 units of cylinder.
+  // Its lit east face samples (229,197,182).
+  // The two tones are base colours, not the samples: the samples divided back
+  // through the lighting, then corrected channel by channel against this
+  // build's own capture, which came back (204,145,144) and (203,192,182) on
+  // the first pass and (211,155,153) and (211,202,192) on the second.
+  atlikarincaDilim: 12,
+  atlikarincaPembe: '#c56f7a',
+  atlikarincaKrem: '#d0beb4',
+  atlikarincaGovde: 2.3,
+
+  // The coaster is a rail, not a slide. A perpendicular cut at z -27 through
+  // the west limb reads pad to x 21.99, dark rail 21.99..22.09, pale deck
+  // 22.18..22.86, dark rail 22.86..22.96 and pink rail 23.06..23.20 — 1.21
+  // across. The same cut at the east extreme (z -24) gives 37.39..38.75 and
+  // across the flat top (x 25.5) 0.58, so the deck is 0.90 with a 0.15 lip on
+  // each edge: 1.20 overall against the 3.11 the ribbon was built at.
+  hizTreniYari: 0.45,
+  hizTreniDudak: 0.15,
+  // Rails sampled (244,193,198) and (233,186,194) on the drawing — pink, not
+  // orange. This is the base that lands on them rather than the sample itself:
+  // dividing by the usual 1.22 captured (203,175,174) on the rail crown and
+  // the correction from that captured (213,176,177), so the base carries this
+  // tube's own measured response instead of the flat gain.
+  hizTreniRayTaban: '#de9da9',
+  // Centre line traced off the drawing and checked by overlaying the sampled
+  // curve back on it: an outer loop over the west half (flat top at z -30.8
+  // between x 24 and 27, west extreme x 22.6 at z -27, bottom z -21.7), a
+  // tighter loop nested inside it with its apex at (28.3, -27.9), and an east
+  // loop (top z -26.7 at x 36.3, east extreme x 38.1 at z -24.4, bottom z
+  // -22.1 at x 35.5), the strands crossing near (32.1, -23.6). [x, z, height];
+  // the heights are the ride's own profile, which the drawing cannot show.
+  hizTreniHat: Object.freeze([
+    [27.40, -30.55, 2.30], [25.50, -30.75, 2.40], [23.90, -30.15, 2.20],
+    [22.90, -28.85, 1.90], [22.60, -27.10, 1.60], [22.90, -25.30, 1.30],
+    [23.80, -23.65, 1.10], [25.20, -22.45, 1.05], [27.00, -21.75, 1.10],
+    [28.90, -21.75, 1.20], [30.60, -22.25, 1.50], [31.90, -23.05, 1.75],
+    [33.30, -24.50, 1.90], [34.80, -26.00, 2.05], [36.30, -26.70, 2.10],
+    [37.50, -26.20, 2.00], [38.10, -25.00, 1.80], [38.00, -23.70, 1.55],
+    [37.00, -22.55, 1.25], [35.50, -22.10, 1.05], [33.90, -22.30, 0.95],
+    [32.50, -22.85, 1.05], [31.20, -23.70, 1.15], [30.50, -24.70, 1.25],
+    [30.30, -25.85, 1.55], [29.60, -27.00, 1.60], [28.30, -27.85, 1.60],
+    [27.10, -27.20, 1.40], [26.20, -26.20, 1.20], [25.75, -24.95, 1.00],
+    [26.20, -23.75, 0.75], [27.30, -22.95, 0.55], [29.20, -22.75, 0.45],
+    [30.80, -23.50, 0.50], [31.50, -24.85, 0.60], [31.20, -26.45, 0.85],
+    [30.40, -28.20, 1.55], [29.10, -29.50, 2.05],
+  ]),
+  // The fairground pad it has to stay on, PLAN_OYUN's lunapark platform inset
+  // by the ribbon's own half width, so no part of the track can run onto the
+  // carousel lawn to the north or the marina promenade to the east.
+  hizTreniSinir: Object.freeze({ minX: 20.85, maxX: 39.41, minZ: -49.63, maxZ: -21.67 }),
+});
+
 export const PLAN_SPOR = Object.freeze([
   [-41.37, -29.45, 9.69, 16.66, '#dd8f89'], // atletizm kosu pisti (oval)
   [-41.37, -33.23, 1.26, 0.78, '#6f6f63'], // kale (kuzey)
