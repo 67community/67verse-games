@@ -278,15 +278,25 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // silhouette the reference draws. Parked in the gym lot and at kerbs;
   // four slow drivers loop the two inner avenues.
   // -------------------------------------------------------------------
+  const V = Math.PI / 2;
   const PARKED = [
     // gym parking lot rows (reference top-left)
     [-46, -44, 0], [-43, -44, 0], [-40, -44, 0], [-37, -44, 0],
-    [-46, -40.5, 0], [-43, -40.5, 0], [-40, -40.5, 0],
-    // kerb-parked around the grid
-    [-17.2, -30, 0], [-17.2, 4, 0], [18.8, 30, 0], [13.2, -8, 0],
-    [-30, -16.2, Math.PI / 2], [4, 18.8, Math.PI / 2], [30, 13.2, Math.PI / 2],
+    [-46, -40.5, 0], [-43, -40.5, 0], [-40, -40.5, 0], [-37, -40.5, 0],
+    // kerbs along the north-south boulevards
+    [-17.2, -34, 0], [-17.2, -22, 0], [-17.2, -6, 0], [-17.2, 4, 0], [-17.2, 26, 0],
+    [-22.8, -12, 0], [-22.8, 12, 0], [-22.8, 34, 0],
+    [13.2, -30, 0], [13.2, -8, 0], [13.2, 12, 0], [13.2, 34, 0],
+    [18.8, -20, 0], [18.8, 6, 0], [18.8, 30, 0],
+    [41.2, -8, 0], [46.8, 22, 0], [-48.2, -6, 0], [-53.8, 24, 0],
+    // kerbs along the east-west streets
+    [-38, -16.2, V], [-30, -16.2, V], [-8, -16.2, V], [6, -16.2, V], [26, -16.2, V],
+    [-34, -21.8, V], [-14, -21.8, V], [10, -21.8, V], [34, -21.8, V],
+    [-40, 18.8, V], [-24, 18.8, V], [4, 18.8, V], [22, 18.8, V], [38, 18.8, V],
+    [-30, 13.2, V], [-6, 13.2, V], [18, 13.2, V], [30, 13.2, V],
+    [-20, 48.8, V], [8, 48.8, V], [30, 48.8, V], [-40, 43.2, V], [16, 43.2, V],
   ];
-  const DRIVERS = 4;
+  const DRIVERS = 10;
   const CAR_N = PARKED.length + DRIVERS;
   const carBodies = new THREE.InstancedMesh(new THREE.BoxGeometry(1.6, 0.55, 3.1), mats.white, CAR_N);
   const carCabins = new THREE.InstancedMesh(new THREE.BoxGeometry(1.35, 0.45, 1.5), mats.carDark, CAR_N);
@@ -325,16 +335,29 @@ export function buildCityDistricts({ group, add, material, animated }) {
   add(carBodies, { camera: false, cast: true });
   add(carCabins, { camera: false, cast: false });
   add(carWheels, { camera: false, cast: false });
+  // Traffic on every avenue of the grid, both directions: six run the
+  // north-south roads and four run the east-west streets, each in its own
+  // lane and offset along the road so they never travel as a convoy.
+  const ROUTES = [
+    { axis: 'z', road: -20, dir: 1 }, { axis: 'z', road: -20, dir: -1 },
+    { axis: 'z', road: 16, dir: 1 }, { axis: 'z', road: 16, dir: -1 },
+    { axis: 'z', road: 44, dir: 1 }, { axis: 'z', road: -51, dir: -1 },
+    { axis: 'x', road: -19, dir: 1 }, { axis: 'x', road: -19, dir: -1 },
+    { axis: 'x', road: 16, dir: 1 }, { axis: 'x', road: 46, dir: -1 },
+  ];
   animated?.push((time) => {
-    for (let d = 0; d < DRIVERS; d += 1) {
+    ROUTES.forEach((route, d) => {
       const index = PARKED.length + d;
-      const road = d % 2 === 0 ? -20 : 16;
-      const dir = d < 2 ? 1 : -1;
-      const lane = road + dir * 1.15;
-      const span = 92;
-      const along = ((time * 4.5 + d * 23) % span) - span / 2;
-      placeCar(index, lane, dir > 0 ? along : -along, dir > 0 ? Math.PI : 0);
-    }
+      const lane = route.road + route.dir * 1.15;
+      const span = 96;
+      const along = ((time * 4.5 + d * 19) % span) - span / 2;
+      const travel = route.dir > 0 ? along : -along;
+      if (route.axis === 'z') {
+        placeCar(index, lane, travel, route.dir > 0 ? Math.PI : 0);
+      } else {
+        placeCar(index, travel, lane, route.dir > 0 ? -Math.PI / 2 : Math.PI / 2);
+      }
+    });
     carBodies.instanceMatrix.needsUpdate = true;
     carCabins.instanceMatrix.needsUpdate = true;
     carWheels.instanceMatrix.needsUpdate = true;
@@ -1110,8 +1133,13 @@ export function buildCityDistricts({ group, add, material, animated }) {
   river.position.y = 0.05;
   river.name = 'district:river';
   add(river, { camera: false, cast: false });
-  const bridges = new THREE.InstancedMesh(new THREE.BoxGeometry(7, 0.4, 2.6), mats.wood, 3);
-  [[-54, -19, 0], [-54, 16, 0], [-30, 54.5, 0.35]].forEach(([x, z, rot], i) => {
+  // A bridge wherever a street meets the water, as the reference has.
+  const BRIDGES = [
+    [-54, -19, 0], [-54, 16, 0], [-53, -44, 0], [-52, 38, 0],
+    [-30, 54.5, 0.35], [-6, 56, 0.1], [16, 55, -0.1],
+  ];
+  const bridges = new THREE.InstancedMesh(new THREE.BoxGeometry(7, 0.4, 2.6), mats.wood, BRIDGES.length);
+  BRIDGES.forEach(([x, z, rot], i) => {
     const m = new THREE.Matrix4().makeRotationY(rot);
     m.setPosition(x, 0.36, z);
     bridges.setMatrixAt(i, m);
@@ -1120,15 +1148,35 @@ export function buildCityDistricts({ group, add, material, animated }) {
   bridges.name = 'district:river-bridges';
   add(bridges, { camera: false, cast: false });
 
+  // The suburbs ring the whole plan in the reference, not just one strip:
+  // rows outside the river to the west, along the south edge, up the north
+  // edge past the kart track, and behind the coast road to the east. Rows
+  // alternate their roof angle so the belt reads as streets, not a fence.
   const HOUSES = [
-    [-59, -36], [-60, -12], [-59, 10], [-60, 30],
-    [-52, 47], [-40, 52], [-20, 51], [-8, 52], [6, 51], [20, 55], [34, 55], [44, 50],
+    // west of the river, two staggered rows
+    [-59, -46], [-59, -36], [-60, -26], [-60, -16], [-59, -6],
+    [-59, 4], [-60, 14], [-60, 24], [-59, 34], [-58, 44],
+    [-52, -41], [-53, -21], [-53, -1], [-53, 19], [-52, 39],
+    // south edge
+    [-46, 52], [-36, 53], [-26, 52], [-16, 53], [-6, 52],
+    [4, 53], [14, 52], [24, 53], [34, 52], [44, 53],
+    [-40, 59], [-20, 59], [0, 59], [20, 59], [40, 59],
+    // north edge, past the kart track
+    [-48, -57], [-36, -57], [-24, -58], [-12, -57], [0, -58],
+    [12, -57], [24, -58], [36, -57], [46, -56],
+    // east, behind the coast road
+    [52, 40], [54, 50], [50, 30],
   ];
   const houseBodies = new THREE.InstancedMesh(new THREE.BoxGeometry(3, 2.2, 3.4), mats.block, HOUSES.length);
   const houseRoofs = new THREE.InstancedMesh(new THREE.ConeGeometry(2.5, 1.5, 4), mats.copingRed, HOUSES.length);
   HOUSES.forEach(([x, z], i) => {
-    houseBodies.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 1.1, z));
-    const rm = new THREE.Matrix4().makeRotationY(Math.PI / 4);
+    // Alternate the plan rotation so a row of houses reads as a street of
+    // separate homes rather than one repeated stamp.
+    const turn = (i % 2) * (Math.PI / 2);
+    const bodyM = new THREE.Matrix4().makeRotationY(turn);
+    bodyM.setPosition(x, 1.1, z);
+    houseBodies.setMatrixAt(i, bodyM);
+    const rm = new THREE.Matrix4().makeRotationY(Math.PI / 4 + turn);
     rm.setPosition(x, 2.95, z);
     houseRoofs.setMatrixAt(i, rm);
     houseRoofs.setColorAt(i, new THREE.Color(CAR_PAINT[i % 3]));
