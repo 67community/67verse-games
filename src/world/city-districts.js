@@ -1276,7 +1276,11 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   const OZEL_BOLGELER = [
     { minX: -16.5, maxX: 17.8, minZ: -50.2, maxZ: -19.3 },   // skatepark
     { minX: -48, maxX: -24, minZ: -12, maxZ: 12 },   // basketball court ring
-    { minX: 20, maxX: 44, minZ: -12, maxZ: 12 },     // stadium
+    // The whole measured apron, not just the oval: the old box stopped at
+    // z = +/-12 and the apron runs -18.6..15.5, so the layout solver was free
+    // to stand a house on the stadium's west wall and another on its south
+    // corner. That is what "the wall is tangled up with the houses" was.
+    { minX: 18.6, maxX: 41.2, minZ: -19.4, maxZ: 16.2 },     // stadium
     { minX: -10, maxX: 6, minZ: 24, maxZ: 39 },      // market square
     { minX: 18, maxX: 46, minZ: -50, maxZ: -18 },    // funfair
     { minX: 18, maxX: 46, minZ: 18, maxZ: 46 },      // pond park

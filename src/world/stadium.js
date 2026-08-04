@@ -138,10 +138,15 @@ export function buildStadium(mats) {
   // end. All three are the same pale box, so they ride one instanced mesh.
   // Offsets from the stadium's own centre, each read off the drawing: the two
   // grandstands outside the long sides, and the entrance block at the south.
+  // Measured at 9x: the west stand runs pixels 861..883 by 573..676, so it is
+  // 2.1 wide by 10.0 long and sits ON the bowl wall — its outer face just
+  // past the oval, its inner face over the wall's inner edge. That is what a
+  // seating deck looks like from above, and it is why it must not be a
+  // free-standing block beside the stadium.
   const STANDS_67 = [
-    [-7.5, 0.55, 2.6, 10.1, 2.3],
-    [7.5, 0.55, 2.8, 10.1, 2.3],
-    [0.7, 16.05, 7.8, 2.9, 1.9],
+    [-7.42, 0, 2.13, 9.98, 2.55],
+    [7.42, 0, 2.13, 9.98, 2.55],
+    [0.7, 16.05, 7.8, 2.9, 1.7],
   ];
   const standMesh = new THREE.InstancedMesh(
     roundedBoxGeometry(1, 1, 1, 0.18, 0.06), mats.white, STANDS_67.length,
