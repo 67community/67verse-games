@@ -552,14 +552,25 @@ export function disposeCharacterObjectResources(root) {
   });
 }
 
+// Manifest URLs are written from the site root, which is right when the game
+// is served from the root and wrong the moment it is not. On GitHub Pages it
+// lives under /67versee/, so a root-relative URL fetched Oscar's character
+// from the domain root, got a 404, and the hub quietly fell back to the QA
+// Runner — his character simply vanished online while working locally.
+function siteUrl(url) {
+  if (/^(?:https?:)?\/\//i.test(url)) return url;
+  const base = import.meta.env?.BASE_URL ?? '/';
+  return url.startsWith('/') ? `${base.replace(/\/$/, '')}${url}` : url;
+}
+
 function basePathOf(url) {
-  const absolute = new URL(url, globalThis.location?.href || 'http://localhost/');
+  const absolute = new URL(siteUrl(url), globalThis.location?.href || 'http://localhost/');
   return absolute.href.slice(0, absolute.href.lastIndexOf('/') + 1);
 }
 
 async function fetchCandidateBytes(manifest) {
   const absolute = new URL(
-    manifest.url,
+    siteUrl(manifest.url),
     globalThis.location?.href || 'http://localhost/',
   ).href;
   if (!candidateBytes.has(absolute)) {
