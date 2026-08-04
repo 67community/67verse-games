@@ -86,6 +86,17 @@ function copingArc(material, radius, tube, arc) {
   return mesh;
 }
 
+// Every canvas in this file is authored in sRGB — hex colours picked to match
+// the reference — but three treats a CanvasTexture as linear data unless it is
+// told otherwise, which reads every one of them back far too light and washed
+// out. The basketball court was rendering 170,181,146 against a reference of
+// 102,107,93 for exactly this reason.
+function canvasTexture(canvas) {
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
 function flatLabel(text, size) {
   if (typeof document === 'undefined') return null;
   const canvas = document.createElement('canvas');
@@ -99,7 +110,7 @@ function flatLabel(text, size) {
   c.fillText(text, 64, 68);
   const mesh = new THREE.Mesh(
     new THREE.PlaneGeometry(size, size),
-    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ map: canvasTexture(canvas), transparent: true, depthWrite: false }),
   );
   mesh.rotation.x = -Math.PI / 2;
   return mesh;
@@ -112,21 +123,48 @@ function flatLabel(text, size) {
 // the tree's own coordinates) so the world is reproducible.
 // The reference's buildings are squircles, not boxes: soft rounded corners
 // with a flat top. One unit-sized geometry, scaled per instance.
-function roundedBoxGeometry(w, d, h, r) {
-  const shape = new THREE.Shape();
+function squirclePath(w, d, r, Ctor = THREE.Shape) {
+  const path = new Ctor();
   const hw = w / 2;
   const hd = d / 2;
-  shape.moveTo(-hw + r, -hd);
-  shape.lineTo(hw - r, -hd);
-  shape.quadraticCurveTo(hw, -hd, hw, -hd + r);
-  shape.lineTo(hw, hd - r);
-  shape.quadraticCurveTo(hw, hd, hw - r, hd);
-  shape.lineTo(-hw + r, hd);
-  shape.quadraticCurveTo(-hw, hd, -hw, hd - r);
-  shape.lineTo(-hw, -hd + r);
-  shape.quadraticCurveTo(-hw, -hd, -hw + r, -hd);
-  const geometry = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false, curveSegments: 4 });
+  const rr = Math.max(0.01, Math.min(r, hw - 0.01, hd - 0.01));
+  path.moveTo(-hw + rr, -hd);
+  path.lineTo(hw - rr, -hd);
+  path.quadraticCurveTo(hw, -hd, hw, -hd + rr);
+  path.lineTo(hw, hd - rr);
+  path.quadraticCurveTo(hw, hd, hw - rr, hd);
+  path.lineTo(-hw + rr, hd);
+  path.quadraticCurveTo(-hw, hd, -hw, hd - rr);
+  path.lineTo(-hw, -hd + rr);
+  path.quadraticCurveTo(-hw, -hd, -hw + rr, -hd);
+  return path;
+}
+
+// The reference's blocks are not slabs — every top edge carries a fat fillet
+// that catches the key light as a bright rim, which is most of why they read
+// as soft clay rather than cut paper. `bevel` builds that fillet; the shape and
+// depth are shrunk by it first so the finished size is still exactly w x d x h
+// and the layout solver's footprints stay true. `hole` turns the result into a
+// frame, which is how a roof gets its tray.
+function roundedBoxGeometry(w, d, h, r, bevel = 0, hole = 0) {
+  const b = Math.max(0, Math.min(bevel, w / 4, d / 4, h / 3));
+  const shape = squirclePath(w - b * 2, d - b * 2, r - b);
+  if (hole > 0) {
+    shape.holes.push(squirclePath((w - b * 2) * hole, (d - b * 2) * hole, (r - b) * hole, THREE.Path));
+  }
+  const geometry = new THREE.ExtrudeGeometry(shape, {
+    depth: Math.max(0.01, h - b * 2),
+    bevelEnabled: b > 0,
+    bevelThickness: b,
+    bevelSize: b,
+    bevelOffset: 0,
+    bevelSegments: 2,
+    curveSegments: 4,
+  });
   geometry.rotateX(-Math.PI / 2);
+  // Bevelled extrusion starts a bevel below zero; lift it so the box still
+  // spans 0..h and every caller's positioning is unchanged.
+  if (b > 0) geometry.translate(0, b, 0);
   return geometry;
 }
 
@@ -284,6 +322,32 @@ function kiyiX(z) {
 }
 const denizdeMi = (x, z) => x > kiyiX(z);
 
+// The reference's ground is not one flat tone: beside a building it reads
+// 170,142,151 and out in the open 235,211,211, a sixty-five level spread that
+// is contact shading. Mine measured 217,204,199 everywhere, which is exactly
+// why the city looked like cut paper. A shadow map alone does not give this —
+// it is ambient occlusion, and AO is post-process and tier-gated here, so the
+// pool under each block is baked instead: one soft radial decal, one draw for
+// the whole city, present on every device.
+function contactShadowTexture() {
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const c = canvas.getContext('2d');
+  // Multiply blending, so the decal darkens whatever it lies on and white
+  // costs nothing. The dark core has to reach well past the block's own
+  // plinth or the only part anyone sees is the tail of the falloff.
+  const gradient = c.createRadialGradient(64, 64, 8, 64, 64, 64);
+  gradient.addColorStop(0, '#4a3d46');
+  gradient.addColorStop(0.74, '#574a53');
+  gradient.addColorStop(0.9, '#a2969d');
+  gradient.addColorStop(1, '#ffffff');
+  c.fillStyle = gradient;
+  c.fillRect(0, 0, 128, 128);
+  return canvasTexture(canvas);
+}
+
 const BLOBS_PER_TREE = 6;
 function treeBlobs(positions, THREE_, blobMaterial) {
   const blobs = new THREE_.InstancedMesh(
@@ -331,7 +395,8 @@ export function buildCityDistricts({ group, add, material, animated }) {
     concreteDeep: material(0xb8b2a6, { roughness: 0.7 }),
     block: material(0xb5a9a6, { roughness: 0.7 }),
     blockDark: material(0xa39590, { roughness: 0.75 }),
-    court: material(0x748560, { roughness: 0.9 }),
+    // The reference's court is a deep muted olive, 102,107,93 lit.
+    court: material(0x5c6b48, { roughness: 0.9 }),
     pitch: material(0x475142, { roughness: 0.92 }),
     trackRed: material(0xa9736a, { roughness: 0.9 }),
     grass: material(0x868b6e, { roughness: 0.95 }),
@@ -352,7 +417,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
     // through the lighting gain.
     wood: material(0xb09492, { flatShading: true, roughness: 1 }),
     rail: material(0x70757e, { roughness: 0.35, metalness: 0.4 }),
-    white: material(0xc0b7ad, { roughness: 0.6 }),
+    white: material(0xbeb3b7, { roughness: 0.6 }),
     cream: material(0xbeb0a9, { roughness: 0.5 }),
     // Skatepark surfaces are one-sided sheets — bowl walls, ramp faces — so
     // they are drawn from both sides rather than gambling on winding, and the
@@ -949,7 +1014,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
       c.lineTo(8, (i * 64) / 6);
       c.stroke();
     }
-    return new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(canvas), roughness: 0.9 });
+    return new THREE.MeshStandardMaterial({ map: canvasTexture(canvas), roughness: 0.9 });
   }
   const oval = copingArc(lanesTexture(), 4.85, 2.4, Math.PI * 2);
   oval.scale.set(1, 1, 0.06);
@@ -1031,7 +1096,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
       c.fillRect((i * 256) / wedges, 0, 256 / wedges + 1, 16);
     }
     return new THREE.MeshStandardMaterial({
-      map: new THREE.CanvasTexture(canvas),
+      map: canvasTexture(canvas),
       roughness: 0.6,
     });
   }
@@ -1506,10 +1571,12 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // of the map: a soft squircle body on a wider plinth, a raised lip framing
   // the roof, an L-shaped recess inside that lip, and a striped awning at the
   // street face. Five instanced meshes cover every block in the city.
-  const blockGeo = roundedBoxGeometry(1, 1, 1, 0.16);
+  const blockGeo = roundedBoxGeometry(1, 1, 1, 0.16, 0.075);
   const blockBodies = new THREE.InstancedMesh(blockGeo, mats.white, BLOCKS.length);
-  const blockPlinths = new THREE.InstancedMesh(roundedBoxGeometry(1, 1, 1, 0.22), mats.concrete, BLOCKS.length);
-  const blockLips = new THREE.InstancedMesh(roundedBoxGeometry(1, 1, 1, 0.16), mats.white, BLOCKS.length);
+  const blockPlinths = new THREE.InstancedMesh(roundedBoxGeometry(1, 1, 1, 0.22, 0.05), mats.concrete, BLOCKS.length);
+  // The roof lip is a frame, not a lid: the tray it encloses is what the
+  // reference shows inside every parapet.
+  const blockLips = new THREE.InstancedMesh(roundedBoxGeometry(1, 1, 1, 0.16, 0.045, 0.74), mats.white, BLOCKS.length);
   // The L recess is two arms of the same material and geometry, so both ride
   // one instanced mesh: index 2i is the long arm, 2i+1 the short.
   const blockNotches = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.blockDark, BLOCKS.length * 2);
@@ -1534,14 +1601,17 @@ export function buildCityDistricts({ group, add, material, animated }) {
     // Each block wears the colour measured off its own footprint in the plan,
     // divided back through this scene's exposure so it lands on the drawing's
     // value once lit.
-    blockBodies.setColorAt(i, new THREE.Color(BLOCKS[i][5] || '#c9bcb8').multiplyScalar(0.82));
+    // Measured, not tuned by eye: the reference's roofs sit at 230,206,205
+    // and the 0.82 that used to be here landed them at 191,172,159 — forty
+    // levels dark, which is most of why the city read as cardboard.
+    blockBodies.setColorAt(i, new THREE.Color(BLOCKS[i][5] || '#c9bcb8'));
     // Plinth: a slightly wider, very low pad the body sits on.
     bm.makeScale(w + 1.1, 0.26, d + 1.1);
     bm.setPosition(x, 0.13, z);
     blockPlinths.setMatrixAt(i, bm);
     // Roof lip: a thin raised frame just inside the roof edge.
-    bm.makeScale(w * 0.9, 0.16, d * 0.9);
-    bm.setPosition(x, h + 0.06, z);
+    bm.makeScale(w * 0.9, 0.24, d * 0.9);
+    bm.setPosition(x, h + 0.02, z);
     blockLips.setMatrixAt(i, bm);
     // The L recess inside the lip: one long arm, one short.
     bm.makeScale(w * 0.5, 0.07, 0.16);
@@ -1577,6 +1647,42 @@ export function buildCityDistricts({ group, add, material, animated }) {
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }
+  // The pool of shade each block sits in. Sized from the block's own
+  // footprint so a long terrace gets a long pool, and laid just over the
+  // paving with depth writes off so it darkens rather than z-fights.
+  const contactMap = contactShadowTexture();
+  if (contactMap) {
+    const contactGeo = new THREE.PlaneGeometry(1, 1);
+    contactGeo.rotateX(-Math.PI / 2);
+    const contacts = new THREE.InstancedMesh(
+      contactGeo,
+      new THREE.MeshBasicMaterial({
+        map: contactMap,
+        transparent: true,
+        blending: THREE.MultiplyBlending,
+        // three refuses to set up multiply blending without this and the
+        // decal silently renders almost invisible, which is exactly what it
+        // did on the first two passes.
+        premultipliedAlpha: true,
+        depthWrite: false,
+      }),
+      BLOCKS.length,
+    );
+    contacts.renderOrder = 2;
+    const cm = new THREE.Matrix4();
+    BLOCKS.forEach(([x, z, w, h, d], i) => {
+      cm.makeScale(w + 2.8, 1, d + 2.8);
+      // Above the plaza plate and the plinth, both of which would otherwise
+      // hide the pool inside themselves, and far enough under the block that
+      // nothing floats at eye level.
+      cm.setPosition(x, 0.29, z);
+      contacts.setMatrixAt(i, cm);
+    });
+    contacts.instanceMatrix.needsUpdate = true;
+    contacts.name = 'district:block-contact';
+    add(contacts, { camera: false, cast: false });
+  }
+
   blockBodies.name = 'district:blocks';
   add(blockBodies, { camera: true, cast: true });
   add(blockPlinths, { camera: false, cast: false });
@@ -1621,7 +1727,10 @@ export function buildCityDistricts({ group, add, material, animated }) {
     const c = canvas.getContext('2d');
     // The canvas is a lit surface, so its base sits well below the reference
     // court green — at the hub's exposure this is what lands on it.
-    c.fillStyle = '#3f5130';
+    // Measured with the colour space correct: this lands 106,110,96, which is
+    // the reference court to four levels. The old value was picked against a
+    // texture three was decoding as linear, so it was compensating for a bug.
+    c.fillStyle = '#5a5f58';
     c.fillRect(0, 0, 256, 384);
     c.strokeStyle = '#cfcbb8';
     c.lineWidth = 4;
@@ -1650,7 +1759,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
     c.textBaseline = 'middle';
     c.fillText('67', 128, 193);
     return new THREE.MeshStandardMaterial({
-      map: new THREE.CanvasTexture(canvas),
+      map: canvasTexture(canvas),
       roughness: 0.9,
     });
   }
