@@ -186,6 +186,11 @@ import {
   destinationFocusVisualState,
 } from '../src/world/hub-plus.js';
 import { buildWorld } from '../src/world.js';
+import { buildCityDistricts } from '../src/world/city-districts.js';
+
+// The city ships as its own chunk, so buildWorld takes its builder rather than
+// importing it. Tests hand it over the same way the app does.
+const buildHubWorld = (scene) => buildWorld(scene, { buildCity: buildCityDistricts });
 import {
   SKYPARK_LANDMARKS,
   SKYPARK_ROUTES,
@@ -2125,7 +2130,7 @@ test('scene attribution accounts for instances, groups, materials, and hidden ob
 
 test('town lobby stays inside the draw budget at both quality tiers', () => {
   const scene = new THREE.Scene();
-  const world = buildWorld(scene);
+  const world = buildHubWorld(scene);
 
   // The lobby is grass, one avenue, its shopfronts and traffic. Nothing else
   // ships, so there is no high-tier-only layer to toggle any more; what the
@@ -2147,7 +2152,7 @@ test('town lobby stays inside the draw budget at both quality tiers', () => {
 
 test('town lobby ships the pedestrian city and nothing left over from the old hub', () => {
   const scene = new THREE.Scene();
-  const world = buildWorld(scene);
+  const world = buildHubWorld(scene);
 
   // What the lobby is: the faithful island city from the 2026-08-04 rich
   // reference — street grid with crosswalks and street cars, the framed 67

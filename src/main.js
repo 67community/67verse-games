@@ -3,10 +3,6 @@
 
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { createSkyDome } from './core/sky.js';
 import { buildWorld, PALETTE } from './world.js';
 import { loadWorldItems } from './world-items.js';
@@ -103,8 +99,29 @@ let composer = null;
 let gtaoPass = null;
 let renderPass = null;
 
+// The AO stack is sixty kilobytes of three add-ons that only the high quality
+// tier ever runs, so it is fetched the first time a frame actually asks for
+// it. Until it arrives the caller renders straight to the screen, which is the
+// same path the low tier takes — AO fades in a frame or two late, and a device
+// that never turns it on never downloads it.
+let composerLoading = null;
 function ensureComposer() {
   if (composer) return composer;
+  if (!composerLoading) {
+    composerLoading = Promise.all([
+      import('three/addons/postprocessing/EffectComposer.js'),
+      import('three/addons/postprocessing/RenderPass.js'),
+      import('three/addons/postprocessing/GTAOPass.js'),
+      import('three/addons/postprocessing/OutputPass.js'),
+    ]).then(([
+      { EffectComposer }, { RenderPass }, { GTAOPass }, { OutputPass },
+    ]) => buildComposer(EffectComposer, RenderPass, GTAOPass, OutputPass))
+      .catch(() => { composerLoading = null; });
+  }
+  return composer;
+}
+
+function buildComposer(EffectComposer, RenderPass, GTAOPass, OutputPass) {
   composer = new EffectComposer(renderer);
   renderPass = new RenderPass(scene, camera);
   composer.addPass(renderPass);
@@ -137,6 +154,10 @@ function renderFrame(activeScene, activeCamera) {
     return;
   }
   const fx = ensureComposer();
+  if (!fx) {
+    renderer.render(activeScene, activeCamera);
+    return;
+  }
   if (fx.__pixelRatio !== renderer.getPixelRatio()) {
     fx.__pixelRatio = renderer.getPixelRatio();
     fx.setPixelRatio(renderer.getPixelRatio());
@@ -187,7 +208,11 @@ rim.target.position.set(0, 1.2, 6);
 scene.add(rim, rim.target);
 
 // ---------- World ----------
-const world = buildWorld(scene);
+// The city is its own chunk: keeping ninety kilobytes of measured plan data
+// out of the first bundle is worth one await here, and nothing renders before
+// this line anyway.
+const { buildCityDistricts } = await import('./world/city-districts.js');
+const world = buildWorld(scene, { buildCity: buildCityDistricts });
 // Authored Meshy props load in parallel and swap in when ready; the
 // procedural placeholders keep the hub fully visible in the meantime.
 loadWorldItems('/assets/items/')

@@ -10,7 +10,6 @@
 // player actually looks at is authored geometry loaded by world/city-avenue.js.
 
 import * as THREE from 'three';
-import { buildCityDistricts } from './world/city-districts.js';
 import { buildTerrainMesh, getHeight } from './world/sixseven-terrain.js';
 
 export const PALETTE = Object.freeze({
@@ -42,7 +41,14 @@ function bounds2Of(object) {
   };
 }
 
-export function buildWorld(scene) {
+// The city is the single largest thing this app ships, and it is loaded as its
+// own chunk rather than in the first bundle. Its builder is therefore passed
+// in rather than imported here — and it is required, so a caller cannot end up
+// with a silently empty island.
+export function buildWorld(scene, { buildCity } = {}) {
+  if (typeof buildCity !== 'function') {
+    throw new TypeError('buildWorld needs the city builder: import world/city-districts.js and pass buildCity.');
+  }
   const group = new THREE.Group();
   group.name = 'town-lobby';
   group.userData.perfGroup = 'hub-town';
@@ -98,7 +104,7 @@ export function buildWorld(scene) {
   // main-street module (shops, benches, promenade) is gone by explicit order:
   // nothing from the previous town ships on the main map.
   // ---------------------------------------------------------------------
-  const districts = buildCityDistricts({ group, add, material, animated });
+  const districts = buildCity({ group, add, material, animated });
   const solids = districts.colliders ?? [];
 
   // Low kerb along the world edge: the invisible bound needs something
