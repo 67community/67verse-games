@@ -24,7 +24,7 @@ import {
 
 import { PLAN_BINALAR, PLAN_BINA_RENK, PLAN_AGACLAR, PLAN_ARABALAR } from './plan-verisi.js';
 import {
-  PLAN_ANA_YOLLAR, PLAN_PATIKALAR, PLAN_ZEBRALAR, PLAN_KAVSAKLAR,
+  PLAN_ANA_YOLLAR, PLAN_PATIKALAR, PLAN_ZEBRALAR, PLAN_KAVSAKLAR, PLAN_PAZAR,
 } from './plan-ek.js';
 import {
   PLAN_BANKLAR, PLAN_SEMSIYELER, PLAN_LAMBALAR, PLAN_HEYKELLER,
@@ -204,6 +204,17 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     // gain puts the base here.
     concrete: material(0xcbb5b2, { roughness: 0.62 }),
     concreteDeep: material(0xb8b2a6, { roughness: 0.7 }),
+    // The market square's paving is the warmest ground in the reference —
+    // (205,174,166) on its lit half against (232,210,208) for the street it
+    // sits in. The square used concreteDeep and captured (207,201,190), a
+    // flat grey with no warmth in it at all. concreteDeep's base against that
+    // capture gives the gain this surface sees, 1.13; the first base off that
+    // division landed ten green and six blue high, so both are trimmed and
+    // the square now captures (206,178,171).
+    marketPaving: material(0xb59290, { roughness: 0.72 }),
+    // Stall canopies, sampled off the reference's olive awnings at
+    // (189,173,150) and trimmed the same way — captured (191,176,151).
+    stallCanopy: material(0xa1917c, { roughness: 0.8 }),
     block: material(0xb5a9a6, { roughness: 0.7 }),
     blockDark: material(0xa39590, { roughness: 0.75 }),
     // The reference's court is a deep muted olive, 102,107,93 lit.
@@ -265,10 +276,20 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // the four-by-four grid I had drawn by hand. Each is laid along its longer
   // axis. PLAN_PATIKALAR carries the park walks and neighbourhood lanes.
   const yatayMi = (g, d) => g >= d;
-  const V_ROADS = [...new Set(PLAN_ANA_YOLLAR.filter(([, , g, d]) => !yatayMi(g, d))
-    .map(([x]) => Math.round(x * 2) / 2))];
-  const H_ROADS = [...new Set(PLAN_ANA_YOLLAR.filter(([, , g, d]) => yatayMi(g, d))
-    .map(([, z]) => Math.round(z * 2) / 2))];
+  // A road is a segment, not an infinite line. The plan gives each one a
+  // length as well as a centre, and that length has to be carried into the
+  // clash test: the drawing's z = 34.88 street is fourteen units long out at
+  // x = -55, and the z = 22.86 park walk is twenty-one units long out at
+  // x = 34, but both were being treated as full-width barriers across the
+  // whole map. Between those two phantom lines the market square's flanking
+  // blocks — 6.7 and 7.2 deep, standing at z 27.6..42.2 — had nowhere to sit,
+  // so the solver shrank them to two thirds, shoved them north into the
+  // plaza, and gave up on one of them entirely. Each road now carries the
+  // span it actually covers along its own long axis.
+  const V_ROADS = PLAN_ANA_YOLLAR.filter(([, , g, d]) => !yatayMi(g, d))
+    .map(([x, z, , d]) => [x, z - d / 2, z + d / 2]);
+  const H_ROADS = PLAN_ANA_YOLLAR.filter(([, , g, d]) => yatayMi(g, d))
+    .map(([x, z, g]) => [z, x - g / 2, x + g / 2]);
 
   // Nothing from the plan may stand on a road. A footprint that lands on a
   // carriageway is not deleted — the plan drew a building there and it should
@@ -277,16 +298,21 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // The plan builds right up to the kerb, so the setback is a kerb's width,
   // not a garden. A larger margin was rejecting terraces that genuinely fit.
   const YOL_PAYI = ROAD_W / 2 + 0.35;
+  // A footprint only clashes with a road if it overlaps the road's own length
+  // as well as crossing its centre line.
+  const boyunca = (c, half, min, max) => c + half > min && c - half < max;
   function yoldanKaydir(x, z, w = 0, d = 0) {
     let nx = x;
     let nz = z;
     for (let tur = 0; tur < 3; tur += 1) {
       let carpisma = false;
-      for (const rx of V_ROADS) {
+      for (const [rx, z0, z1] of V_ROADS) {
+        if (!boyunca(nz, d / 2, z0, z1)) continue;
         const bindirme = YOL_PAYI + w / 2 - Math.abs(nx - rx);
         if (bindirme > 0) { nx += nx >= rx ? bindirme : -bindirme; carpisma = true; }
       }
-      for (const rz of H_ROADS) {
+      for (const [rz, x0, x1] of H_ROADS) {
+        if (!boyunca(nx, w / 2, x0, x1)) continue;
         const bindirme = YOL_PAYI + d / 2 - Math.abs(nz - rz);
         if (bindirme > 0) { nz += nz >= rz ? bindirme : -bindirme; carpisma = true; }
       }
@@ -295,8 +321,12 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     return [nx, nz];
   }
   function yolUstunde(x, z, w = 0, d = 0) {
-    for (const rx of V_ROADS) if (Math.abs(x - rx) < YOL_PAYI + w / 2) return true;
-    for (const rz of H_ROADS) if (Math.abs(z - rz) < YOL_PAYI + d / 2) return true;
+    for (const [rx, z0, z1] of V_ROADS) {
+      if (boyunca(z, d / 2, z0, z1) && Math.abs(x - rx) < YOL_PAYI + w / 2) return true;
+    }
+    for (const [rz, x0, x1] of H_ROADS) {
+      if (boyunca(x, w / 2, x0, x1) && Math.abs(z - rz) < YOL_PAYI + d / 2) return true;
+    }
     return false;
   }
 
@@ -1136,10 +1166,8 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     ...MARINA_ISKELELER.map((p) => ({ ...p, y: 0.2, tint: '#ffffff' })),
     ...MARINA_PARMAKLAR.map((p) => ({ ...p, y: 0.16, tint: '#92bef0' })),
   ];
-  // Market tables share this timber later on, so the mesh is sized for them.
-  const AHSAP_BASLANGIC = AHSAP.length + AHSAP_KOPRU.length;
   const docks = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(1, 1, 1), mats.wood, AHSAP_BASLANGIC + 5,
+    new THREE.BoxGeometry(1, 1, 1), mats.wood, AHSAP.length + AHSAP_KOPRU.length,
   );
   const dkm = new THREE.Matrix4();
   const beyaz = new THREE.Color('#ffffff');
@@ -1310,7 +1338,15 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     // to stand a house on the stadium's west wall and another on its south
     // corner. That is what "the wall is tangled up with the houses" was.
     { minX: 18.6, maxX: 41.2, minZ: -19.4, maxZ: 16.2 },     // stadium
-    { minX: -10, maxX: 6, minZ: 24, maxZ: 39 },      // market square
+    // The measured paving, not a guess at it: the old box ran x -10..6 by
+    // z 24..39 and left the square's whole southern and eastern strips open,
+    // so the solver could stand a block on the paving and did.
+    {
+      minX: PLAN_PAZAR.zemin[0] - PLAN_PAZAR.zemin[2] / 2,
+      maxX: PLAN_PAZAR.zemin[0] + PLAN_PAZAR.zemin[2] / 2,
+      minZ: PLAN_PAZAR.zemin[1] - PLAN_PAZAR.zemin[3] / 2,
+      maxZ: PLAN_PAZAR.zemin[1] + PLAN_PAZAR.zemin[3] / 2,
+    },                                               // market square
     { minX: 18, maxX: 46, minZ: -50, maxZ: -18 },    // funfair
     { minX: 18, maxX: 46, minZ: 18, maxZ: 46 },      // pond park
     { minX: -40, maxX: -22, minZ: -50, maxZ: -34 },  // gym + parking
@@ -1318,6 +1354,31 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   const ozelIcinde = (x, z) => OZEL_BOLGELER.some(
     (b) => x > b.minX && x < b.maxX && z > b.minZ && z < b.maxZ,
   );
+  // A keep-out box the block did not already stand in is an obstacle, not a
+  // suggestion. Shifting for a road or for a neighbour used to be free to end
+  // inside one, which is how a terrace drawn north of the market square ended
+  // up on the market's paving. Overlaps the plan itself draws are left alone —
+  // a district's own apron often runs under the edge of a block — so each
+  // block only has to stay out of the boxes it started clear of.
+  const kutuBindirmesi = (x, z, w, d, b) => (
+    x + w / 2 > b.minX && x - w / 2 < b.maxX && z + d / 2 > b.minZ && z - d / 2 < b.maxZ
+  );
+  const bolgedenKaydir = (x, z, w, d, yasak) => {
+    let nx = x;
+    let nz = z;
+    for (const b of yasak) {
+      if (!kutuBindirmesi(nx, nz, w, d, b)) continue;
+      const cx = (b.minX + b.maxX) / 2;
+      const cz = (b.minZ + b.maxZ) / 2;
+      const bindirX = (b.maxX - b.minX) / 2 + w / 2 - Math.abs(nx - cx);
+      const bindirZ = (b.maxZ - b.minZ) / 2 + d / 2 - Math.abs(nz - cz);
+      // Out along whichever wall is nearer, so a block leaves by the edge it
+      // came in through instead of being flung across the district.
+      if (bindirX < bindirZ) nx += nx >= cx ? bindirX : -bindirX;
+      else nz += nz >= cz ? bindirZ : -bindirZ;
+    }
+    return [nx, nz];
+  };
   // Placement is resolved, not just nudged. Two constraints have to hold at
   // once — clear of every carriageway, and clear of each other — and shifting
   // for one used to break the other, which left buildings both on the road and
@@ -1332,6 +1393,9 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
         return { x, z, w, h, d, renk: PLAN_BINA_RENK[i] };
       })
       .filter(({ x, z }) => !ozelIcinde(x, z) && !denizdeMi(x, z));
+    for (const b of adaylar) {
+      b.yasak = OZEL_BOLGELER.filter((k) => !kutuBindirmesi(b.x, b.z, b.w, b.d, k));
+    }
 
     // The plan draws terraces that touch, so neighbours may share a wall;
     // only a real overlap is a fault.
@@ -1339,7 +1403,8 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     for (let tur = 0; tur < 60; tur += 1) {
       let oynadi = false;
       for (const b of adaylar) {
-        const [nx, nz] = yoldanKaydir(b.x, b.z, b.w, b.d);
+        const [rx, rz] = yoldanKaydir(b.x, b.z, b.w, b.d);
+        const [nx, nz] = bolgedenKaydir(rx, rz, b.w, b.d, b.yasak);
         if (nx !== b.x || nz !== b.z) { b.x = nx; b.z = nz; oynadi = true; }
       }
       for (let i = 0; i < adaylar.length; i += 1) {
@@ -1350,15 +1415,29 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
           const bindirZ = (a.d + b.d) / 2 + BOSLUK - Math.abs(a.z - b.z);
           if (bindirX <= 0 || bindirZ <= 0) continue;
           oynadi = true;
-          // Separate along the axis that needs the smaller correction.
-          if (bindirX < bindirZ) {
-            const yon = a.x <= b.x ? -1 : 1;
-            a.x += (yon * bindirX) / 2;
-            b.x -= (yon * bindirX) / 2;
-          } else {
-            const yon = a.z <= b.z ? -1 : 1;
-            a.z += (yon * bindirZ) / 2;
-            b.z -= (yon * bindirZ) / 2;
+          // Separate along the axis that needs the smaller correction, and
+          // share the correction only between blocks that have somewhere to
+          // go. Halving it blindly is what walked a terrace drawn north of
+          // the market out onto the market's paving: its neighbour pushed it
+          // south, the square pushed it back, and after sixty rounds of that
+          // neither of the pair could be placed at all. A block with a
+          // keep-out box behind it stands still and its neighbour takes the
+          // whole move.
+          const eksen = bindirX < bindirZ ? 'x' : 'z';
+          const miktar = bindirX < bindirZ ? bindirX : bindirZ;
+          const yon = a[eksen] <= b[eksen] ? -1 : 1;
+          const gidebilir = (blok, delta) => {
+            const nx = eksen === 'x' ? blok.x + delta : blok.x;
+            const nz = eksen === 'z' ? blok.z + delta : blok.z;
+            return !blok.yasak.some((k) => kutuBindirmesi(nx, nz, blok.w, blok.d, k));
+          };
+          const aSerbest = gidebilir(a, yon * miktar);
+          const bSerbest = gidebilir(b, -yon * miktar);
+          if (aSerbest && !bSerbest) a[eksen] += yon * miktar;
+          else if (bSerbest && !aSerbest) b[eksen] -= yon * miktar;
+          else {
+            a[eksen] += (yon * miktar) / 2;
+            b[eksen] -= (yon * miktar) / 2;
           }
         }
       }
@@ -1381,6 +1460,7 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
         const w = b.w * olcek;
         const d = b.d * olcek;
         if (yolUstunde(b.x, b.z, w, d)) continue;
+        if (b.yasak.some((k) => kutuBindirmesi(b.x, b.z, w, d, k))) continue;
         const cakisiyor = yerlesen.some((o) => (
           Math.abs(b.x - o.x) < (w + o.w) / 2 - 0.25
           && Math.abs(b.z - o.z) < (d + o.d) / 2 - 0.25
@@ -1662,40 +1742,135 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   add(courtDomes, { camera: false, cast: true });
   add(courtRoofUnits, { camera: false, cast: false });
 
-  const marketGround = new THREE.Mesh(new THREE.CylinderGeometry(7, 7, 0.12, 20), mats.concreteDeep);
-  marketGround.position.set(-2, 0.06, 31);
+  // -------------------------------------------------------------------
+  // MARKET SQUARE — paving, bollard ring, eight stalls, centre pavilion
+  // -------------------------------------------------------------------
+  // Every number here is PLAN_PAZAR's, measured off the reference. What stood
+  // here was a fourteen-unit disc at (-2, 31) that missed the square's whole
+  // southern and eastern strips, five stalls at coordinates that matched none
+  // of the eight the drawing shows, a round tower with a yellow ball on top
+  // that appears nowhere in the reference, and no boundary at all.
+  const [pazarX, pazarZ, pazarW, pazarD] = PLAN_PAZAR.zemin;
+  const marketGround = new THREE.Mesh(
+    roundedBoxGeometry(pazarW, pazarD, 0.12, 0.5, 0.03), mats.marketPaving,
+  );
+  marketGround.position.set(pazarX, 0.005, pazarZ);
   marketGround.name = 'district:market-ground';
   add(marketGround, { walkable: true, camera: false, cast: false });
-  const tower = new THREE.Group();
-  const towerBase = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.5, 2.4, 10), mats.block);
-  towerBase.position.y = 1.2;
-  tower.add(towerBase);
-  const towerTop = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1, 1.6, 10), mats.blockDark);
-  towerTop.position.y = 3.2;
-  tower.add(towerTop);
-  const towerCrown = new THREE.Mesh(new THREE.SphereGeometry(0.5, 12, 10), mats.copingYellow);
-  towerCrown.position.y = 4.3;
-  tower.add(towerCrown);
-  tower.position.set(-2, 0, 31);
-  tower.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-  tower.name = 'district:market-tower';
-  group.add(tower);
-  const STALLS = [[-7, 28], [-6.5, 34.5], [3, 34], [3.5, 28], [-2, 25.5]];
-  // Market tables are the same timber as the piers and bridges, so they join
-  // that instanced mesh rather than opening a fourth wood draw.
-  const stallAwnings = new THREE.InstancedMesh(new THREE.BoxGeometry(1.9, 0.12, 1.4), mats.white, STALLS.length);
-  const AWNING = [COPING.red, COPING.blue, COPING.yellow];
-  STALLS.forEach(([x, z], i) => {
-    dkm.makeScale(1.6, 0.8, 1.1);
-    dkm.setPosition(x, 0.4, z);
-    docks.setMatrixAt(AHSAP_BASLANGIC + i, dkm);
-    stallAwnings.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 1.5, z));
-    stallAwnings.setColorAt(i, new THREE.Color(AWNING[i % 3]));
+
+  // One instanced box carries every small white fixture in the square — the
+  // bollards and the rope between them, the stall legs and tables, and the
+  // pavilion's four pillars — so the whole boundary costs a single draw.
+  const CIT = PLAN_PAZAR.cit;
+  const citX = Math.max(2, Math.round((CIT.maxX - CIT.minX) / CIT.adim) + 1);
+  const citZ = Math.max(2, Math.round((CIT.maxZ - CIT.minZ) / CIT.adim) + 1);
+  const DIREKLER = [];
+  for (let i = 0; i < citX; i += 1) {
+    const t = i / (citX - 1);
+    const x = CIT.minX + (CIT.maxX - CIT.minX) * t;
+    DIREKLER.push([x, CIT.minZ], [x, CIT.maxZ]);
+  }
+  for (let i = 1; i < citZ - 1; i += 1) {
+    const t = i / (citZ - 1);
+    const z = CIT.minZ + (CIT.maxZ - CIT.minZ) * t;
+    DIREKLER.push([CIT.minX, z], [CIT.maxX, z]);
+  }
+  const DIREK_Y = 0.85;
+  const HALAT_Y = 0.62;
+  const TEZGAHLAR = PLAN_PAZAR.tezgahlar;
+  const MASA = PLAN_PAZAR.tezgahMasa;
+  const KOSK = PLAN_PAZAR.kosk;
+  const CATI_KALIN = 0.35;
+  const TENTE_Y = 2.1;
+  const fixtures = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 1, 1),
+    mats.paint,
+    // bollards + rope runs + four legs and one table a stall + four pillars
+    DIREKLER.length * 2 + TEZGAHLAR.length * 5 + 4,
+  );
+  let fx = 0;
+  const koy = (w, h, d, x, y, z) => {
+    dkm.makeScale(w, h, d);
+    dkm.setPosition(x, y, z);
+    fixtures.setMatrixAt(fx, dkm);
+    fx += 1;
+  };
+  // Two pixels across at the reference's scale is 0.19 world units.
+  DIREKLER.forEach(([x, z]) => koy(0.17, DIREK_Y, 0.17, x, DIREK_Y / 2, z));
+  // The rope runs from each post to the next along the same edge, so a run is
+  // one flat box spanning the pitch.
+  for (let i = 0; i < citX - 1; i += 1) {
+    const x = CIT.minX + (CIT.maxX - CIT.minX) * ((i + 0.5) / (citX - 1));
+    const uzunluk = (CIT.maxX - CIT.minX) / (citX - 1);
+    koy(uzunluk, 0.05, 0.05, x, HALAT_Y, CIT.minZ);
+    koy(uzunluk, 0.05, 0.05, x, HALAT_Y, CIT.maxZ);
+  }
+  for (let i = 0; i < citZ - 1; i += 1) {
+    const z = CIT.minZ + (CIT.maxZ - CIT.minZ) * ((i + 0.5) / (citZ - 1));
+    const uzunluk = (CIT.maxZ - CIT.minZ) / (citZ - 1);
+    koy(0.05, 0.05, uzunluk, CIT.minX, HALAT_Y, z);
+    koy(0.05, 0.05, uzunluk, CIT.maxX, HALAT_Y, z);
+  }
+
+  // Stalls: an olive canopy on four legs with its white table beside it, on
+  // the plaza side. The canopies keep the plan's orientation — the north and
+  // south pairs run east-west, the east and west pairs north-south — and the
+  // table steps toward the middle of the square by the measured offset.
+  const stallAwnings = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 0.14, 1), mats.stallCanopy, TEZGAHLAR.length,
+  );
+  TEZGAHLAR.forEach(([x, z, w, d], i) => {
+    dkm.makeScale(w, 1, d);
+    dkm.setPosition(x, TENTE_Y, z);
+    stallAwnings.setMatrixAt(i, dkm);
+    const ayakX = w / 2 - 0.12;
+    const ayakZ = d / 2 - 0.12;
+    for (const sx of [-ayakX, ayakX]) {
+      for (const sz of [-ayakZ, ayakZ]) {
+        koy(0.1, TENTE_Y, 0.1, x + sx, TENTE_Y / 2, z + sz);
+      }
+    }
+    // Toward the centre of the square, along whichever axis the stall faces.
+    const yatay = w >= d;
+    const yonZ = yatay ? Math.sign(pazarZ - z) : 0;
+    const yonX = yatay ? 0 : Math.sign(pazarX - x);
+    koy(
+      yatay ? MASA.boy : MASA.en, 0.8, yatay ? MASA.en : MASA.boy,
+      x + yonX * MASA.kacis, 0.4, z + yonZ * MASA.kacis,
+    );
   });
   stallAwnings.instanceMatrix.needsUpdate = true;
-  docks.instanceMatrix.needsUpdate = true;
-  if (stallAwnings.instanceColor) stallAwnings.instanceColor.needsUpdate = true;
-  add(stallAwnings, { camera: false, cast: false });
+  stallAwnings.name = 'district:market-stalls';
+  add(stallAwnings, { camera: false, cast: true });
+
+  // Centre pavilion: a rounded-square canopy with a raised core on it, both
+  // the same near-white the blocks are roofed in. Two instances of one
+  // rounded box, so the whole thing is one draw.
+  const pavilion = new THREE.InstancedMesh(
+    roundedBoxGeometry(1, 1, 1, 0.18, 0.06), mats.white, 2,
+  );
+  // roundedBoxGeometry stands on y = 0, so each tier is positioned by its own
+  // underside rather than its middle.
+  dkm.makeScale(KOSK.cati[2], CATI_KALIN, KOSK.cati[3]);
+  dkm.setPosition(KOSK.cati[0], KOSK.cati[4] - CATI_KALIN, KOSK.cati[1]);
+  pavilion.setMatrixAt(0, dkm);
+  const cekirdekH = KOSK.cekirdek[4] - KOSK.cati[4] + CATI_KALIN;
+  dkm.makeScale(KOSK.cekirdek[2], cekirdekH, KOSK.cekirdek[3]);
+  dkm.setPosition(KOSK.cekirdek[0], KOSK.cekirdek[4] - cekirdekH, KOSK.cekirdek[1]);
+  pavilion.setMatrixAt(1, dkm);
+  pavilion.instanceMatrix.needsUpdate = true;
+  pavilion.name = 'district:market-pavilion';
+  add(pavilion, { camera: true, cast: true });
+  // Four pillars, one at the middle of each canopy edge, which is where the
+  // reference shows them.
+  const ayakY = KOSK.cati[4] - CATI_KALIN;
+  [[KOSK.cati[2] / 2 - 0.3, 0], [-KOSK.cati[2] / 2 + 0.3, 0],
+    [0, KOSK.cati[3] / 2 - 0.3], [0, -KOSK.cati[3] / 2 + 0.3]].forEach(([dx, dz]) => {
+    koy(0.28, ayakY, 0.28, KOSK.cati[0] + dx, ayakY / 2, KOSK.cati[1] + dz);
+  });
+  fixtures.instanceMatrix.needsUpdate = true;
+  fixtures.name = 'district:market-fixtures';
+  add(fixtures, { camera: false, cast: true });
 
   // -------------------------------------------------------------------
   // SE CELL — playground with pools, teddy statues, dense trees

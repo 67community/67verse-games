@@ -2187,7 +2187,7 @@ test('town lobby ships the pedestrian city and nothing left over from the old hu
   assert.ok(world.group.getObjectByName('district:skatepark-props'));
   assert.ok(world.group.getObjectByName('district:skatepark-rails'));
   assert.ok(world.group.getObjectByName('district:basketball-court'));
-  assert.ok(world.group.getObjectByName('district:market-tower'));
+  assert.ok(world.group.getObjectByName('district:market-pavilion'));
   assert.ok(world.group.getObjectByName('district:pond'));
   assert.ok(world.group.getObjectByName('district:stadium'));
   assert.ok(world.group.getObjectByName('district:ferris-wheel'));

@@ -345,6 +345,53 @@ export const PLAN_OGELER = Object.freeze([
   [-2.91, -50.76, 0.87, 0.68, '#5a4a48'], // sokak lambasi 3 (ust cadde)
 ]);
 
+// Market square, re-measured off the 1280 px reference for this build. The
+// square is the open ground between the four block columns: pixels 533..745
+// across by 925..1078 down, which is the paving row PLAN_OGELER already
+// carries. Inside it the drawing shows a ring of bright bollards, eight
+// stalls in facing pairs, and a two-tier canopy pavilion at the centre.
+export const PLAN_PAZAR = Object.freeze({
+  // [x, z, width, depth, colour]. Colour sampled on the lit paving at three
+  // points — (206,175,168), (205,174,166), (203,174,164) — a warm pink that
+  // reads clearly darker than the street it sits in, (232,210,208).
+  zemin: Object.freeze([0.1, 35.07, 19.57, 14.82, '#cdaea6']),
+  // Bollard ring. The posts are the brightest pixels in the square: the top
+  // run sits at y 938 and spans x 551..729, the bottom run at y 1063, and the
+  // side runs at x 552 and x 728. Pitch read off the top run is 178 px over
+  // 22 gaps = 8.09 px = 0.78 world units, so 23 posts to a long edge and 17
+  // to a short one, 76 in all.
+  cit: Object.freeze({ minX: -8.62, maxX: 8.62, minZ: 28.87, maxZ: 40.98, adim: 0.78 }),
+  // Eight stalls, two to a side, each an olive canopy with a white table slab
+  // beside it on the plaza side. [x, z, width, depth]; the canopy extents were
+  // re-read off an olive mask (G - B > 16), which puts them about half a unit
+  // deeper than the PLAN_OGELER rows recorded. North-west canopy measured
+  // x 581..601 by y 933..942 = 2.04 x 1.07; west-upper canopy x 550..557 by
+  // y 959..983 = 0.78 x 2.42. Canopy colour sampled (189,173,150).
+  tezgahlar: Object.freeze([
+    Object.freeze([-4.70, 28.92, 2.20, 1.00]), // north-west
+    Object.freeze([4.75, 28.95, 2.20, 1.00]), // north-east
+    Object.freeze([-8.33, 32.11, 0.85, 2.40]), // west-upper
+    Object.freeze([-8.33, 37.20, 0.85, 2.40]), // west-lower
+    Object.freeze([8.43, 32.16, 0.85, 2.40]), // east-upper
+    Object.freeze([8.43, 37.30, 0.85, 2.40]), // east-lower
+    Object.freeze([-4.60, 40.69, 2.20, 1.00]), // south-west
+    Object.freeze([4.55, 40.69, 2.20, 1.00]), // south-east
+  ]),
+  // The table beside each stall: 1.5 long by 0.68 across, its centre 0.9
+  // toward the middle of the square from the canopy's. Measured on the
+  // north-west pair, canopy centre z 28.92 against table centre z 29.83, and
+  // on the west-upper pair, canopy centre x -8.38 against table centre -7.56.
+  tezgahMasa: Object.freeze({ boy: 1.5, en: 0.68, kacis: 0.9 }),
+  // Centre pavilion, two tiers of the same near-white the blocks are roofed
+  // in — lit roof sampled (233,208,204), core top (240,211,207), and no
+  // yellow anywhere on it. Outer canopy pixels 602..678 by 957..1032; the
+  // raised core inside it pixels 618..661 by 978..1020. [x, z, w, d, height].
+  kosk: Object.freeze({
+    cati: Object.freeze([0.0, 34.34, 7.36, 7.27, 2.7]),
+    cekirdek: Object.freeze([0.0, 34.83, 4.20, 4.07, 3.6]),
+  }),
+});
+
 export const PLAN_KOPRULER = Object.freeze([
   [-57.93, -0.48, 5.23, 3.49], // ahsap yaya koprusu
   [-0.1, -14.63, 6.59, 0.48], // ince yaya köprüsü / ray (kuzey aks)
