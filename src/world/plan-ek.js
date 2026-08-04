@@ -3,7 +3,10 @@
 // donusum: w = (px/1280 - 0.5) * 124. Her sayi cizimden okunmustur.
 
 export const PLAN_ANA_YOLLAR = Object.freeze([
-  [-39.72, -51.93, 44.56, 2.32, '#c3aeaa'], // ana bulvar (yatay)
+  // West end measured: at z = -51.9 the carriageway starts at x = -47.86 and
+  // at z = -51.5 at -49.12. This row ran all the way to -62 and cut the kart
+  // circuit's lawn in half; the drawing has lawn there, not road.
+  [-32.97, -51.93, 31.06, 2.32, '#c3aeaa'], // ana bulvar (yatay)
   [-53.67, -28.58, 2.52, 22.47, '#c3aeaa'], // bati dikey cadde
   [-18.79, -39.72, 2.91, 44.56, '#c3aeaa'], // dogu dikey cadde
   [-39.72, -18.7, 44.56, 2.71, '#c3aeaa'], // guney yatay cadde

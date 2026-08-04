@@ -18,8 +18,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
-  canvasTexture, squirclePath, roundedBoxGeometry, insetPolygon, ribbonSides,
-  shapeFromPoints, wallStripGeometry, copingTube, tinted, tintedByHeight,
+  canvasTexture, squirclePoints, roundedBoxGeometry, insetPolygon,
+  ribbonSides, shapeFromPoints, wallStripGeometry, copingTube, tinted, tintedByHeight,
 } from './sekil.js';
 
 import { PLAN_BINALAR, PLAN_BINA_RENK, PLAN_AGACLAR, PLAN_ARABALAR } from './plan-verisi.js';
@@ -302,20 +302,23 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     // in the oval, (176,172,143) in the outfield and (184,168,134) in the
     // diamond, so one olive carries all three. The old base captured
     // (84,93,70) — a forest green nothing in the drawing is.
-    pitch: material(0x9c987d, { roughness: 0.92 }),
+    pitch: material(0x959276, { roughness: 0.92 }),
     // Baseball dirt, sampled (227,198,164) on the fan and (234,200,165) on
     // the pitcher's mound. mats.sand is the beach and stays where it is; this
     // is a warmer, more saturated tan than wet sand.
-    ballDirt: material(0xdab18e, { roughness: 0.95 }),
+    ballDirt: material(0xe1ae84, { roughness: 0.95 }),
     // The kart circuit's lawn in the north-west corner, sampled (177,177,153)
     // at (-53,-50) and (179,178,147) at (-58,-46).
-    kartLawn: material(0x9d9c80, { roughness: 0.95 }),
+    kartLawn: material(0x95967d, { roughness: 0.95 }),
     // Its kerbs: the dark line down each side of the ribbon, (103,108,104)
     // and (91,91,89) at z = -50.
-    kartKerb: material(0x4d504d, { roughness: 0.9 }),
+    kartKerb: material(0x565d5f, { roughness: 0.9 }),
+    // Its surface. Warmer than the city's tarmac — the render puts the roads
+    // at a neutral (216,204,204) and this ribbon at (202,181,177).
+    kartYol: material(0xb79b9e, { roughness: 0.95 }),
     // The gym's roof light is glazing, not a white lid: the reference reads
     // (145,151,175) and (161,168,196) across it, a cool blue-grey.
-    roofGlass: material(0x838aa1, { roughness: 0.35, metalness: 0.1 }),
+    roofGlass: material(0x6d7595, { roughness: 0.35, metalness: 0.1 }),
     trackRed: material(0xa9736a, { roughness: 0.9 }),
     // The stadium's track reads 122,112,129 in the reference — a purple-grey,
     // most of it the bowl wall's own shadow, so the base sits above that and
@@ -943,13 +946,22 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   kartLawn.name = 'district:kart-lawn';
   add(kartLawn, { walkable: true, camera: false, cast: false });
 
+  // Traced control points every two units read as a polygon at this scale, so
+  // the loop is run through a closed spline and resampled fine enough that the
+  // hairpins come out round.
+  const kartLine = (() => {
+    const curve = new THREE.CatmullRomCurve3(
+      PLAN_KART.hat.map(([x, z]) => new THREE.Vector3(x, 0, z)), true, 'catmullrom', 0.5,
+    );
+    return curve.getSpacedPoints(104).slice(0, 104).map((p) => [p.x, p.z]);
+  })();
   const kartKerb = new THREE.Mesh(
-    flatRibbonGeometry(PLAN_KART.hat, PLAN_KART.bordur, 0.09), mats.kartKerb,
+    flatRibbonGeometry(kartLine, PLAN_KART.bordur, 0.09), mats.kartKerb,
   );
   kartKerb.name = 'district:kart-kerbs';
   add(kartKerb, { camera: false, cast: false });
   const kart = new THREE.Mesh(
-    flatRibbonGeometry(PLAN_KART.hat, PLAN_KART.bant, 0.105), mats.road,
+    flatRibbonGeometry(kartLine, PLAN_KART.bant, 0.105), mats.kartYol,
   );
   kart.name = 'district:kart-track';
   add(kart, { walkable: true, camera: false, cast: false });
@@ -980,7 +992,7 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     canvas.width = 160;
     canvas.height = 96;
     const c = canvas.getContext('2d');
-    c.fillStyle = '#838aa1';
+    c.fillStyle = '#6d7595';
     c.fillRect(0, 0, 160, 96);
     c.fillStyle = '#d4d5d5';
     for (let i = 0; i <= 5; i += 1) c.fillRect((i * 160) / 5 - 2, 0, 4, 96);
@@ -1003,9 +1015,9 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     canvas.width = 8;
     canvas.height = 64;
     const c = canvas.getContext('2d');
-    c.fillStyle = '#e8b6ae';
+    c.fillStyle = '#ffb2b0';
     c.fillRect(0, 0, 8, 64);
-    c.fillStyle = '#f6ddd4';
+    c.fillStyle = '#ffdfda';
     for (let i = 0; i < 8; i += 1) c.fillRect(0, i * 8, 8, 4);
     return new THREE.MeshStandardMaterial({ map: canvasTexture(canvas), roughness: 0.85 });
   }
@@ -1014,53 +1026,89 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   awnings.name = 'district:gym-awnings';
   add(awnings, { camera: false, cast: true });
 
-  // Measured: the oval sits at (-41.4, -29.4) and runs 9.7 x 16.7 — taller
-  // than wide, which is why an oval scaled the other way looked wrong. Lane
-  // lines are painted into the ring's texture, one draw for the whole track.
+  // The athletics track is a stadium oval — two straights closed by rounded
+  // ends — not the donut a torus makes. The torus put a 14.5 x 14.5 circle
+  // where the drawing has a 9.69 x 16.66 ring, and its tube wrapped the lane
+  // texture the wrong way, so only two of the five lines ever showed.
+  // Lane lines are painted across the band's own v axis instead, so the whole
+  // track is still one draw.
   function lanesTexture() {
     if (typeof document === 'undefined') return mats.trackRed;
     const canvas = document.createElement('canvas');
     canvas.width = 8;
-    canvas.height = 64;
+    canvas.height = 128;
     const c = canvas.getContext('2d');
-    c.fillStyle = '#a9736a';
-    c.fillRect(0, 0, 8, 64);
-    c.strokeStyle = '#d8ccc4';
-    c.lineWidth = 1;
-    for (let i = 1; i < 6; i += 1) {
-      c.beginPath();
-      c.moveTo(0, (i * 64) / 6);
-      c.lineTo(8, (i * 64) / 6);
-      c.stroke();
-    }
+    // Between the lines the render reads (218,148,136); the lines themselves
+    // read (248,195,185). Both divided back through the lighting.
+    c.fillStyle = '#c8726b';
+    c.fillRect(0, 0, 8, 128);
+    c.fillStyle = '#ffa9a0';
+    // Four lanes: a line on each rim and three between them, 0.39 apart on a
+    // band 1.75 across.
+    for (let i = 0; i <= 4; i += 1) c.fillRect(0, (i * 128) / 4 - 3, 8, 6);
+    c.fillRect(0, 122, 8, 6);
     return new THREE.MeshStandardMaterial({ map: canvasTexture(canvas), roughness: 0.9 });
   }
-  const oval = copingArc(lanesTexture(), 4.85, 2.4, Math.PI * 2);
-  oval.scale.set(1, 1, 0.06);
-  oval.position.set(-41.4, 0.12, -29.4);
-  oval.rotation.z = Math.PI / 2;
+  const [ovalX, ovalZ, ovalW, ovalD] = PLAN_SPOR_OLCU.pist;
+  const bantYari = PLAN_SPOR_OLCU.pistBant / 2;
+  const kutuNoktalari = (x, z, w, d, r, perCorner = 7) => squirclePoints(w, d, r, perCorner)
+    .map((p) => [x + p.x, z + p.y]);
+  // The centreline is the measured outer edge pulled in by half the band, so
+  // the finished ribbon lands exactly on the drawing's footprint.
+  const ovalLine = kutuNoktalari(
+    ovalX, ovalZ,
+    ovalW - PLAN_SPOR_OLCU.pistBant,
+    ovalD - PLAN_SPOR_OLCU.pistBant,
+    PLAN_SPOR_OLCU.pistKose - bantYari,
+    9,
+  );
+  const [spX, spZ, , spD] = PLAN_SPOR_OLCU.sprint;
+  const trackParts = [
+    flatRibbonGeometry(ovalLine, bantYari, 0.12, 24),
+    flatRibbonGeometry(
+      [[spX, spZ - spD / 2], [spX, spZ + spD / 2]], bantYari, 0.118, 8, false,
+    ),
+  ];
+  const oval = new THREE.Mesh(mergeGeometries(trackParts, false), lanesTexture());
   oval.name = 'district:athletics-track';
   add(oval, { camera: false, cast: false });
-  const infield = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.6, 0.08, 20), mats.pitch);
-  infield.scale.z = 1.9;
-  infield.position.set(-41.4, 0.1, -29.4);
-  add(infield, { walkable: true, camera: false, cast: false });
 
-  // Baseball, measured at (-26.7, -27.4): a green outfield wedge with the
-  // sand infield fan set into its corner, the way the plan draws it.
-  const outfield = new THREE.Mesh(
-    new THREE.CylinderGeometry(6.5, 6.5, 0.08, 16, 1, false, 0, Math.PI / 2), mats.court,
+  // Every olive plate in the sports quarter is the same turf, so the oval's
+  // infield, the baseball outfield and the diamond inside its sand fan are
+  // one merged mesh and one draw.
+  const [cimX, cimZ, cimW, cimD, cimR] = PLAN_SPOR_OLCU.cim;
+  const [ofX, ofZ, ofW, ofD, ofR] = PLAN_SPOR_OLCU.disSaha;
+  const [dmX, dmZ, dmW, dmD] = PLAN_SPOR_OLCU.elmas;
+  const turf = new THREE.Mesh(slabGeometry([
+    kutuNoktalari(cimX, cimZ, cimW, cimD, cimR),
+    kutuNoktalari(ofX, ofZ, ofW, ofD, ofR),
+    [[dmX - dmW / 2, dmZ - dmD / 2], [dmX + dmW / 2, dmZ - dmD / 2],
+      [dmX + dmW / 2, dmZ + dmD / 2], [dmX - dmW / 2, dmZ + dmD / 2]],
+  ].map((points) => groundShape(points)), 0.06, 0.06), mats.pitch);
+  turf.name = 'district:sports-turf';
+  add(turf, { walkable: true, camera: false, cast: false });
+
+  // The sand fan is a quarter disc struck from home plate at (-21.7,-21.51)
+  // with the diamond cut out of it, so the turf below shows through as the
+  // green square the drawing has there. The mound rides in the middle of it.
+  const kum = PLAN_SPOR_OLCU.kum;
+  const fan = new THREE.Shape();
+  fan.moveTo(kum.x, -kum.z);
+  fan.lineTo(kum.x, -kum.z + kum.r);
+  fan.absarc(kum.x, -kum.z, kum.r, Math.PI / 2, Math.PI, false);
+  fan.lineTo(kum.x, -kum.z);
+  fan.holes.push(groundShape([
+    [dmX - dmW / 2, dmZ - dmD / 2], [dmX - dmW / 2, dmZ + dmD / 2],
+    [dmX + dmW / 2, dmZ + dmD / 2], [dmX + dmW / 2, dmZ - dmD / 2],
+  ], THREE.Path));
+  const mound = new THREE.Shape();
+  mound.absarc(
+    PLAN_SPOR_OLCU.tepe[0], -PLAN_SPOR_OLCU.tepe[1], PLAN_SPOR_OLCU.tepe[2],
+    0, Math.PI * 2, false,
   );
-  outfield.position.set(-26.7, 0.08, -27.4);
-  outfield.rotation.y = Math.PI * 0.75;
-  outfield.name = 'district:baseball';
-  add(outfield, { camera: false, cast: false });
-  const infieldFan = new THREE.Mesh(
-    new THREE.CylinderGeometry(3.4, 3.4, 0.06, 14, 1, false, 0, Math.PI / 2), mats.sand,
-  );
-  infieldFan.position.set(-24.6, 0.11, -24.6);
-  infieldFan.rotation.y = Math.PI * 0.75;
-  add(infieldFan, { camera: false, cast: false });
+  const dirt = new THREE.Mesh(slabGeometry([fan, mound], 0.05, 0.115), mats.ballDirt);
+  dirt.name = 'district:baseball';
+  add(dirt, { camera: false, cast: false });
 
   // -------------------------------------------------------------------
   // NE — funfair, and the marina against the coast road
@@ -1163,8 +1211,11 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // Piers and river bridges are the same timber deck, so one instanced mesh
   // carries both: the three piers first, then a bridge wherever the plan puts
   // a street across the water.
+  // The bridges at (-54,-19) and (-53,-44) are gone with the water they used
+  // to span: the river's head is at z = -14 now, so both were standing on dry
+  // ground — the second of them out on the kart circuit's lawn.
   const AHSAP_KOPRU = [
-    [-54, -19, 7, 0.4, 2.6, 0], [-54, 16, 7, 0.4, 2.6, 0], [-53, -44, 7, 0.4, 2.6, 0],
+    [-54, 16, 7, 0.4, 2.6, 0],
     [-52, 38, 7, 0.4, 2.6, 0], [-30, 54.5, 7, 0.4, 2.6, 0.35], [-6, 56, 7, 0.4, 2.6, 0.1],
     [16, 55, 7, 0.4, 2.6, -0.1],
   ];
@@ -2041,9 +2092,17 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // -------------------------------------------------------------------
   // EDGES — river down the left and along the bottom, bridges, suburbs
   // -------------------------------------------------------------------
+  // The river's head, measured: the northernmost water anywhere on the west
+  // margin is a component running x -62..-55.32 by z -15.60..-2.23, and there
+  // is not one blue pixel above z = -15.6. The curve used to start at
+  // (-54,-58), which drove 4.6 units of water straight through the middle of
+  // the kart circuit. Row centres down the west reach read -57.2 at z = -8,
+  // -56.6 at z = -4, -56.5 at z = 10 and -55.6 at z = 20, so the northern
+  // control points are those rather than the guesses they replace.
   const riverCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-54, 0.05, -58), new THREE.Vector3(-55, 0.05, -34),
-    new THREE.Vector3(-53, 0.05, -8), new THREE.Vector3(-55, 0.05, 18),
+    new THREE.Vector3(-59.5, 0.05, -14), new THREE.Vector3(-57.2, 0.05, -8),
+    new THREE.Vector3(-56.6, 0.05, -1), new THREE.Vector3(-56.4, 0.05, 10),
+    new THREE.Vector3(-55.4, 0.05, 19), new THREE.Vector3(-53.5, 0.05, 25),
     new THREE.Vector3(-52, 0.05, 38), new THREE.Vector3(-44, 0.05, 52),
     new THREE.Vector3(-24, 0.05, 56), new THREE.Vector3(0, 0.05, 57),
   ]);
@@ -2057,17 +2116,21 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // rows outside the river to the west, along the south edge, up the north
   // edge past the kart track, and behind the coast road to the east. Rows
   // alternate their roof angle so the belt reads as streets, not a fence.
+  // Four rows are gone: [-59,-46], [-52,-41], [-48,-57] and [-36,-57]. Those
+  // belong to the sports quarter, and the drawing has no house in any of it —
+  // a red-roof mask over x -62..-40 by z -62..-40 returns nothing at all, and
+  // the west margin returns nothing between z -50 and -20 either.
   const HOUSES = [
     // west of the river, two staggered rows
-    [-59, -46], [-59, -36], [-60, -26], [-60, -16], [-59, -6],
+    [-59, -36], [-60, -26], [-60, -16], [-59, -6],
     [-59, 4], [-60, 14], [-60, 24], [-59, 34], [-58, 44],
-    [-52, -41], [-53, -21], [-53, -1], [-53, 19], [-52, 39],
+    [-53, -21], [-53, -1], [-53, 19], [-52, 39],
     // south edge
     [-46, 52], [-36, 53], [-26, 52], [-16, 53], [-6, 52],
     [4, 53], [14, 52], [24, 53], [34, 52], [44, 53],
     [-40, 59], [-20, 59], [0, 59], [20, 59], [40, 59],
-    // north edge, past the kart track
-    [-48, -57], [-36, -57], [-24, -58], [-12, -57], [0, -58],
+    // north edge, past the pool complex
+    [-24, -58], [-12, -57], [0, -58],
     [12, -57], [24, -58], [36, -57], [46, -56],
     // east, behind the coast road
     [52, 40], [54, 50], [50, 30],
@@ -2083,10 +2146,27 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // The footprint is the roof, not the walls: the body is 3 x 3.4 but the
   // pyramid over it reaches 2.5 to the corner, so a house measured by its
   // walls still hangs over the kerb.
+  //
+  // Blocks were the only fixed thing a house had to keep out of, so the belt
+  // put four pyramid roofs on the kart lawn, one in the car park, one on the
+  // sports campus beside the running track and one standing in the west
+  // swimming pool. The reference has no house in any of them — the whole
+  // north-west corner returns zero red-roof pixels. So the decks and the kart
+  // lawn are fixed obstacles now too, and a house that cannot clear them is
+  // dropped by the sweep below like any other misfit.
   const EV_G = 3.7;
   const EV_D = 4.1;
+  const EV_YASAK = [
+    // Sports campus, pool deck and car park; the stadium apron is left out
+    // because the stadium already carries its own keep-out box.
+    ...DECKS.slice(0, 3).map(([x, z, w, d]) => ({ x, z, w, d, sabit: true })),
+    { x: -52.8, z: -52.65, w: 18.4, d: 18.5, sabit: true },   // kart lawn
+  ];
   const KARADAKI_EVLER = (() => {
-    const yerlesik = BLOCKS.map(([x, z, w, , d]) => ({ x, z, w, d, sabit: true }));
+    const yerlesik = [
+      ...BLOCKS.map(([x, z, w, , d]) => ({ x, z, w, d, sabit: true })),
+      ...EV_YASAK,
+    ];
     const evler = HOUSES
       .filter(([x, z]) => !denizdeMi(x, z))
       .map(([x, z]) => ({ x, z, w: EV_G, d: EV_D, sabit: false }));
