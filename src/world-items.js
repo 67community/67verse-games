@@ -86,7 +86,11 @@ function extractItemGeometry(gltf, { grounded }) {
   return Object.freeze({ geometry, material });
 }
 
-export function loadWorldItems(baseUrl = '/assets/items/') {
+// Base-aware: on GitHub Pages the game lives under /67versee/, so a path
+// rooted at / would fetch from the domain root and find nothing.
+const ITEM_BASE = `${import.meta.env?.BASE_URL ?? '/'}assets/items/`;
+
+export function loadWorldItems(baseUrl = ITEM_BASE) {
   const loader = new GLTFLoader();
   const jobs = Object.entries(WORLD_ITEM_FILES).map(([key, file]) => (
     new Promise((resolve) => {

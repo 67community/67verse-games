@@ -935,7 +935,7 @@ registerGame({
     // The procedural batches below stay visible until the GLB items resolve;
     // each swap keeps one InstancedMesh per prop family, so draw calls and
     // frame cost stay flat. Runs fire-and-forget; `alive` guards unmount.
-    loadWorldItems('/assets/items/')
+    loadWorldItems()
       .then((items) => {
         if (!alive || !items) return;
 

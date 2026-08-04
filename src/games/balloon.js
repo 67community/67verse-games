@@ -151,7 +151,7 @@ registerGame({
     // corner trees + grass tufts on the terrace, clouds drifting beyond the
     // rim. Shared item geometry is never disposed here — arena.dispose drops
     // the whole root on unmount.
-    loadWorldItems('/assets/items/')
+    loadWorldItems()
       .then((worldItems) => {
         if (disposed || !worldItems) return;
         const placer = new T.Object3D();

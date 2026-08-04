@@ -105,7 +105,7 @@ registerGame({
     // once the GLB resolves; the arena keeps its authored layout either way.
     // The shared item geometry is never tracked/disposed here — arena.dispose
     // drops the whole root on unmount.
-    loadWorldItems('/assets/items/')
+    loadWorldItems()
       .then((worldItems) => {
         if (ended || !worldItems?.building?.geometry) return;
         const layout = arena.skylineLayout;

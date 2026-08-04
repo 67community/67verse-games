@@ -222,7 +222,7 @@ const world = buildWorld(scene, {
 });
 // Authored Meshy props load in parallel and swap in when ready; the
 // procedural placeholders keep the hub fully visible in the meantime.
-loadWorldItems('/assets/items/')
+loadWorldItems()
   .then((items) => { world.applyItems?.(items); })
   .catch(() => {});
 queueMicrotask(() => {

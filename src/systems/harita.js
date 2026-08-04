@@ -16,14 +16,19 @@
 
 import { registerSystem } from '../core/registry.js';
 
-const MAP_SRC = '/map/harita.png';
+const MAP_SRC = `${import.meta.env?.BASE_URL ?? '/'}map/harita.png`;
+// The 67VERSE skate lobby is its own deployment, so this is its live address
+// rather than the local one it is developed against: the map ships to phones.
+const LOBBY_URL = 'https://67verse.67gamehub.workers.dev/skate';
 const MAP_SPAN = 124;
 
 // Measured places, each on ground you can actually stand on — the marina's pin
 // sits on its promenade rather than out on a pier, and the beach's on sand
 // rather than in the bay.
 export const HARITA_YERLERI = Object.freeze([
-  Object.freeze({ id: 'plaza', name: '67 Plaza', x: -2, z: -1 }),
+  // Pinned north of the plaza's true centre so the LOBBY button, which sits
+  // dead centre, does not cover its own label.
+  Object.freeze({ id: 'plaza', name: '67 Plaza', x: -2, z: -11 }),
   Object.freeze({ id: 'skatepark', name: 'Skatepark', x: 0.6, z: -34.8 }),
   Object.freeze({ id: 'marina', name: 'Marina', x: 41.5, z: -38.6 }),
   Object.freeze({ id: 'funfair', name: 'Funfair', x: 30, z: -44 }),
@@ -103,7 +108,7 @@ function openMap(ctx) {
   const panel = ctx.ui.panel({ title: '67 Park map' });
   const intro = document.createElement('p');
   intro.className = 'uv-play-intro';
-  intro.textContent = 'Tap anywhere on the map to travel there. Activities still start at their own marker with E / GRAB.';
+  intro.textContent = 'Tap anywhere on the map to travel there. LOBBY leaves 67 Park for the 67VERSE skate lobby.';
 
   const frame = styled(document.createElement('div'), {
     position: 'relative',
@@ -153,8 +158,36 @@ function openMap(ctx) {
     travel(spot.x, spot.z, null);
   });
 
+  // The 67VERSE lobby, in the middle of the map. It is a different park on a
+  // different server, so this leaves 67 Park rather than teleporting inside
+  // it — the deployed address, not a local one, so it works from a phone too.
+  const lobby = document.createElement('button');
+  lobby.type = 'button';
+  lobby.textContent = 'LOBBY';
+  lobby.setAttribute('aria-label', 'Open the 67VERSE skate lobby');
+  styled(lobby, {
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    transform: 'translate(-50%, -50%)',
+    padding: '10px 20px',
+    borderRadius: '999px',
+    border: '1px solid rgba(255,255,255,0.5)',
+    background: '#1c1c20',
+    color: '#ffffff',
+    font: '700 13px/1 Figtree, system-ui, sans-serif',
+    letterSpacing: '0.08em',
+    cursor: 'pointer',
+    boxShadow: '0 2px 10px rgba(20,16,24,0.35)',
+  });
+  lobby.addEventListener('click', (event) => {
+    event.stopPropagation();
+    window.location.assign(LOBBY_URL);
+  });
+
   frame.append(image, here);
   for (const place of HARITA_YERLERI) frame.appendChild(marker(place, travel));
+  frame.appendChild(lobby);
   panel.body.append(intro, frame);
 }
 

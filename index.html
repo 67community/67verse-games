@@ -60,12 +60,16 @@
     #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
     /* Wordmark: one ink weight, tight tracking, no colour split — the PN
        lockup reads as a single quiet mark, not a two-tone logo. */
+    /* Oscar's own artwork, not type: the name is set in his colours
+       everywhere it appears, the gate and the HUD alike. */
     #wordmark {
-      position: absolute; top: calc(var(--safe-top) + 18px); left: calc(var(--safe-left) + 22px);
-      font-weight: 600; font-size: 19px; letter-spacing: -0.01em;
-      color: var(--ink);
+      position: absolute; top: calc(var(--safe-top) + 14px); left: calc(var(--safe-left) + 20px);
+      line-height: 0;
     }
-    #wordmark span { color: var(--ink); font-weight: 400; }
+    #wordmark img {
+      display: block; height: 30px; width: auto;
+      filter: drop-shadow(0 1px 3px rgba(20, 16, 24, 0.22));
+    }
     /* Primary action: PN ink-filled button. Solid, quiet, with the iOS press
        scale rather than a colour flash. */
     #primary-play {
@@ -370,7 +374,8 @@
     /* Keep the full hub visible on phones: two compact icon rows share the
        top safe area with the wordmark instead of covering the city horizon. */
     @media (max-width: 600px) {
-      #wordmark { top: calc(var(--safe-top) + 14px); left: calc(var(--safe-left) + 16px); font-size: 17px; letter-spacing: .1em; }
+      #wordmark { top: calc(var(--safe-top) + 12px); left: calc(var(--safe-left) + 16px); }
+      #wordmark img { height: 25px; }
       #hub-actions { top: calc(var(--safe-top) + 54px); left: calc(var(--safe-left) + 16px); gap: 6px; }
       #primary-play, #primary-chat, #primary-map { min-height: 42px; padding: 0 13px; font-size: 12px; }
       body .uv-hudbar {
@@ -430,7 +435,7 @@
 </head>
 <body class="entry-open">
   <div id="hud">
-    <div id="wordmark">67<span>park</span></div>
+    <div id="wordmark"><img src="/brand/67park-logo.png" alt="67 Park" /></div>
     <div id="hub-actions" role="navigation" aria-label="Skypark actions">
       <button id="primary-play" type="button" aria-label="Choose a game">▶ PLAY GAMES</button>
       <button id="primary-map" type="button" aria-label="Open the park map">MAP</button>

@@ -1,6 +1,9 @@
 import { defineConfig } from 'vite';
 
-export default defineConfig({
+// Built for GitHub Pages, which serves the game from /67versee/ rather than
+// the domain root, so the build carries that base and the dev server does not.
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/67versee/' : '/',
   build: {
     // The budget checker uses Vite's source-to-chunk graph rather than
     // filename guesses, so hashed production chunks remain measurable.
@@ -33,4 +36,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));
