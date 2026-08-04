@@ -527,24 +527,78 @@ export function buildCityDistricts({ group, add, material, animated }) {
   carousel.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   group.add(carousel);
 
-  const coasterCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(22, 0.8, -28), new THREE.Vector3(27, 3.4, -30),
-    new THREE.Vector3(32, 1.2, -26), new THREE.Vector3(37, 4.6, -28),
-    new THREE.Vector3(40, 1.4, -24), new THREE.Vector3(31, 3.2, -22),
-    new THREE.Vector3(24, 0.9, -24),
+  // The swirling ride in the reference is not a rail coaster: it is a wide
+  // skate CHANNEL — a flat grey floor you could ride, with an orange lip
+  // running down both sides — that folds back over itself in a long loop.
+  // Built as a ribbon: sample the curve, step left and right along its
+  // horizontal normal, and stitch the floor; the lips ride the same offsets.
+  const slideCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(22, 0.7, -30), new THREE.Vector3(28, 1.5, -32.5),
+    new THREE.Vector3(35, 0.9, -30), new THREE.Vector3(39, 1.7, -26),
+    new THREE.Vector3(35, 1.0, -22.5), new THREE.Vector3(29, 1.9, -24),
+    new THREE.Vector3(25, 1.1, -27), new THREE.Vector3(30, 1.6, -28.5),
+    new THREE.Vector3(36, 0.8, -27),
   ], true);
-  const coaster = new THREE.Mesh(new THREE.TubeGeometry(coasterCurve, 96, 0.14, 8), mats.cream);
-  coaster.name = 'district:roller-coaster';
-  add(coaster, { camera: false, cast: true });
-  const coasterPosts = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.08, 0.08, 1, 6), mats.rail, 6);
-  [[27, -30, 3.4], [37, -28, 4.6], [40, -24, 1.4], [31, -22, 3.2], [32, -26, 1.2], [22, -28, 0.8]]
-    .forEach(([x, z, h], i) => {
-      const m = new THREE.Matrix4().makeScale(1, h, 1);
-      m.setPosition(x, h / 2, z);
-      coasterPosts.setMatrixAt(i, m);
-    });
-  coasterPosts.instanceMatrix.needsUpdate = true;
-  add(coasterPosts, { camera: false, cast: false });
+  const SLIDE_HALF = 1.5;
+  function ribbonGeometry(curve, halfWidth, segments) {
+    const positions = [];
+    const indices = [];
+    const up = new THREE.Vector3(0, 1, 0);
+    const point = new THREE.Vector3();
+    const tangent = new THREE.Vector3();
+    const side = new THREE.Vector3();
+    for (let i = 0; i <= segments; i += 1) {
+      const t = i / segments;
+      curve.getPointAt(t, point);
+      curve.getTangentAt(t, tangent);
+      side.crossVectors(tangent, up).normalize().multiplyScalar(halfWidth);
+      positions.push(point.x - side.x, point.y, point.z - side.z);
+      positions.push(point.x + side.x, point.y, point.z + side.z);
+      if (i < segments) {
+        const a = i * 2;
+        indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    return geometry;
+  }
+  const slideFloor = new THREE.Mesh(ribbonGeometry(slideCurve, SLIDE_HALF, 220), mats.concrete);
+  slideFloor.material.side = THREE.DoubleSide;
+  slideFloor.name = 'district:funfair-slide';
+  add(slideFloor, { camera: false, cast: false });
+  // Orange lips: one tube down each edge, offset by tracing a parallel curve.
+  for (const dir of [-1, 1]) {
+    const edgePoints = [];
+    const up = new THREE.Vector3(0, 1, 0);
+    const point = new THREE.Vector3();
+    const tangent = new THREE.Vector3();
+    const side = new THREE.Vector3();
+    for (let i = 0; i < 160; i += 1) {
+      const t = i / 160;
+      slideCurve.getPointAt(t, point);
+      slideCurve.getTangentAt(t, tangent);
+      side.crossVectors(tangent, up).normalize().multiplyScalar(SLIDE_HALF * dir);
+      edgePoints.push(new THREE.Vector3(point.x + side.x, point.y + 0.16, point.z + side.z));
+    }
+    const lip = new THREE.Mesh(
+      new THREE.TubeGeometry(new THREE.CatmullRomCurve3(edgePoints, true), 200, 0.17, 6),
+      mats.copingRed,
+    );
+    add(lip, { camera: false, cast: false });
+  }
+  // Slim supports under the raised sections.
+  const slidePosts = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.1, 0.13, 1, 6), mats.concreteDeep, 12);
+  for (let i = 0; i < 12; i += 1) {
+    const p = slideCurve.getPointAt(i / 12);
+    const m = new THREE.Matrix4().makeScale(1, Math.max(0.2, p.y), 1);
+    m.setPosition(p.x, p.y / 2, p.z);
+    slidePosts.setMatrixAt(i, m);
+  }
+  slidePosts.instanceMatrix.needsUpdate = true;
+  add(slidePosts, { camera: false, cast: false });
   const tent = new THREE.Mesh(new THREE.ConeGeometry(2.6, 2.6, 12), mats.copingRed);
   tent.position.set(38, 1.3, -36);
   tent.name = 'district:big-top';
