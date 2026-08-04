@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createSkyDome } from './core/sky.js';
 import { buildWorld, PALETTE } from './world.js';
+import { createFriendsieRival, isRiggedCharacter } from './core/friendsie-bot.js';
 import { loadWorldItems } from './world-items.js';
 import { cameraRelativeDirection, createInput } from './input.js';
 import { createPlayerState, stepPlayer } from './player.js';
@@ -261,7 +262,9 @@ function fireGrabFeedback() {
 // Arrival: the south end of the boulevard, clear of the market stalls and
 // the blocks either side, facing the 67 plaza up the street. The Quick Start
 // arc still runs north to the plaza, which is where it completes.
-const sim = createPlayerState(0, 42);
+// You start at the funfair, on Oscar's call. Ground was checked at this spot
+// rather than assumed: solid, dry, and clear of every ride.
+const sim = createPlayerState(26, -24);
 const input = createInput();
 
 // ---------- Shared ctx + module shell ----------
@@ -417,11 +420,17 @@ let hubCharacterLoadToken = 0;
 async function mountHubCharacter(id = ctx.characters.equippedId()) {
   const loadToken = ++hubCharacterLoadToken;
   try {
-    const instance = await ctx.characters.createInstance(id, {
-      skinTone: ctx.save.settings.skinTone,
-      lod: 'hero',
-      shadow: 'hero',
-    });
+    // Oscar's gorilla is an authored rigged model, not roster geometry, so it
+    // comes from the same factory the rivals use — it carries the bone names
+    // the gait driver writes to, and it walks on its own skeleton.
+    const instance = (isRiggedCharacter(id)
+      ? await createFriendsieRival(id, { height: 1.9 })
+      : null)
+      || await ctx.characters.createInstance(isRiggedCharacter(id) ? 'qa-runner' : id, {
+        skinTone: ctx.save.settings.skinTone,
+        lod: 'hero',
+        shadow: 'hero',
+      });
     if (loadToken !== hubCharacterLoadToken) {
       instance.dispose();
       return;

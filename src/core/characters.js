@@ -503,8 +503,10 @@ export function createCharacters(ctx, {
       );
       if (candidate) return candidate.id;
       const requested = ctx.save.get('equipped', null);
-      // First-run default: the project main character (hero-67) takes over
-      // local play. An explicit later shop selection still wins.
+      // Oscar's gorilla is the main character now, on his call, so a player who
+      // has never chosen anything wears it. An explicit shop selection still
+      // wins, and a saved choice is never overwritten.
+      if (requested == null) return 'gorilla';
       if (
         requested == null
         && candidateManifests.some((entry) => entry.id === DEFAULT_CHARACTER_ID)

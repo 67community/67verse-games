@@ -188,11 +188,11 @@ function installCompactProofHub(ctx, scene, world, getSim) {
     active: false,
     stage: 0,
     prompt: '',
-    startPosition: { x: 0, z: 42 },
+    startPosition: { x: 26, z: -24 },
     start() {
       this.active = true;
       this.stage = 0;
-      this.prompt = 'Follow the gold lozenges to Confluence Plaza';
+      this.prompt = 'Walk out of the funfair and into the park';
       const sim = getSim?.();
       if (sim) this.startPosition = { x: sim.pos.x, z: sim.pos.z };
     },
@@ -210,9 +210,9 @@ function installCompactProofHub(ctx, scene, world, getSim) {
       }
       if (this.stage === 1 && !sim.grounded) {
         this.stage = 2;
-        this.prompt = 'Reach Confluence Plaza';
+        this.prompt = 'Reach the 67 plaza';
       }
-      if (this.stage === 2 && sim.pos.z <= 14) {
+      if (this.stage === 2 && sim.pos.z >= -14) {
         this.active = false;
         this.prompt = '';
         const total = commitQuickStartReward(ctx.save);

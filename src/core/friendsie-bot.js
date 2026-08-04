@@ -16,6 +16,16 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const BASE = `${import.meta.env?.BASE_URL ?? '/'}friendsies/`;
 
+// Characters that are authored, rigged models rather than roster geometry.
+// The key is what a game or the hub asks for; the value is where it lives.
+export const RIGGED_CHARACTERS = Object.freeze({
+  gorilla: `${import.meta.env?.BASE_URL ?? '/'}characters/gorilla.glb`,
+});
+
+export function isRiggedCharacter(id) {
+  return typeof id === 'string' && Object.prototype.hasOwnProperty.call(RIGGED_CHARACTERS, id);
+}
+
 // The four lightest of Oscar's rigged collection, textures resized to 512.
 export const FRIENDSIE_RIVALS = Object.freeze([
   'rig_21.glb', 'rig_18.glb', 'rig_6.glb', 'rig_56.glb',
@@ -32,13 +42,13 @@ export function isFriendsieRival(id) {
 const loader = new GLTFLoader();
 const cache = new Map();
 
-function loadModel(file) {
-  if (!cache.has(file)) {
-    cache.set(file, new Promise((resolve) => {
-      loader.load(`${BASE}${file}`, (gltf) => resolve(gltf.scene), undefined, () => resolve(null));
+function loadModel(url) {
+  if (!cache.has(url)) {
+    cache.set(url, new Promise((resolve) => {
+      loader.load(url, (gltf) => resolve(gltf.scene), undefined, () => resolve(null));
     }));
   }
-  return cache.get(file);
+  return cache.get(url);
 }
 
 /**
@@ -46,8 +56,8 @@ function loadModel(file) {
  * Returns the same surface spawnBot uses from a roster character.
  */
 export async function createFriendsieRival(id, { height = 1.8 } = {}) {
-  const file = id.slice('friendsie:'.length);
-  const template = await loadModel(file);
+  const url = isRiggedCharacter(id) ? RIGGED_CHARACTERS[id] : `${BASE}${id.slice('friendsie:'.length)}`;
+  const template = await loadModel(url);
   if (!template) return null;
 
   const model = template.clone(true);
@@ -89,8 +99,14 @@ export async function createFriendsieRival(id, { height = 1.8 } = {}) {
 
   let phase = Math.random() * Math.PI * 2;
   let airborne = 0;
+  // The hub reads animator.contact every frame to fire a footstep sound when
+  // the serial changes. A rival never touched it; the player does, so this
+  // reports a real contact — one per half stride, alternating feet.
+  const contact = { serial: 0, foot: 'left' };
+  let lastStrideSign = 0;
 
   const animator = {
+    contact,
     signal(event) {
       // A jump is the one moment the legs should stop cycling and tuck.
       if (event === 'jump') airborne = 0.42;
@@ -109,6 +125,12 @@ export async function createFriendsieRival(id, { height = 1.8 } = {}) {
       }
       // Standing still still breathes a little, so a waiting rival is not a statue.
       const stride = Math.sin(phase) * (0.1 + running * 0.42);
+      const strideSign = Math.sign(Math.sin(phase));
+      if (running > 0.12 && strideSign !== 0 && strideSign !== lastStrideSign) {
+        lastStrideSign = strideSign;
+        contact.foot = strideSign > 0 ? 'left' : 'right';
+        contact.serial += 1;
+      }
       swing('ThighL', stride);
       swing('ThighR', -stride);
       swing('ArmL', -stride * 0.8);
