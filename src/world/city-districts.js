@@ -753,7 +753,11 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     [-36.0, -30.0, 32.2, 20.1],
     [-30.2, -57.4, 19.8, 8.7],
     [-44.8, -43.6, 11.8, 9.9],
-    [29.85, -1.55, 21.3, 34.1],
+    // Pulled in off four carriageways: the drawing's apron runs 19.2..40.5 by
+    // -18.6..15.5, and the roads measured from the same drawing sit at x
+    // 16.75..20.25 and 39.63..43.69 and z -21.12..-17.44 and 16.42..19.62. The
+    // apron was over all four.
+    [29.95, -0.15, 19.1, 32.9],
   ];
   const decks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.12, 1), mats.concreteDeep, DECKS.length);
   const dm = new THREE.Matrix4();
@@ -1157,15 +1161,29 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   docks.name = 'district:marina-docks';
   add(docks, { camera: false, cast: false });
 
-  // Hulls are pointed at both ends, not boxes: from the air that silhouette is
-  // the whole difference between a moored boat and a crate.
-  const hullShape = new THREE.Shape();
-  hullShape.moveTo(0, -0.5);
-  hullShape.bezierCurveTo(0.5, -0.3, 0.5, 0.18, 0.34, 0.42);
-  hullShape.quadraticCurveTo(0, 0.56, -0.34, 0.42);
-  hullShape.bezierCurveTo(-0.5, 0.18, -0.5, -0.3, 0, -0.5);
-  const hullGeometry = new THREE.ExtrudeGeometry(hullShape, { depth: 0.42, bevelEnabled: false, curveSegments: 4 });
-  hullGeometry.rotateX(-Math.PI / 2);
+  // A boat in the drawing is two things, not one: a pale hull with its gunwale
+  // showing all the way round, and a vivid deck set inside it. Painting the
+  // whole hull one colour is what made these read as leaves floating on the
+  // bay. Measured off the render at 7x — hull about 10 x 24 pixels, the
+  // coloured deck about 7 x 18 inside it.
+  function hullShape(width, length, waist) {
+    const shape = new THREE.Shape();
+    const hw = width / 2;
+    const hl = length / 2;
+    shape.moveTo(0, -hl);
+    shape.bezierCurveTo(hw * waist, -hl * 0.55, hw, hl * 0.1, hw * 0.62, hl * 0.78);
+    shape.quadraticCurveTo(0, hl * 1.02, -hw * 0.62, hl * 0.78);
+    shape.bezierCurveTo(-hw, hl * 0.1, -hw * waist, -hl * 0.55, 0, -hl);
+    return shape;
+  }
+  function flatHull(width, length, waist, depth) {
+    const geometry = new THREE.ExtrudeGeometry(hullShape(width, length, waist), {
+      depth, bevelEnabled: false, curveSegments: 4,
+    });
+    geometry.rotateX(-Math.PI / 2);
+    return geometry;
+  }
+
   const MOORED = [
     ...MARINA_TEKNELER.map(({ x, z, renk }) => ({
       x, z, renk, yaw: 0, length: MARINA_TEKNE_BOY.length, width: MARINA_TEKNE_BOY.width,
@@ -1175,18 +1193,29 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
       yaw: MARINA_YELKENLI.yaw, length: MARINA_YELKENLI.length, width: MARINA_YELKENLI.width,
     },
   ];
-  const boats = new THREE.InstancedMesh(hullGeometry, mats.white, MOORED.length);
+
+  const hulls = new THREE.InstancedMesh(flatHull(1, 1, 1.05, 0.34), mats.white, MOORED.length);
+  const boatDecks = new THREE.InstancedMesh(flatHull(0.7, 0.76, 1.0, 0.16), mats.skateLip, MOORED.length);
   MOORED.forEach(({ x, z, renk, yaw, length, width }, i) => {
     const m = new THREE.Matrix4().makeRotationY(yaw);
     m.scale(new THREE.Vector3(width, 1, length));
-    m.setPosition(x, 0.16, z);
-    boats.setMatrixAt(i, m);
-    boats.setColorAt(i, new THREE.Color(renk));
+    m.setPosition(x, 0.12, z);
+    hulls.setMatrixAt(i, m);
+    hulls.setColorAt(i, new THREE.Color('#ddd6cc'));
+    const d = new THREE.Matrix4().makeRotationY(yaw);
+    d.scale(new THREE.Vector3(width, 1, length));
+    d.setPosition(x, 0.34, z);
+    boatDecks.setMatrixAt(i, d);
+    boatDecks.setColorAt(i, new THREE.Color(renk));
   });
-  boats.instanceMatrix.needsUpdate = true;
-  if (boats.instanceColor) boats.instanceColor.needsUpdate = true;
-  boats.name = 'district:marina-boats';
-  add(boats, { camera: false, cast: false });
+  hulls.instanceMatrix.needsUpdate = true;
+  boatDecks.instanceMatrix.needsUpdate = true;
+  if (hulls.instanceColor) hulls.instanceColor.needsUpdate = true;
+  if (boatDecks.instanceColor) boatDecks.instanceColor.needsUpdate = true;
+  hulls.name = 'district:marina-boats';
+  boatDecks.name = 'district:marina-decks';
+  add(hulls, { camera: false, cast: true });
+  add(boatDecks, { camera: false, cast: false });
 
   // The one boat under sail, out past the piers.
   // Seen from above, a sail is a triangle lying over its hull, which is how

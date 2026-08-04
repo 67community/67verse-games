@@ -33,7 +33,10 @@ export const HARITA_YERLERI = Object.freeze([
   Object.freeze({ id: 'marina', name: 'Marina', x: 41.5, z: -38.6 }),
   Object.freeze({ id: 'funfair', name: 'Funfair', x: 30, z: -44 }),
   Object.freeze({ id: 'beach', name: 'Beach', x: 50, z: -10 }),
-  Object.freeze({ id: 'stadium', name: 'Stadium', x: 29.7, z: 0.3 }),
+  // On the apron outside the bowl, not on the pitch: the bowl wall is 2.35
+  // high and arriving inside it puts you in a walled ring with the camera in
+  // the wall.
+  Object.freeze({ id: 'stadium', name: 'Stadium', x: 20.9, z: -0.15 }),
   Object.freeze({ id: 'court', name: 'Basketball court', x: -36, z: 0 }),
   Object.freeze({ id: 'athletics', name: 'Athletics track', x: -36, z: -30 }),
   Object.freeze({ id: 'market', name: 'Market square', x: -2, z: 31 }),

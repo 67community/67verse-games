@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { canvasTexture, squirclePath, roundedBoxGeometry } from './sekil.js';
 
 export const STADIUM_PITCH = Object.freeze({
-  x: 29.9, z: -1.5, rx: 4.7, rz: 11.3, topY: 0.16,
+  x: 29.95, z: -0.15, rx: 4.7, rz: 11.3, topY: 0.16,
 });
 
 // Built from main.js's own import rather than from inside the city module, so
@@ -28,26 +28,36 @@ export function buildStadium(mats) {
   // pitch 903..1000 by 512..745, with a grandstand outside each long side.
   // What was here was a torus scaled into an oval — a rubber ring, not a
   // stadium — and a bare green cylinder for the pitch.
-  const BOWL = { rx: 8.25, rz: 14.3, inner: { rx: 6.4, rz: 13.1 }, height: 2.35 };
+  // The bowl's inner edge cannot be an ellipse. A 9.4 x 22.6 pitch does not fit
+  // inside a 6.4 x 13.1 oval — its corners test 1.28 against it — so an
+  // elliptical wall stands on the green at all four corners, which is what you
+  // could see. Everything inside is a rounded rectangle around the pitch now;
+  // only the outer face is an oval, which is the face the drawing shows as one.
+  const BOWL = { rx: 8.25, rz: 14.3, height: 2.35 };
   // Pitch and bowl are concentric in the drawing — its pitch centres on py
   // 628.5 and its bowl on 627.5 — so nothing here carries an offset. An
   // earlier attempt shifted the track ring twice and hung the pitch off the
   // north end of the oval.
-  const PITCH = { w: 9.4, d: 22.6 };
+  const PITCH = { w: 9.4, d: 22.6, r: 1.1 };
+  const TRACK_PAY = 1.6;
 
-  function ovalRing(rx, rz, innerRx, innerRz) {
+  // The track's outer edge, and so the wall's inner edge: the pitch's own
+  // rectangle grown by the track width.
+  const TRACK_W = PITCH.w + TRACK_PAY * 2;
+  const TRACK_D = PITCH.d + TRACK_PAY * 2;
+  const TRACK_R = PITCH.r + TRACK_PAY;
+
+  function ovalAround(rx, rz, holeW, holeD, holeR) {
     const shape = new THREE.Shape();
     shape.absellipse(0, 0, rx, rz, 0, Math.PI * 2, false, 0);
-    const hole = new THREE.Path();
-    hole.absellipse(0, 0, innerRx, innerRz, 0, Math.PI * 2, true, 0);
-    shape.holes.push(hole);
+    shape.holes.push(squirclePath(holeW, holeD, holeR, THREE.Path));
     return shape;
   }
 
   // The bowl wall: a real wall with a flat top, bevelled like every other
   // block in the city so it catches the same rim of light.
   const bowlGeometry = new THREE.ExtrudeGeometry(
-    ovalRing(BOWL.rx, BOWL.rz, BOWL.inner.rx, BOWL.inner.rz),
+    ovalAround(BOWL.rx, BOWL.rz, TRACK_W, TRACK_D, TRACK_R),
     {
       depth: BOWL.height - 0.24,
       bevelEnabled: true,
@@ -66,13 +76,11 @@ export function buildStadium(mats) {
 
   // The running track inside the wall, which reads as the dark band around
   // the pitch in the reference.
-  // The track's inner edge is the pitch itself, not a second ellipse: an
-  // ellipse there cuts the pitch's corners off, because a 9.4 x 22.6 rectangle
-  // does not fit inside a 6.4 x 13.1 oval — its corners sit well outside it.
-  const trackShape = new THREE.Shape();
-  trackShape.absellipse(0, 0, BOWL.inner.rx, BOWL.inner.rz, 0, Math.PI * 2, false, 0);
-  trackShape.holes.push(squirclePath(PITCH.w + 0.3, PITCH.d + 0.3, 1.1, THREE.Path));
-  const trackGeometry = new THREE.ShapeGeometry(trackShape, 22);
+  // The track is a band of even width around the pitch, which is how the
+  // drawing reads it, and its outer edge is where the wall starts.
+  const trackShape = squirclePath(TRACK_W, TRACK_D, TRACK_R);
+  trackShape.holes.push(squirclePath(PITCH.w + 0.3, PITCH.d + 0.3, PITCH.r, THREE.Path));
+  const trackGeometry = new THREE.ShapeGeometry(trackShape, 12);
   trackGeometry.rotateX(-Math.PI / 2);
   trackGeometry.translate(0, 0.12, 0);
   const track = new THREE.Mesh(trackGeometry, mats.stadiumTrack);
@@ -146,7 +154,7 @@ export function buildStadium(mats) {
   const STANDS_67 = [
     [-7.42, 0, 2.13, 9.98, 2.55],
     [7.42, 0, 2.13, 9.98, 2.55],
-    [0.7, 16.05, 7.8, 2.9, 1.7],
+    [0.7, 14.6, 7.8, 2.9, 1.7],
   ];
   const standMesh = new THREE.InstancedMesh(
     roundedBoxGeometry(1, 1, 1, 0.18, 0.06), mats.white, STANDS_67.length,
@@ -161,7 +169,8 @@ export function buildStadium(mats) {
   standMesh.name = 'district:stadium-stands';
   stadium.add(standMesh);
 
-  stadium.position.set(29.9, 0, -1.5);
+  // Centred on its own apron, which moved north off the ring road.
+  stadium.position.set(29.95, 0, -0.15);
   stadium.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   return stadium;
 }
