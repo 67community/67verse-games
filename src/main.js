@@ -473,6 +473,9 @@ if (entrySummary) {
   }`;
 }
 const primaryPlayButton = document.getElementById('primary-play');
+// The 67VERSE skate lobby's live address. Shared by the Play Games panel and
+// the map, so there is one place to change it.
+const SKATE_LOBBY_URL = 'https://67verse.67gamehub.workers.dev/skate';
 const primaryMapButton = document.getElementById('primary-map');
 const primaryChatButton = document.getElementById('primary-chat');
 const returnSkyparkButton = document.getElementById('return-skypark');
@@ -849,6 +852,25 @@ function openGameSelect() {
     card.append(icon, name, description, status, play);
     grid.appendChild(card);
   }
+  // The skate lobby, where Oscar looks for it: in Play Games, above the map,
+  // not only on the map panel. It is a different park on a different server,
+  // so this leaves 67 Park rather than starting a mode inside it.
+  const lobbyHeading = document.createElement('h3');
+  lobbyHeading.className = 'uv-spot-heading';
+  lobbyHeading.textContent = 'Other parks';
+  const lobbyRow = document.createElement('article');
+  lobbyRow.className = 'uv-spot-row';
+  const lobbyInfo = document.createElement('div');
+  lobbyInfo.className = 'uv-spot-info';
+  const lobbyName = document.createElement('h4');
+  lobbyName.textContent = '67VERSE Skate Lobby';
+  const lobbyText = document.createElement('p');
+  lobbyText.textContent = 'The skate park lobby — shops, ramps and rails. Leaves 67 Park.';
+  lobbyInfo.append(lobbyName, lobbyText);
+  lobbyRow.append(lobbyInfo, ctx.ui.button('Open Skate Lobby', () => {
+    window.location.assign(SKATE_LOBBY_URL);
+  }, { primary: true }));
+
   const spotsHeading = document.createElement('h3');
   spotsHeading.className = 'uv-spot-heading';
   spotsHeading.textContent = '67 Park spots';
@@ -874,7 +896,7 @@ function openGameSelect() {
     row.append(info, go);
     spotList.appendChild(row);
   }
-  p.body.append(intro, grid, spotsHeading, spotsIntro, spotList);
+  p.body.append(intro, grid, lobbyHeading, lobbyRow, spotsHeading, spotsIntro, spotList);
 }
 // The public proof has one promise: play the course. Secondary systems remain
 // registered and reachable through explicit dev/QA routes, but do not compete

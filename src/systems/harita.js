@@ -163,20 +163,20 @@ function openMap(ctx) {
   // it — the deployed address, not a local one, so it works from a phone too.
   const lobby = document.createElement('button');
   lobby.type = 'button';
-  lobby.textContent = 'LOBBY';
+  lobby.textContent = 'SKATE LOBBY';
   lobby.setAttribute('aria-label', 'Open the 67VERSE skate lobby');
   styled(lobby, {
     position: 'absolute',
     left: '50%',
     top: '50%',
     transform: 'translate(-50%, -50%)',
-    padding: '10px 20px',
+    padding: '13px 24px',
     borderRadius: '999px',
-    border: '1px solid rgba(255,255,255,0.5)',
+    border: '2px solid rgba(255,255,255,0.75)',
     background: '#1c1c20',
     color: '#ffffff',
-    font: '700 13px/1 Figtree, system-ui, sans-serif',
-    letterSpacing: '0.08em',
+    font: '800 14px/1 Figtree, system-ui, sans-serif',
+    letterSpacing: '0.09em',
     cursor: 'pointer',
     boxShadow: '0 2px 10px rgba(20,16,24,0.35)',
   });
