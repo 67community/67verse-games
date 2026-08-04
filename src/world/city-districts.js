@@ -17,6 +17,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { PLAN_BINALAR, PLAN_BINA_RENK, PLAN_AGACLAR, PLAN_ARABALAR } from './plan-verisi.js';
+import {
+  PLAN_ANA_YOLLAR, PLAN_PATIKALAR, PLAN_ZEBRALAR, PLAN_KAVSAKLAR,
+} from './plan-ek.js';
 const COPING = Object.freeze({ red: 0xe0745e, blue: 0x5a80d6, yellow: 0xf6c445 });
 
 // Landmark buildings generated from the map itself: single-object crops of
@@ -195,16 +198,21 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // and 52. Several earlier guesses were two to six units out, which is what
   // pushed plan-placed buildings onto the carriageway.
   const ROAD_W = 4.6;
-  const V_ROADS = [-53.7, -19, 18.6, 41.7];
-  const H_ROADS = [-51, -18.5, 18.2, 52];
+  // Roads come from the plan: PLAN_ANA_YOLLAR holds every arterial the drawing
+  // shows with its measured centre, length and width — twenty-six of them, not
+  // the four-by-four grid I had drawn by hand. Each is laid along its longer
+  // axis. PLAN_PATIKALAR carries the park walks and neighbourhood lanes.
+  const yatayMi = (g, d) => g >= d;
+  const V_ROADS = [...new Set(PLAN_ANA_YOLLAR.filter(([, , g, d]) => !yatayMi(g, d))
+    .map(([x]) => Math.round(x * 2) / 2))];
+  const H_ROADS = [...new Set(PLAN_ANA_YOLLAR.filter(([, , g, d]) => yatayMi(g, d))
+    .map(([, z]) => Math.round(z * 2) / 2))];
 
-  // Nothing from the plan may stand on a road. A footprint is rejected when it
-  // overlaps any corridor, with a kerb margin so buildings sit back from the
-  // edge rather than flush against traffic.
+  // Nothing from the plan may stand on a road. A footprint that lands on a
+  // carriageway is not deleted — the plan drew a building there and it should
+  // exist — it is pushed clear along whichever axis needs the smaller move,
+  // the way a site plan resolves a clash.
   const YOL_PAYI = ROAD_W / 2 + 1.2;
-  // A footprint that lands on a carriageway is not deleted — the plan drew a
-  // building there and it should exist — it is pushed clear along whichever
-  // axis needs the smaller move, the way a site plan resolves a clash.
   function yoldanKaydir(x, z, w = 0, d = 0) {
     let nx = x;
     let nz = z;
@@ -212,76 +220,97 @@ export function buildCityDistricts({ group, add, material, animated }) {
       let carpisma = false;
       for (const rx of V_ROADS) {
         const bindirme = YOL_PAYI + w / 2 - Math.abs(nx - rx);
-        if (bindirme > 0) {
-          nx += nx >= rx ? bindirme : -bindirme;
-          carpisma = true;
-        }
+        if (bindirme > 0) { nx += nx >= rx ? bindirme : -bindirme; carpisma = true; }
       }
       for (const rz of H_ROADS) {
         const bindirme = YOL_PAYI + d / 2 - Math.abs(nz - rz);
-        if (bindirme > 0) {
-          nz += nz >= rz ? bindirme : -bindirme;
-          carpisma = true;
-        }
+        if (bindirme > 0) { nz += nz >= rz ? bindirme : -bindirme; carpisma = true; }
       }
       if (!carpisma) break;
     }
     return [nx, nz];
   }
-  function yolUstunde(x, z, w = 0, d = 0) {
-    for (const rx of V_ROADS) if (Math.abs(x - rx) < YOL_PAYI + w / 2) return true;
-    for (const rz of H_ROADS) if (Math.abs(z - rz) < YOL_PAYI + d / 2) return true;
-    return false;
-  }
-  const vRoads = new THREE.InstancedMesh(new THREE.BoxGeometry(ROAD_W, 0.08, 100), mats.road, V_ROADS.length);
-  V_ROADS.forEach((x, i) => {
-    vRoads.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.04, -2.5));
-  });
-  vRoads.instanceMatrix.needsUpdate = true;
-  vRoads.name = 'district:road-grid';
-  add(vRoads, { walkable: true, camera: false, cast: false });
-  const hRoads = new THREE.InstancedMesh(new THREE.BoxGeometry(98, 0.08, ROAD_W), mats.road, H_ROADS.length);
-  H_ROADS.forEach((z, i) => {
-    hRoads.setMatrixAt(i, new THREE.Matrix4().makeTranslation(-3.5, 0.04, z));
-  });
-  hRoads.instanceMatrix.needsUpdate = true;
-  hRoads.name = 'district:cross-roads';
-  add(hRoads, { camera: false, cast: false });
 
-  // Kerb edge strips: the light lip both sides of every road.
-  const kerbCount = (V_ROADS.length + H_ROADS.length) * 2;
-  const kerbs = new THREE.InstancedMesh(new THREE.BoxGeometry(0.5, 0.1, 100), mats.kerbLight, kerbCount);
-  let kerbIndex = 0;
-  const kerbM = new THREE.Matrix4();
-  for (const x of V_ROADS) {
-    for (const side of [-1, 1]) {
-      kerbM.identity();
-      kerbM.setPosition(x + side * (ROAD_W / 2 + 0.25), 0.05, -2.5);
-      kerbs.setMatrixAt(kerbIndex, kerbM);
-      kerbIndex += 1;
+  // One instanced mesh carries every arterial; scale gives each its measured
+  // length and width, so the network is the plan's rather than a grid.
+  const anaYollar = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 0.08, 1), mats.road, PLAN_ANA_YOLLAR.length,
+  );
+  const ym = new THREE.Matrix4();
+  PLAN_ANA_YOLLAR.forEach(([x, z, g, d], i) => {
+    ym.makeScale(Math.max(g, ROAD_W * 0.7), 1, Math.max(d, ROAD_W * 0.7));
+    ym.setPosition(x, 0.04, z);
+    anaYollar.setMatrixAt(i, ym);
+  });
+  anaYollar.instanceMatrix.needsUpdate = true;
+  anaYollar.name = 'district:road-grid';
+  add(anaYollar, { walkable: true, camera: false, cast: false });
+
+  // Park walks and neighbourhood lanes: narrower, and they never carry traffic.
+  const patikalar = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 0.07, 1), mats.kerbLight, PLAN_PATIKALAR.length,
+  );
+  PLAN_PATIKALAR.forEach(([x, z, g, d], i) => {
+    ym.makeScale(Math.max(g, 1.2), 1, Math.max(d, 1.2));
+    ym.setPosition(x, 0.05, z);
+    patikalar.setMatrixAt(i, ym);
+  });
+  patikalar.instanceMatrix.needsUpdate = true;
+  patikalar.name = 'district:cross-roads';
+  add(patikalar, { camera: false, cast: false });
+
+  // Roundabouts where the plan marks them, each with its green island.
+  const kavsaklar = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(1, 1, 0.1, 18), mats.road, Math.max(1, PLAN_KAVSAKLAR.length),
+  );
+  const kavsakYesil = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(1, 1, 0.14, 14), mats.grass, Math.max(1, PLAN_KAVSAKLAR.length),
+  );
+  PLAN_KAVSAKLAR.forEach(([x, z, g, d], i) => {
+    const r = Math.max(2.2, (g + d) / 4);
+    ym.makeScale(r, 1, r);
+    ym.setPosition(x, 0.05, z);
+    kavsaklar.setMatrixAt(i, ym);
+    ym.makeScale(r * 0.42, 1, r * 0.42);
+    ym.setPosition(x, 0.09, z);
+    kavsakYesil.setMatrixAt(i, ym);
+  });
+  kavsaklar.instanceMatrix.needsUpdate = true;
+  kavsakYesil.instanceMatrix.needsUpdate = true;
+  add(kavsaklar, { walkable: true, camera: false, cast: false });
+  add(kavsakYesil, { camera: false, cast: false });
+
+  // Kerb lips down both sides of every arterial, and the dashed centre line
+  // along its length — both derived from the plan's own road records.
+  const kerbSayisi = PLAN_ANA_YOLLAR.length * 2;
+  const kerbs = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.1, 1), mats.kerbLight, kerbSayisi);
+  const dashList = [];
+  PLAN_ANA_YOLLAR.forEach(([x, z, g, d], i) => {
+    const yatay = yatayMi(g, d);
+    const uzun = Math.max(g, d);
+    const genis = Math.max(Math.min(g, d), ROAD_W * 0.7);
+    for (const yon of [-1, 1]) {
+      if (yatay) {
+        ym.makeScale(uzun, 1, 0.5);
+        ym.setPosition(x, 0.05, z + yon * (genis / 2 + 0.25));
+      } else {
+        ym.makeScale(0.5, 1, uzun);
+        ym.setPosition(x + yon * (genis / 2 + 0.25), 0.05, z);
+      }
+      kerbs.setMatrixAt(i * 2 + (yon < 0 ? 0 : 1), ym);
     }
-  }
-  for (const z of H_ROADS) {
-    for (const side of [-1, 1]) {
-      kerbM.makeRotationY(Math.PI / 2);
-      kerbM.setPosition(-3.5, 0.05, z + side * (ROAD_W / 2 + 0.25));
-      kerbs.setMatrixAt(kerbIndex, kerbM);
-      kerbIndex += 1;
+    const adim = 4.4;
+    for (let t = -uzun / 2 + 2; t < uzun / 2 - 1; t += adim) {
+      dashList.push(yatay ? [x + t, z, Math.PI / 2] : [x, z + t, 0]);
     }
-  }
+  });
   kerbs.instanceMatrix.needsUpdate = true;
   add(kerbs, { camera: false, cast: false });
 
-  // Dashed center lines along every road.
-  const dashPositions = [];
-  for (const x of V_ROADS) {
-    for (let z = -49; z <= 44; z += 4.4) dashPositions.push([x, z, 0]);
-  }
-  for (const z of H_ROADS) {
-    for (let x = -49; x <= 42; x += 4.4) dashPositions.push([x, z, Math.PI / 2]);
-  }
-  const dashes = new THREE.InstancedMesh(new THREE.BoxGeometry(0.28, 0.02, 1.9), mats.paint, dashPositions.length);
-  dashPositions.forEach(([x, z, rot], i) => {
+  const dashes = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(0.28, 0.02, 1.9), mats.paint, Math.max(1, dashList.length),
+  );
+  dashList.forEach(([x, z, rot], i) => {
     const m = new THREE.Matrix4().makeRotationY(rot);
     m.setPosition(x, 0.1, z);
     dashes.setMatrixAt(i, m);
@@ -290,24 +319,18 @@ export function buildCityDistricts({ group, add, material, animated }) {
   dashes.name = 'district:lane-dashes';
   add(dashes, { camera: false, cast: false });
 
-  // Crosswalks at every internal junction.
-  const junctions = [];
-  for (const x of [-20, 16]) for (const z of [-19, 16, 46]) junctions.push([x, z]);
-  junctions.push([-20, -51], [16, -51], [44, -19], [44, 16], [-51, -19], [-51, 16]);
-  const stripes = new THREE.InstancedMesh(new THREE.BoxGeometry(0.7, 0.02, 3.4), mats.paint, junctions.length * 10);
-  let stripeIndex = 0;
-  const stripeM = new THREE.Matrix4();
-  junctions.forEach(([cx, cz]) => {
-    for (let s = 0; s < 5; s += 1) {
-      const offset = (s - 2) * 1.0;
-      stripeM.identity();
-      stripeM.setPosition(cx + offset, 0.1, cz + ROAD_W / 2 + 2.1);
-      stripes.setMatrixAt(stripeIndex, stripeM);
-      stripeIndex += 1;
-      stripeM.makeRotationY(Math.PI / 2);
-      stripeM.setPosition(cx + ROAD_W / 2 + 2.1, 0.1, cz + offset);
-      stripes.setMatrixAt(stripeIndex, stripeM);
-      stripeIndex += 1;
+  // Crosswalks exactly where the plan paints them: each record becomes a set
+  // of five stripes laid across the road it belongs to.
+  const stripes = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(0.7, 0.02, 3.4), mats.paint, Math.max(1, PLAN_ZEBRALAR.length * 5),
+  );
+  PLAN_ZEBRALAR.forEach(([x, z, g, d], c) => {
+    const yatay = g >= d;
+    for (let sIdx = 0; sIdx < 5; sIdx += 1) {
+      const offset = (sIdx - 2) * 0.95;
+      const m = new THREE.Matrix4().makeRotationY(yatay ? 0 : Math.PI / 2);
+      m.setPosition(yatay ? x + offset : x, 0.1, yatay ? z : z + offset);
+      stripes.setMatrixAt(c * 5 + sIdx, m);
     }
   });
   stripes.instanceMatrix.needsUpdate = true;
@@ -866,15 +889,17 @@ export function buildCityDistricts({ group, add, material, animated }) {
   const blockBodies = new THREE.InstancedMesh(blockGeo, mats.white, BLOCKS.length);
   const blockPlinths = new THREE.InstancedMesh(roundedBoxGeometry(1, 1, 1, 0.22), mats.concrete, BLOCKS.length);
   const blockLips = new THREE.InstancedMesh(roundedBoxGeometry(1, 1, 1, 0.16), mats.white, BLOCKS.length);
-  const blockNotchLong = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.blockDark, BLOCKS.length);
-  const blockNotchShort = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.blockDark, BLOCKS.length);
+  // The L recess is two arms of the same material and geometry, so both ride
+  // one instanced mesh: index 2i is the long arm, 2i+1 the short.
+  const blockNotches = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.blockDark, BLOCKS.length * 2);
   const awnings = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.22, 0.55), mats.white, BLOCKS.length);
   // Glazing, in the building's own language: a cream surround with the glass
   // set into it, mullions so it reads as a door rather than a mirror, and an
   // upper window band in the same glass the gym roof uses.
-  const doorFrames = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.white, BLOCKS.length);
+  // Surround and mullions are the same cream box geometry, so they share one
+  // instanced mesh: three slots per block — the surround then two mullions.
+  const doorFrames = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.white, BLOCKS.length * 3);
   const doorGlass = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.glass, BLOCKS.length);
-  const doorMullions = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.white, BLOCKS.length * 2);
   const windowBands = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.glass, BLOCKS.length);
   const AWNING_TONE = [COPING.red, COPING.blue, 0xd7cfc2];
   const bm = new THREE.Matrix4();
@@ -897,10 +922,10 @@ export function buildCityDistricts({ group, add, material, animated }) {
     // The L recess inside the lip: one long arm, one short.
     bm.makeScale(w * 0.5, 0.07, 0.16);
     bm.setPosition(x - w * 0.14, h + 0.15, z - d * 0.22);
-    blockNotchLong.setMatrixAt(i, bm);
+    blockNotches.setMatrixAt(i * 2, bm);
     bm.makeScale(0.16, 0.07, d * 0.34);
     bm.setPosition(x - w * 0.36, h + 0.15, z - d * 0.06);
-    blockNotchShort.setMatrixAt(i, bm);
+    blockNotches.setMatrixAt(i * 2 + 1, bm);
     // Awning across the street face.
     bm.makeScale(w * 0.62, 1, 1);
     bm.setPosition(x, 0.62, z + d / 2 + 0.2);
@@ -909,23 +934,23 @@ export function buildCityDistricts({ group, add, material, animated }) {
     // Glazed shopfront under the awning.
     bm.makeScale(w * 0.46, 1.9, 0.14);
     bm.setPosition(x, 0.95, z + d / 2 + 0.03);
-    doorFrames.setMatrixAt(i, bm);
+    doorFrames.setMatrixAt(i * 3, bm);
     bm.makeScale(w * 0.38, 1.6, 0.1);
     bm.setPosition(x, 0.9, z + d / 2 + 0.12);
     doorGlass.setMatrixAt(i, bm);
     bm.makeScale(0.09, 1.6, 0.08);
     bm.setPosition(x - w * 0.1, 0.9, z + d / 2 + 0.16);
-    doorMullions.setMatrixAt(i * 2, bm);
+    doorFrames.setMatrixAt(i * 3 + 1, bm);
     bm.setPosition(x + w * 0.1, 0.9, z + d / 2 + 0.16);
-    doorMullions.setMatrixAt(i * 2 + 1, bm);
+    doorFrames.setMatrixAt(i * 3 + 2, bm);
     // Upper-floor window band.
     bm.makeScale(w * 0.66, 0.55, 0.09);
     bm.setPosition(x, h * 0.66, z + d / 2 + 0.06);
     windowBands.setMatrixAt(i, bm);
   });
   for (const mesh of [
-    blockBodies, blockPlinths, blockLips, blockNotchLong, blockNotchShort,
-    awnings, doorFrames, doorGlass, doorMullions, windowBands,
+    blockBodies, blockPlinths, blockLips, blockNotches,
+    awnings, doorFrames, doorGlass, windowBands,
   ]) {
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -934,13 +959,11 @@ export function buildCityDistricts({ group, add, material, animated }) {
   add(blockBodies, { camera: true, cast: true });
   add(blockPlinths, { camera: false, cast: false });
   add(blockLips, { camera: false, cast: true });
-  add(blockNotchLong, { camera: false, cast: false });
-  add(blockNotchShort, { camera: false, cast: false });
+  add(blockNotches, { camera: false, cast: false });
   add(awnings, { camera: false, cast: true });
   doorGlass.name = 'district:block-glass';
   add(doorFrames, { camera: false, cast: false });
   add(doorGlass, { camera: false, cast: false });
-  add(doorMullions, { camera: false, cast: false });
   add(windowBands, { camera: false, cast: false });
 
   // --- Basketball court, built from the close-up reference ---
