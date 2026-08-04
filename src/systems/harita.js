@@ -20,6 +20,7 @@ const MAP_SRC = `${import.meta.env?.BASE_URL ?? '/'}map/harita.png`;
 // The 67VERSE skate lobby is its own deployment, so this is its live address
 // rather than the local one it is developed against: the map ships to phones.
 const LOBBY_URL = 'https://67verse.67gamehub.workers.dev/skate';
+const CITY_URL = 'https://67verse.67gamehub.workers.dev/';
 const MAP_SPAN = 124;
 
 // Measured places, each on ground you can actually stand on — the marina's pin
@@ -188,9 +189,22 @@ function openMap(ctx) {
     window.location.assign(LOBBY_URL);
   });
 
+  // And the open city, under the lobby: two ways out of the park, both on the
+  // map where you go looking for somewhere to be.
+  const city = lobby.cloneNode(false);
+  city.textContent = 'CITY MAP';
+  city.setAttribute('aria-label', 'Open the 67VERSE city and its World Map');
+  city.style.top = 'calc(50% + 46px)';
+  city.style.background = '#3b3f4a';
+  city.addEventListener('click', (event) => {
+    event.stopPropagation();
+    window.location.assign(CITY_URL);
+  });
+
   frame.append(image, here);
   for (const place of HARITA_YERLERI) frame.appendChild(marker(place, travel));
   frame.appendChild(lobby);
+  frame.appendChild(city);
   panel.body.append(intro, frame);
 }
 

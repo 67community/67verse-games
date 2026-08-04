@@ -476,6 +476,9 @@ const primaryPlayButton = document.getElementById('primary-play');
 // The 67VERSE skate lobby's live address. Shared by the Play Games panel and
 // the map, so there is one place to change it.
 const SKATE_LOBBY_URL = 'https://67verse.67gamehub.workers.dev/skate';
+// The open city on the same deployment — the World Map's other half, which
+// was reachable only from inside the lobby.
+const CITY_MAP_URL = 'https://67verse.67gamehub.workers.dev/';
 const primaryMapButton = document.getElementById('primary-map');
 const primaryLobbyButton = document.getElementById('primary-lobby');
 const primaryChatButton = document.getElementById('primary-chat');
@@ -872,6 +875,19 @@ function openGameSelect() {
     window.location.assign(SKATE_LOBBY_URL);
   }, { primary: true }));
 
+  const cityRow = document.createElement('article');
+  cityRow.className = 'uv-spot-row';
+  const cityInfo = document.createElement('div');
+  cityInfo.className = 'uv-spot-info';
+  const cityName = document.createElement('h4');
+  cityName.textContent = '67VERSE City';
+  const cityText = document.createElement('p');
+  cityText.textContent = 'The open city and its World Map. Leaves 67 Park.';
+  cityInfo.append(cityName, cityText);
+  cityRow.append(cityInfo, ctx.ui.button('Open City', () => {
+    window.location.assign(CITY_MAP_URL);
+  }));
+
   const spotsHeading = document.createElement('h3');
   spotsHeading.className = 'uv-spot-heading';
   spotsHeading.textContent = '67 Park spots';
@@ -897,7 +913,7 @@ function openGameSelect() {
     row.append(info, go);
     spotList.appendChild(row);
   }
-  p.body.append(intro, grid, lobbyHeading, lobbyRow, spotsHeading, spotsIntro, spotList);
+  p.body.append(intro, grid, lobbyHeading, lobbyRow, cityRow, spotsHeading, spotsIntro, spotList);
 }
 // The public proof has one promise: play the course. Secondary systems remain
 // registered and reachable through explicit dev/QA routes, but do not compete
