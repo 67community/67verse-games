@@ -20,6 +20,10 @@ import { PLAN_BINALAR, PLAN_BINA_RENK, PLAN_AGACLAR, PLAN_ARABALAR } from './pla
 import {
   PLAN_ANA_YOLLAR, PLAN_PATIKALAR, PLAN_ZEBRALAR, PLAN_KAVSAKLAR,
 } from './plan-ek.js';
+import {
+  PLAN_BANKLAR, PLAN_SEMSIYELER, PLAN_LAMBALAR, PLAN_HEYKELLER,
+  PLAN_COPLER, PLAN_UFAKLAR,
+} from './plan-oge.js';
 const COPING = Object.freeze({ red: 0xe0745e, blue: 0x5a80d6, yellow: 0xf6c445 });
 
 // Landmark buildings generated from the map itself: single-object crops of
@@ -536,15 +540,8 @@ export function buildCityDistricts({ group, add, material, animated }) {
     [22.6, -1.6, 2.4, 9.5], [39.1, -1.4, 2.3, 10.0],      // stadium
     [-52.4, -32.4, 0.9, 7.2],                              // tram platform
   ];
-  const stands = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.concrete, STANDS.length);
-  STANDS.forEach(([x, z, w, d], i) => {
-    dm.makeScale(w, 1.1, d);
-    dm.setPosition(x, 0.55, z);
-    stands.setMatrixAt(i, dm);
-  });
-  stands.instanceMatrix.needsUpdate = true;
-  stands.name = 'district:stands';
-  add(stands, { camera: true, cast: true });
+  // Grandstands share the pale concrete box with the street furniture below,
+  // so they are appended to that mesh rather than drawn on their own.
 
   // -------------------------------------------------------------------
   // NW — kart loop in the corner, parking + solar gym, athletics, baseball
@@ -998,7 +995,9 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // The L recess is two arms of the same material and geometry, so both ride
   // one instanced mesh: index 2i is the long arm, 2i+1 the short.
   const blockNotches = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.blockDark, BLOCKS.length * 2);
-  const awnings = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.22, 0.55), mats.white, BLOCKS.length);
+  // Awnings are the same painted box as the street furniture, so they are
+  // carried by that mesh instead of opening their own draw.
+  const AWNING_SLOT = [];
   // Glazing, in the building's own language: a cream surround with the glass
   // set into it, mullions so it reads as a door rather than a mirror, and an
   // upper window band in the same glass the gym roof uses.
@@ -1034,10 +1033,8 @@ export function buildCityDistricts({ group, add, material, animated }) {
     bm.setPosition(x - w * 0.36, h + 0.15, z - d * 0.06);
     blockNotches.setMatrixAt(i * 2 + 1, bm);
     // Awning across the street face.
-    bm.makeScale(w * 0.62, 1, 1);
-    bm.setPosition(x, 0.62, z + d / 2 + 0.2);
-    awnings.setMatrixAt(i, bm);
-    awnings.setColorAt(i, new THREE.Color(AWNING_TONE[i % AWNING_TONE.length]));
+    AWNING_SLOT.push([x, 0.62, z + d / 2 + 0.2, w * 0.62, 0.22, 0.55,
+      AWNING_TONE[i % AWNING_TONE.length]]);
     // Glazed shopfront under the awning.
     bm.makeScale(w * 0.46, 1.9, 0.14);
     bm.setPosition(x, 0.95, z + d / 2 + 0.03);
@@ -1057,7 +1054,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
   });
   for (const mesh of [
     blockBodies, blockPlinths, blockLips, blockNotches,
-    awnings, doorFrames, doorGlass,
+    doorFrames, doorGlass,
   ]) {
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -1067,7 +1064,6 @@ export function buildCityDistricts({ group, add, material, animated }) {
   add(blockPlinths, { camera: false, cast: false });
   add(blockLips, { camera: false, cast: true });
   add(blockNotches, { camera: false, cast: false });
-  add(awnings, { camera: false, cast: true });
   doorGlass.name = 'district:block-glass';
   add(doorFrames, { camera: false, cast: false });
   add(doorGlass, { camera: false, cast: false });
@@ -1488,6 +1484,55 @@ export function buildCityDistricts({ group, add, material, animated }) {
       }, undefined, () => { /* procedural blocks already hold the city */ });
     }
   }
+
+  // -------------------------------------------------------------------
+  // MEASURED STREET FURNITURE — the benches, parasols, lamps, bins,
+  // statues and the many small props the plan dots across the city. Two
+  // instanced meshes carry the lot: one for the coloured pieces, one for
+  // the pale ones, so 180 objects cost two draws.
+  // -------------------------------------------------------------------
+  const RENKLI = [...PLAN_BANKLAR, ...PLAN_SEMSIYELER, ...PLAN_HEYKELLER];
+  const SOLUK = [...PLAN_LAMBALAR, ...PLAN_COPLER, ...PLAN_UFAKLAR];
+  const om = new THREE.Matrix4();
+  const renkliOge = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 1, 1), mats.white, RENKLI.length + AWNING_SLOT.length,
+  );
+  RENKLI.forEach(([x, z, g, d, , renk], i) => {
+    const [nx, nz] = yoldanKaydir(x, z, g, d);
+    om.makeScale(Math.max(g, 0.5), 0.42, Math.max(d, 0.5));
+    om.setPosition(nx, 0.24, nz);
+    renkliOge.setMatrixAt(i, om);
+    renkliOge.setColorAt(i, new THREE.Color(renk || '#d0c4bc').multiplyScalar(0.85));
+  });
+  AWNING_SLOT.forEach(([x, y, z, w, h, d, renk], i) => {
+    om.makeScale(w, h, d);
+    om.setPosition(x, y, z);
+    renkliOge.setMatrixAt(RENKLI.length + i, om);
+    renkliOge.setColorAt(RENKLI.length + i, new THREE.Color(renk).multiplyScalar(0.85));
+  });
+  renkliOge.instanceMatrix.needsUpdate = true;
+  if (renkliOge.instanceColor) renkliOge.instanceColor.needsUpdate = true;
+  renkliOge.name = 'district:street-furniture';
+  add(renkliOge, { camera: false, cast: true });
+
+  const solukOge = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 1, 1), mats.concrete, SOLUK.length + STANDS.length,
+  );
+  solukOge.name = 'district:stands';
+  SOLUK.forEach(([x, z, g, d], i) => {
+    const [nx, nz] = yoldanKaydir(x, z, g, d);
+    const yuksek = Math.min(1.4, 0.3 + Math.max(g, d) * 0.2);
+    om.makeScale(Math.max(g, 0.45), yuksek, Math.max(d, 0.45));
+    om.setPosition(nx, yuksek / 2, nz);
+    solukOge.setMatrixAt(i, om);
+  });
+  STANDS.forEach(([x, z, w, d], i) => {
+    om.makeScale(w, 1.1, d);
+    om.setPosition(x, 0.55, z);
+    solukOge.setMatrixAt(SOLUK.length + i, om);
+  });
+  solukOge.instanceMatrix.needsUpdate = true;
+  add(solukOge, { camera: true, cast: true });
 
   // -------------------------------------------------------------------
   // Solid footprints for the player sim.
