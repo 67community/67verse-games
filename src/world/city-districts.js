@@ -509,8 +509,10 @@ export function buildCityDistricts({ group, add, material, animated }) {
   const decks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.12, 1), mats.concreteDeep, DECKS.length);
   const dm = new THREE.Matrix4();
   DECKS.forEach(([x, z, w, d], i) => {
+    // Sits just under the pitches and courts that share its footprint, so a
+    // deck never covers the surface it is meant to support.
     dm.makeScale(w, 1, d);
-    dm.setPosition(x, 0.06, z);
+    dm.setPosition(x, 0.03, z);
     decks.setMatrixAt(i, dm);
   });
   decks.instanceMatrix.needsUpdate = true;
@@ -931,13 +933,15 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // -------------------------------------------------------------------
   const stadium = new THREE.Group();
   stadium.name = 'district:stadium';
-  const stand = copingArc(mats.blockDark, 8.6, 1.4, Math.PI * 2);
-  stand.scale.set(1.2, 1, 0.5);
+  // Measured: the stadium footprint is 19.2 x 33.1, so its ring runs long
+  // north-south rather than the near-circle I had.
+  const stand = copingArc(mats.blockDark, 8.6, 1.6, Math.PI * 2);
+  stand.scale.set(1.12, 1, 1.92);
   stand.position.y = 0.7;
   stadium.add(stand);
   const pitch = new THREE.Mesh(new THREE.CylinderGeometry(7.4, 7.4, 0.1, 22), mats.pitch);
-  pitch.scale.x = 1.2;
-  pitch.position.y = 0.06;
+  pitch.scale.set(1.15, 1, 1.9);
+  pitch.position.y = 0.16;
   pitch.name = 'district:stadium-pitch';
   stadium.add(pitch);
   const pitchLabel = flatLabel('67', 6);
@@ -945,7 +949,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
     pitchLabel.position.y = 0.13;
     stadium.add(pitchLabel);
   }
-  stadium.position.set(31, 0, -1);
+  stadium.position.set(29.7, 0, 0.3);
   stadium.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
   group.add(stadium);
 
@@ -1504,7 +1508,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
 
   return {
     skatepark: Object.freeze({ minX: -16.5, maxX: 15.5, minZ: -47.5, maxZ: -21.5, topY: 0.44 }),
-    stadiumPitch: Object.freeze({ x: 31, z: -1, rx: 8.9, rz: 7.4, topY: 0.11 }),
+    stadiumPitch: Object.freeze({ x: 29.7, z: 0.3, rx: 8.5, rz: 14, topY: 0.21 }),
     blockCount: BLOCKS.length,
     colliders,
   };
