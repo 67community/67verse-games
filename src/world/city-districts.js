@@ -190,9 +190,49 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // STREET GRID — reference-exact: light warm asphalt, dashed center
   // lines, kerb edge strips, crosswalks at every junction.
   // -------------------------------------------------------------------
+  // Axes measured off the plan, not chosen: the drawing puts its verticals at
+  // x = -53.7, -19, 18.6 and 41.7 and its horizontals at z = -51, -18.5, 18.2
+  // and 52. Several earlier guesses were two to six units out, which is what
+  // pushed plan-placed buildings onto the carriageway.
   const ROAD_W = 4.6;
-  const V_ROADS = [-20, 16, 44, -51];          // x positions, z span -51..46
-  const H_ROADS = [-19, 16, 46, -51];          // z positions, x span -51..44
+  const V_ROADS = [-53.7, -19, 18.6, 41.7];
+  const H_ROADS = [-51, -18.5, 18.2, 52];
+
+  // Nothing from the plan may stand on a road. A footprint is rejected when it
+  // overlaps any corridor, with a kerb margin so buildings sit back from the
+  // edge rather than flush against traffic.
+  const YOL_PAYI = ROAD_W / 2 + 1.2;
+  // A footprint that lands on a carriageway is not deleted — the plan drew a
+  // building there and it should exist — it is pushed clear along whichever
+  // axis needs the smaller move, the way a site plan resolves a clash.
+  function yoldanKaydir(x, z, w = 0, d = 0) {
+    let nx = x;
+    let nz = z;
+    for (let tur = 0; tur < 3; tur += 1) {
+      let carpisma = false;
+      for (const rx of V_ROADS) {
+        const bindirme = YOL_PAYI + w / 2 - Math.abs(nx - rx);
+        if (bindirme > 0) {
+          nx += nx >= rx ? bindirme : -bindirme;
+          carpisma = true;
+        }
+      }
+      for (const rz of H_ROADS) {
+        const bindirme = YOL_PAYI + d / 2 - Math.abs(nz - rz);
+        if (bindirme > 0) {
+          nz += nz >= rz ? bindirme : -bindirme;
+          carpisma = true;
+        }
+      }
+      if (!carpisma) break;
+    }
+    return [nx, nz];
+  }
+  function yolUstunde(x, z, w = 0, d = 0) {
+    for (const rx of V_ROADS) if (Math.abs(x - rx) < YOL_PAYI + w / 2) return true;
+    for (const rz of H_ROADS) if (Math.abs(z - rz) < YOL_PAYI + d / 2) return true;
+    return false;
+  }
   const vRoads = new THREE.InstancedMesh(new THREE.BoxGeometry(ROAD_W, 0.08, 100), mats.road, V_ROADS.length);
   V_ROADS.forEach((x, i) => {
     vRoads.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.04, -2.5));
@@ -813,7 +853,11 @@ export function buildCityDistricts({ group, add, material, animated }) {
       const h = Math.max(2, Math.min(6.5, 1.6 + Math.sqrt(alan) * 0.62));
       return [x, z, w, h, d, PLAN_BINA_RENK[i]];
     })
-    .filter(([x, z]) => !ozelIcinde(x, z));
+    .filter(([x, z]) => !ozelIcinde(x, z))
+    .map(([x, z, w, h, d, renk]) => {
+      const [nx, nz] = yoldanKaydir(x, z, w, d);
+      return [nx, nz, w, h, d, renk];
+    });
   // Blocks carry the reference building's actual anatomy, read off a 4x crop
   // of the map: a soft squircle body on a wider plinth, a raised lip framing
   // the roof, an L-shaped recess inside that lip, and a striped awning at the
@@ -1206,9 +1250,12 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // Every tree comes from the plan: plan-verisi.js carries the measured
   // centre and canopy width of each one the drawing shows. Width becomes the
   // cluster's scale, so a broad grove reads broad and a street tree reads small.
-  const TREES = PLAN_AGACLAR.map(([x, z, g]) => [
-    x, z, Math.max(0.7, Math.min(1.6, g / 5.5)),
-  ]);
+  // Trees are small enough that a clash is best solved by moving them to the
+  // verge rather than dropping them from the planting.
+  const TREES = PLAN_AGACLAR.map(([x, z, g]) => {
+    const [nx, nz] = yoldanKaydir(x, z, 1.8, 1.8);
+    return [nx, nz, Math.max(0.7, Math.min(1.6, g / 5.5))];
+  });
   const allTrees = [...TREES, ...PLAZA_TREES];
   const canopy = treeBlobs(allTrees, THREE, crownMat);
   canopy.name = 'district:tree-canopy';
