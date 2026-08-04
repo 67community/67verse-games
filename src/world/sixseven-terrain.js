@@ -125,12 +125,17 @@ export function buildTerrainMesh(size = 150, segments = 120) {
     const x = positions.getX(i);
     const z = positions.getZ(i);
     positions.setY(i, getHeight(x, z));
-    // The whole visible plane wears the reference render's sage lawn: the
-    // player is clamped inside the plan, so a differently-tinted countryside
-    // beyond it only reads as a bright green frame around the city.
-    // Measured against the reference: this lands on #8b876d once the hub
-    // lighting has had its say.
-    const tint = [1.053, 0.703, 1.16];
+    // The city floor is PAVED, not planted. In the reference only the parks
+    // are green; everything between the blocks is the same warm taupe as the
+    // roads, which is why buildings there read as a city and mine read as
+    // sheds on a lawn. Measured to land on #c0b6b5 once lit; the countryside
+    // outside the plan keeps its meadow.
+    // Vertex-colour components above 1 are clamped, so a green base could
+    // never be tinted to taupe however large the multiplier. The base is
+    // neutral now and both tints sit under 1: paved #c0b6b5 inside the plan,
+    // meadow #8b876d beyond it.
+    const sehirIcinde = Math.abs(x) < 58 && Math.abs(z) < 58;
+    const tint = sehirIcinde ? [0.753, 0.714, 0.710] : [0.545, 0.529, 0.427];
     colors[i * 3] = tint[0];
     colors[i * 3 + 1] = tint[1];
     colors[i * 3 + 2] = tint[2];
@@ -139,7 +144,7 @@ export function buildTerrainMesh(size = 150, segments = 120) {
   geometry.computeVertexNormals();
 
   const mesh = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
-    color: 0x84c05e,
+    color: 0xffffff,
     flatShading: true,
     roughness: 1,
     metalness: 0,
