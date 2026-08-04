@@ -16,6 +16,7 @@
 //   edges      river + bridges + suburb houses
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { PLAN_BINALAR, PLAN_BINA_RENK, PLAN_AGACLAR, PLAN_ARABALAR } from './plan-verisi.js';
 const COPING = Object.freeze({ red: 0xe0745e, blue: 0x5a80d6, yellow: 0xf6c445 });
 
 // Landmark buildings generated from the map itself: single-object crops of
@@ -278,24 +279,12 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // silhouette the reference draws. Parked in the gym lot and at kerbs;
   // four slow drivers loop the two inner avenues.
   // -------------------------------------------------------------------
+  // Every parked car comes from the plan: plan-verisi.js carries the measured
+  // centre, orientation and paint of each one Oscar's drawing shows — the
+  // parking-lot rows, the kerbside cars, the racers on the kart track.
   const V = Math.PI / 2;
-  const PARKED = [
-    // gym parking lot rows (reference top-left)
-    [-46, -44, 0], [-43, -44, 0], [-40, -44, 0], [-37, -44, 0],
-    [-46, -40.5, 0], [-43, -40.5, 0], [-40, -40.5, 0], [-37, -40.5, 0],
-    // kerbs along the north-south boulevards
-    [-17.2, -34, 0], [-17.2, -22, 0], [-17.2, -6, 0], [-17.2, 4, 0], [-17.2, 26, 0],
-    [-22.8, -12, 0], [-22.8, 12, 0], [-22.8, 34, 0],
-    [13.2, -30, 0], [13.2, -8, 0], [13.2, 12, 0], [13.2, 34, 0],
-    [18.8, -20, 0], [18.8, 6, 0], [18.8, 30, 0],
-    [41.2, -8, 0], [46.8, 22, 0], [-48.2, -6, 0], [-53.8, 24, 0],
-    // kerbs along the east-west streets
-    [-38, -16.2, V], [-30, -16.2, V], [-8, -16.2, V], [6, -16.2, V], [26, -16.2, V],
-    [-34, -21.8, V], [-14, -21.8, V], [10, -21.8, V], [34, -21.8, V],
-    [-40, 18.8, V], [-24, 18.8, V], [4, 18.8, V], [22, 18.8, V], [38, 18.8, V],
-    [-30, 13.2, V], [-6, 13.2, V], [18, 13.2, V], [30, 13.2, V],
-    [-20, 48.8, V], [8, 48.8, V], [30, 48.8, V], [-40, 43.2, V], [16, 43.2, V],
-  ];
+  const PARKED = PLAN_ARABALAR.map(([x, z, dikey]) => [x, z, dikey ? 0 : V]);
+  const PARKED_RENK = PLAN_ARABALAR.map(([, , , renk]) => renk);
   const DRIVERS = 10;
   const CAR_N = PARKED.length + DRIVERS;
   const carBodies = new THREE.InstancedMesh(new THREE.BoxGeometry(1.6, 0.55, 3.1), mats.white, CAR_N);
@@ -329,7 +318,12 @@ export function buildCityDistricts({ group, add, material, animated }) {
     }
   }
   PARKED.forEach(([x, z, yaw], i) => placeCar(i, x, z, yaw));
-  for (let i = 0; i < CAR_N; i += 1) carBodies.setColorAt(i, new THREE.Color(CAR_PAINT[i % CAR_PAINT.length]));
+  for (let i = 0; i < CAR_N; i += 1) {
+    // Parked cars keep the paint measured off the plan; the drivers, which
+    // the plan cannot fix in place, cycle the shared palette.
+    const renk = PARKED_RENK[i] || CAR_PAINT[i % CAR_PAINT.length];
+    carBodies.setColorAt(i, new THREE.Color(renk).multiplyScalar(0.85));
+  }
   if (carBodies.instanceColor) carBodies.instanceColor.needsUpdate = true;
   carBodies.name = 'district:street-cars';
   add(carBodies, { camera: false, cast: true });
@@ -793,19 +787,33 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // -------------------------------------------------------------------
   // WEST + SOUTH CELLS — dense blocks, the basketball court, the market
   // -------------------------------------------------------------------
-  const BLOCKS = [
-    // middle-left dense quarter
-    [-28, -12, 5, 3.2, 6], [-38, -14, 4, 2.6, 5], [-46, -10, 5, 3.6, 6],
-    [-27, 10, 4, 2.4, 5], [-36, 12, 5, 3, 7], [-45, 8, 4, 2.2, 4],
-    [-46, 0, 4, 4.2, 5], [-27, -2, 4, 2.8, 5],
-    // bottom-left quarter
-    [-45, 24, 5, 3, 6], [-36, 28, 4, 2.4, 5], [-27, 24, 4, 3.4, 5],
-    [-45, 36, 4, 2.8, 5], [-34, 38, 5, 2.2, 5], [-25, 36, 4, 2.6, 4],
-    // bottom-center around the market
-    [-12, 24, 4, 3, 5], [8, 24, 4, 2.6, 5], [-12, 40, 4, 2.4, 5], [8, 40, 4, 3.2, 5],
-    // top-right small pair by the funfair entrance
-    [20, -14, 4, 2.4, 4], [38, 8, 4, 2.6, 5],
+  // Every block comes from the plan, not from a guess: plan-verisi.js holds
+  // the position and footprint of each building measured off Oscar's drawing.
+  // Height is not in a top-down plan, so it is derived from footprint area —
+  // a big block reads as a taller mass, a small one as a low shopfront —
+  // clamped to the range the reference's shadows imply.
+  //
+  // Buildings whose own district authors them (skatepark, court ring, stadium,
+  // market, funfair, pond park) are skipped so nothing is built twice.
+  const OZEL_BOLGELER = [
+    { minX: -17, maxX: 16, minZ: -48, maxZ: -21 },   // skatepark
+    { minX: -48, maxX: -24, minZ: -12, maxZ: 12 },   // basketball court ring
+    { minX: 20, maxX: 44, minZ: -12, maxZ: 12 },     // stadium
+    { minX: -10, maxX: 6, minZ: 24, maxZ: 39 },      // market square
+    { minX: 18, maxX: 46, minZ: -50, maxZ: -18 },    // funfair
+    { minX: 18, maxX: 46, minZ: 18, maxZ: 46 },      // pond park
+    { minX: -40, maxX: -22, minZ: -50, maxZ: -34 },  // gym + parking
   ];
+  const ozelIcinde = (x, z) => OZEL_BOLGELER.some(
+    (b) => x > b.minX && x < b.maxX && z > b.minZ && z < b.maxZ,
+  );
+  const BLOCKS = PLAN_BINALAR
+    .map(([x, z, w, d], i) => {
+      const alan = w * d;
+      const h = Math.max(2, Math.min(6.5, 1.6 + Math.sqrt(alan) * 0.62));
+      return [x, z, w, h, d, PLAN_BINA_RENK[i]];
+    })
+    .filter(([x, z]) => !ozelIcinde(x, z));
   // Blocks carry the reference building's actual anatomy, read off a 4x crop
   // of the map: a soft squircle body on a wider plinth, a raised lip framing
   // the roof, an L-shaped recess inside that lip, and a striped awning at the
@@ -830,7 +838,10 @@ export function buildCityDistricts({ group, add, material, animated }) {
     bm.makeScale(w, h, d);
     bm.setPosition(x, h / 2, z);
     blockBodies.setMatrixAt(i, bm);
-    blockBodies.setColorAt(i, new THREE.Color(i % 3 === 0 ? 0xb9aaa5 : 0xc9bcb8));
+    // Each block wears the colour measured off its own footprint in the plan,
+    // divided back through this scene's exposure so it lands on the drawing's
+    // value once lit.
+    blockBodies.setColorAt(i, new THREE.Color(BLOCKS[i][5] || '#c9bcb8').multiplyScalar(0.82));
     // Plinth: a slightly wider, very low pad the body sits on.
     bm.makeScale(w + 1.1, 0.26, d + 1.1);
     bm.setPosition(x, 0.13, z);
@@ -1192,16 +1203,12 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // Park groves match the close-up: clumps of two or three clustered trees at
   // the corners of the pond lawn, singles along the walks, and the belts that
   // line the suburbs and the coast.
-  const TREES = [
-    // pond-park groves
-    [40, 21, 1.15], [42, 23.5, 0.9], [38.5, 24, 1], [43.5, 40, 1.1], [41, 42, 0.95],
-    [21, 22, 1.05], [19.5, 24.5, 0.85], [20, 41, 1.1], [22.5, 43, 0.9],
-    [31, 45.5, 1], [34, 44, 0.85], [45, 31, 1.05], [44.5, 34.5, 0.9],
-    // suburb + coast belts
-    [-56, -44, 1], [-57, -20, 1.1], [-58, 2, 0.95], [-57, 22, 1.05], [-56, 40, 1],
-    [-14, 52, 1], [2, 53, 1.1], [18, 52, 0.95], [34, 50, 1.05],
-    [48, -20, 0.9], [46, 10, 0.95], [-46, 50, 1], [-30, 55, 0.9],
-  ];
+  // Every tree comes from the plan: plan-verisi.js carries the measured
+  // centre and canopy width of each one the drawing shows. Width becomes the
+  // cluster's scale, so a broad grove reads broad and a street tree reads small.
+  const TREES = PLAN_AGACLAR.map(([x, z, g]) => [
+    x, z, Math.max(0.7, Math.min(1.6, g / 5.5)),
+  ]);
   const allTrees = [...TREES, ...PLAZA_TREES];
   const canopy = treeBlobs(allTrees, THREE, crownMat);
   canopy.name = 'district:tree-canopy';
