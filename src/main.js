@@ -5,7 +5,6 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createSkyDome } from './core/sky.js';
 import { buildWorld, PALETTE } from './world.js';
-import { createFriendsieRival, isRiggedCharacter } from './core/friendsie-bot.js';
 import { loadWorldItems } from './world-items.js';
 import { cameraRelativeDirection, createInput } from './input.js';
 import { createPlayerState, stepPlayer } from './player.js';
@@ -422,11 +421,14 @@ async function mountHubCharacter(id = ctx.characters.equippedId()) {
   try {
     // Oscar's gorilla is an authored rigged model, not roster geometry, so it
     // comes from the same factory the rivals use — it carries the bone names
-    // the gait driver writes to, and it walks on its own skeleton.
-    const instance = (isRiggedCharacter(id)
-      ? await createFriendsieRival(id, { height: 1.9 })
+    // the gait driver writes to, and it walks on its own skeleton. The factory
+    // is fetched only when the equipped character actually is one, so a player
+    // wearing a roster character never downloads it.
+    const rigged = await import('./core/friendsie-bot.js');
+    const instance = (rigged.isRiggedCharacter(id)
+      ? await rigged.createFriendsieRival(id, { height: 1.9 })
       : null)
-      || await ctx.characters.createInstance(isRiggedCharacter(id) ? 'qa-runner' : id, {
+      || await ctx.characters.createInstance(rigged.isRiggedCharacter(id) ? 'qa-runner' : id, {
         skinTone: ctx.save.settings.skinTone,
         lod: 'hero',
         shadow: 'hero',
