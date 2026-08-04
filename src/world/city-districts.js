@@ -247,17 +247,18 @@ export function buildCityDistricts({ group, add, material, animated }) {
   add(anaYollar, { walkable: true, camera: false, cast: false });
 
   // Park walks and neighbourhood lanes: narrower, and they never carry traffic.
+  // Park walks and the kerb lips share the pale material and a unit box, so
+  // both live in one instanced mesh: the walks first, then two lips per road.
   const patikalar = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(1, 0.07, 1), mats.kerbLight, PLAN_PATIKALAR.length,
+    new THREE.BoxGeometry(1, 1, 1), mats.kerbLight,
+    PLAN_PATIKALAR.length + PLAN_ANA_YOLLAR.length * 2,
   );
   PLAN_PATIKALAR.forEach(([x, z, g, d], i) => {
-    ym.makeScale(Math.max(g, 1.2), 1, Math.max(d, 1.2));
+    ym.makeScale(Math.max(g, 1.2), 0.07, Math.max(d, 1.2));
     ym.setPosition(x, 0.05, z);
     patikalar.setMatrixAt(i, ym);
   });
-  patikalar.instanceMatrix.needsUpdate = true;
   patikalar.name = 'district:cross-roads';
-  add(patikalar, { camera: false, cast: false });
 
   // Roundabouts where the plan marks them, each with its green island.
   const kavsaklar = new THREE.InstancedMesh(
@@ -282,8 +283,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
 
   // Kerb lips down both sides of every arterial, and the dashed centre line
   // along its length — both derived from the plan's own road records.
-  const kerbSayisi = PLAN_ANA_YOLLAR.length * 2;
-  const kerbs = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.1, 1), mats.kerbLight, kerbSayisi);
+  const kerbTaban = PLAN_PATIKALAR.length;
   const dashList = [];
   PLAN_ANA_YOLLAR.forEach(([x, z, g, d], i) => {
     const yatay = yatayMi(g, d);
@@ -291,21 +291,19 @@ export function buildCityDistricts({ group, add, material, animated }) {
     const genis = Math.max(Math.min(g, d), ROAD_W * 0.7);
     for (const yon of [-1, 1]) {
       if (yatay) {
-        ym.makeScale(uzun, 1, 0.5);
+        ym.makeScale(uzun, 0.1, 0.5);
         ym.setPosition(x, 0.05, z + yon * (genis / 2 + 0.25));
       } else {
-        ym.makeScale(0.5, 1, uzun);
+        ym.makeScale(0.5, 0.1, uzun);
         ym.setPosition(x + yon * (genis / 2 + 0.25), 0.05, z);
       }
-      kerbs.setMatrixAt(i * 2 + (yon < 0 ? 0 : 1), ym);
+      patikalar.setMatrixAt(kerbTaban + i * 2 + (yon < 0 ? 0 : 1), ym);
     }
     const adim = 4.4;
     for (let t = -uzun / 2 + 2; t < uzun / 2 - 1; t += adim) {
       dashList.push(yatay ? [x + t, z, Math.PI / 2] : [x, z + t, 0]);
     }
   });
-  kerbs.instanceMatrix.needsUpdate = true;
-  add(kerbs, { camera: false, cast: false });
 
   const dashes = new THREE.InstancedMesh(
     new THREE.BoxGeometry(0.28, 0.02, 1.9), mats.paint, Math.max(1, dashList.length),
@@ -318,6 +316,8 @@ export function buildCityDistricts({ group, add, material, animated }) {
   dashes.instanceMatrix.needsUpdate = true;
   dashes.name = 'district:lane-dashes';
   add(dashes, { camera: false, cast: false });
+  patikalar.instanceMatrix.needsUpdate = true;
+  add(patikalar, { camera: false, cast: false });
 
   // Crosswalks exactly where the plan paints them: each record becomes a set
   // of five stripes laid across the road it belongs to.
@@ -493,6 +493,56 @@ export function buildCityDistricts({ group, add, material, animated }) {
   skAdd(seQuarter);
   skate.position.set(-0.5, 0, -34.5);
   group.add(skate);
+
+  // -------------------------------------------------------------------
+  // MEASURED FACILITIES — the paved decks, the pool complex and the
+  // grandstands the plan shows and I had never built. Positions and
+  // footprints below are read off the drawing, not chosen.
+  // -------------------------------------------------------------------
+  const DECKS = [
+    // [x, z, w, d] — sports campus, pool deck, car park, stadium apron
+    [-36.0, -30.0, 32.2, 20.1],
+    [-30.2, -57.4, 19.8, 8.7],
+    [-44.8, -43.6, 11.8, 9.9],
+    [29.7, 0.3, 19.2, 33.1],
+  ];
+  const decks = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.12, 1), mats.concreteDeep, DECKS.length);
+  const dm = new THREE.Matrix4();
+  DECKS.forEach(([x, z, w, d], i) => {
+    dm.makeScale(w, 1, d);
+    dm.setPosition(x, 0.06, z);
+    decks.setMatrixAt(i, dm);
+  });
+  decks.instanceMatrix.needsUpdate = true;
+  decks.name = 'district:decks';
+  add(decks, { walkable: true, camera: false, cast: false });
+
+  // The two pools, and the grandstand blocks flanking the running track.
+  const POOLS = [[-34.3, -57.4, 3.5, 5.8], [-29.6, -57.4, 4.5, 5.8]];
+  const pools = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.14, 1), mats.water, POOLS.length);
+  POOLS.forEach(([x, z, w, d], i) => {
+    dm.makeScale(w, 1, d);
+    dm.setPosition(x, 0.13, z);
+    pools.setMatrixAt(i, dm);
+  });
+  pools.instanceMatrix.needsUpdate = true;
+  pools.name = 'district:pools';
+  add(pools, { camera: false, cast: false });
+
+  const STANDS = [
+    [-47.4, -30.5, 1.6, 8.5], [-35.5, -30.0, 1.4, 7.9],   // athletics
+    [22.6, -1.6, 2.4, 9.5], [39.1, -1.4, 2.3, 10.0],      // stadium
+    [-52.4, -32.4, 0.9, 7.2],                              // tram platform
+  ];
+  const stands = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.concrete, STANDS.length);
+  STANDS.forEach(([x, z, w, d], i) => {
+    dm.makeScale(w, 1.1, d);
+    dm.setPosition(x, 0.55, z);
+    stands.setMatrixAt(i, dm);
+  });
+  stands.instanceMatrix.needsUpdate = true;
+  stands.name = 'district:stands';
+  add(stands, { camera: true, cast: true });
 
   // -------------------------------------------------------------------
   // NW — kart loop in the corner, parking + solar gym, athletics, baseball
@@ -757,9 +807,28 @@ export function buildCityDistricts({ group, add, material, animated }) {
   lighthouse.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   group.add(lighthouse);
 
-  const docks = new THREE.InstancedMesh(new THREE.BoxGeometry(8, 0.24, 1.3), mats.wood, 4);
-  [[52, -30], [52, -34], [52, -38], [52, -42]].forEach(([x, z], i) => {
-    docks.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.2, z));
+  // Piers and river bridges are the same timber deck, so one instanced mesh
+  // carries both: the three piers first, then a bridge wherever the plan puts
+  // a street across the water.
+  const AHSAP_KOPRU = [
+    [-54, -19, 7, 0.4, 2.6, 0], [-54, 16, 7, 0.4, 2.6, 0], [-53, -44, 7, 0.4, 2.6, 0],
+    [-52, 38, 7, 0.4, 2.6, 0], [-30, 54.5, 7, 0.4, 2.6, 0.35], [-6, 56, 7, 0.4, 2.6, 0.1],
+    [16, 55, 7, 0.4, 2.6, -0.1],
+  ];
+  const docks = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 1, 1), mats.wood, 4 + AHSAP_KOPRU.length,
+  );
+  const dkm = new THREE.Matrix4();
+  [[48.8, -47.5], [49.2, -38.9], [49.0, -29.0], [49.0, -20.0]].forEach(([x, z], i) => {
+    dkm.makeScale(11.5, 0.24, 1.3);
+    dkm.setPosition(x, 0.2, z);
+    docks.setMatrixAt(i, dkm);
+  });
+  AHSAP_KOPRU.forEach(([x, z, w, h, d, rot], i) => {
+    dkm.makeRotationY(rot);
+    dkm.scale(new THREE.Vector3(w, h, d));
+    dkm.setPosition(x, 0.36, z);
+    docks.setMatrixAt(4 + i, dkm);
   });
   docks.instanceMatrix.needsUpdate = true;
   docks.name = 'district:marina-docks';
@@ -899,8 +968,9 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // Surround and mullions are the same cream box geometry, so they share one
   // instanced mesh: three slots per block — the surround then two mullions.
   const doorFrames = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.white, BLOCKS.length * 3);
-  const doorGlass = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.glass, BLOCKS.length);
-  const windowBands = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.glass, BLOCKS.length);
+  // Shopfront glazing and the upper window band are the same glass box, so
+  // they share one instanced mesh: slot 2i is the door, 2i+1 the band.
+  const doorGlass = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.glass, BLOCKS.length * 2);
   const AWNING_TONE = [COPING.red, COPING.blue, 0xd7cfc2];
   const bm = new THREE.Matrix4();
   BLOCKS.forEach(([x, z, w, h, d], i) => {
@@ -937,7 +1007,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
     doorFrames.setMatrixAt(i * 3, bm);
     bm.makeScale(w * 0.38, 1.6, 0.1);
     bm.setPosition(x, 0.9, z + d / 2 + 0.12);
-    doorGlass.setMatrixAt(i, bm);
+    doorGlass.setMatrixAt(i * 2, bm);
     bm.makeScale(0.09, 1.6, 0.08);
     bm.setPosition(x - w * 0.1, 0.9, z + d / 2 + 0.16);
     doorFrames.setMatrixAt(i * 3 + 1, bm);
@@ -946,11 +1016,11 @@ export function buildCityDistricts({ group, add, material, animated }) {
     // Upper-floor window band.
     bm.makeScale(w * 0.66, 0.55, 0.09);
     bm.setPosition(x, h * 0.66, z + d / 2 + 0.06);
-    windowBands.setMatrixAt(i, bm);
+    doorGlass.setMatrixAt(i * 2 + 1, bm);
   });
   for (const mesh of [
     blockBodies, blockPlinths, blockLips, blockNotches,
-    awnings, doorFrames, doorGlass, windowBands,
+    awnings, doorFrames, doorGlass,
   ]) {
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -964,7 +1034,6 @@ export function buildCityDistricts({ group, add, material, animated }) {
   doorGlass.name = 'district:block-glass';
   add(doorFrames, { camera: false, cast: false });
   add(doorGlass, { camera: false, cast: false });
-  add(windowBands, { camera: false, cast: false });
 
   // --- Basketball court, built from the close-up reference ---
   // A painted court on a rounded concrete apron, ringed by rounded-corner
@@ -1310,20 +1379,6 @@ export function buildCityDistricts({ group, add, material, animated }) {
   river.position.y = 0.05;
   river.name = 'district:river';
   add(river, { camera: false, cast: false });
-  // A bridge wherever a street meets the water, as the reference has.
-  const BRIDGES = [
-    [-54, -19, 0], [-54, 16, 0], [-53, -44, 0], [-52, 38, 0],
-    [-30, 54.5, 0.35], [-6, 56, 0.1], [16, 55, -0.1],
-  ];
-  const bridges = new THREE.InstancedMesh(new THREE.BoxGeometry(7, 0.4, 2.6), mats.wood, BRIDGES.length);
-  BRIDGES.forEach(([x, z, rot], i) => {
-    const m = new THREE.Matrix4().makeRotationY(rot);
-    m.setPosition(x, 0.36, z);
-    bridges.setMatrixAt(i, m);
-  });
-  bridges.instanceMatrix.needsUpdate = true;
-  bridges.name = 'district:river-bridges';
-  add(bridges, { camera: false, cast: false });
 
   // The suburbs ring the whole plan in the reference, not just one strip:
   // rows outside the river to the west, along the south edge, up the north
