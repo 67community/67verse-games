@@ -2164,7 +2164,12 @@ test('town lobby ships the pedestrian city and nothing left over from the old hu
   assert.ok(world.group.getObjectByName('district:plaza'));
   assert.ok(world.group.getObjectByName('district:plaza-towers')?.isInstancedMesh);
   assert.ok(world.group.getObjectByName('district:skatepark-slab'));
-  assert.ok(world.group.getObjectByName('district:skatepark-bowl'));
+  // The park's carved surfaces, painted lips, ledges and rails each merge
+  // into one mesh, so these four names are the whole skatepark.
+  assert.ok(world.group.getObjectByName('district:skatepark-basins'));
+  assert.ok(world.group.getObjectByName('district:skatepark-coping'));
+  assert.ok(world.group.getObjectByName('district:skatepark-props'));
+  assert.ok(world.group.getObjectByName('district:skatepark-rails'));
   assert.ok(world.group.getObjectByName('district:basketball-court'));
   assert.ok(world.group.getObjectByName('district:market-tower'));
   assert.ok(world.group.getObjectByName('district:pond'));

@@ -16,6 +16,7 @@
 //   edges      river + bridges + suburb houses
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PLAN_BINALAR, PLAN_BINA_RENK, PLAN_AGACLAR, PLAN_ARABALAR } from './plan-verisi.js';
 import {
   PLAN_ANA_YOLLAR, PLAN_PATIKALAR, PLAN_ZEBRALAR, PLAN_KAVSAKLAR,
@@ -24,6 +25,10 @@ import {
   PLAN_BANKLAR, PLAN_SEMSIYELER, PLAN_LAMBALAR, PLAN_HEYKELLER,
   PLAN_COPLER, PLAN_UFAKLAR,
 } from './plan-oge.js';
+import {
+  SKATE_PLAZA, SKATE_BOWL, SKATE_TROUGHS, SKATE_KERBS, SKATE_RAMPS,
+  SKATE_LEDGES, SKATE_BANKS, SKATE_STAIRS, SKATE_RAIL_GARDEN, SKATE_LEDGE_WALL,
+} from './plan-skate.js';
 const COPING = Object.freeze({ red: 0xe0745e, blue: 0x5a80d6, yellow: 0xf6c445 });
 
 // Landmark buildings generated from the map itself: single-object crops of
@@ -120,6 +125,144 @@ function roundedBoxGeometry(w, d, h, r) {
   return geometry;
 }
 
+// --- skatepark geometry helpers -------------------------------------------
+// The park's shapes arrive from the drawing as outlines and centrelines, so
+// these turn an outline into the three surfaces a carved bowl actually needs:
+// a hole in the deck, a floor inset from the rim, and the wall between them.
+
+function polygonArea(points) {
+  let area = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const [x1, z1] = points[i];
+    const [x2, z2] = points[(i + 1) % points.length];
+    area += x1 * z2 - x2 * z1;
+  }
+  return area / 2;
+}
+
+function inwardNormal(a, b, sign) {
+  const dx = b[0] - a[0];
+  const dz = b[1] - a[1];
+  const length = Math.hypot(dx, dz) || 1;
+  return [(-sign * dz) / length, (sign * dx) / length];
+}
+
+// Miter offset towards the inside. The bowls are smooth and gently concave,
+// so a bisector offset is exact enough; the cosine floor stops a tight corner
+// from throwing its vertex across the shape.
+function insetPolygon(points, distance) {
+  const sign = polygonArea(points) > 0 ? 1 : -1;
+  const count = points.length;
+  return points.map((p1, i) => {
+    const p0 = points[(i - 1 + count) % count];
+    const p2 = points[(i + 1) % count];
+    const n1 = inwardNormal(p0, p1, sign);
+    const n2 = inwardNormal(p1, p2, sign);
+    let bx = n1[0] + n2[0];
+    let bz = n1[1] + n2[1];
+    const length = Math.hypot(bx, bz) || 1;
+    bx /= length;
+    bz /= length;
+    const cos = Math.max(0.4, bx * n1[0] + bz * n1[1]);
+    return [p1[0] + (bx * distance) / cos, p1[1] + (bz * distance) / cos];
+  });
+}
+
+// A centreline plus a half width becomes two rims; the run's outline is one
+// rim followed by the other, reversed.
+function ribbonSides(line, half) {
+  const left = [];
+  const right = [];
+  for (let i = 0; i < line.length; i += 1) {
+    const a = line[Math.max(0, i - 1)];
+    const b = line[Math.min(line.length - 1, i + 1)];
+    let dx = b[0] - a[0];
+    let dz = b[1] - a[1];
+    const length = Math.hypot(dx, dz) || 1;
+    dx /= length;
+    dz /= length;
+    left.push([line[i][0] - dz * half, line[i][1] + dx * half]);
+    right.push([line[i][0] + dz * half, line[i][1] - dx * half]);
+  }
+  return { left, right, outline: left.concat([...right].reverse()) };
+}
+
+function shapeFromPoints(points, Ctor) {
+  const shape = new Ctor();
+  // Shapes are authored in the XY plane and rotated flat, which maps shape y
+  // to world -z. Every conversion in this file goes through here.
+  points.forEach(([x, z], i) => (i === 0 ? shape.moveTo(x, -z) : shape.lineTo(x, -z)));
+  shape.closePath();
+  return shape;
+}
+
+function wallStripGeometry(rim, floor, rimY, floorY) {
+  const position = [];
+  const uv = [];
+  for (let i = 0; i < rim.length; i += 1) {
+    const j = (i + 1) % rim.length;
+    const a = [rim[i][0], rimY, rim[i][1]];
+    const b = [rim[j][0], rimY, rim[j][1]];
+    const c = [floor[j][0], floorY, floor[j][1]];
+    const d = [floor[i][0], floorY, floor[i][1]];
+    position.push(...a, ...d, ...c, ...a, ...c, ...b);
+    uv.push(0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(position, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function copingTube(points, y, radius, closed) {
+  const curve = new THREE.CatmullRomCurve3(
+    points.map(([x, z]) => new THREE.Vector3(x, y, z)),
+    closed,
+    'catmullrom',
+    0.2,
+  );
+  const segments = Math.max(12, Math.round(curve.getLength() / 0.45));
+  return new THREE.TubeGeometry(curve, segments, radius, 6, closed);
+}
+
+// Colour rides on the vertices so every painted lip in the park — three
+// different colours across bowls, kerbs and ramps — is still one draw call.
+function tinted(geometry, hex) {
+  const colour = new THREE.Color(hex);
+  const count = geometry.getAttribute('position').count;
+  const colours = new Float32Array(count * 3);
+  for (let i = 0; i < count; i += 1) {
+    colours[i * 3] = colour.r;
+    colours[i * 3 + 1] = colour.g;
+    colours[i * 3 + 2] = colour.b;
+  }
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
+  return geometry;
+}
+
+// A bowl in the reference is not a darker floor — the floor is the same
+// concrete as the deck, and what you read as depth is the shade down its
+// wall. This paints that gradient onto the wall's own vertices, so the recess
+// reads from the air without a shadow map fine enough to resolve it.
+function tintedByHeight(geometry, topHex, bottomHex, topY, bottomY) {
+  const top = new THREE.Color(topHex);
+  const bottom = new THREE.Color(bottomHex);
+  const position = geometry.getAttribute('position');
+  const colours = new Float32Array(position.count * 3);
+  const mix = new THREE.Color();
+  const range = topY - bottomY || 1;
+  for (let i = 0; i < position.count; i += 1) {
+    const t = Math.min(1, Math.max(0, (position.getY(i) - bottomY) / range));
+    mix.copy(bottom).lerp(top, t);
+    colours[i * 3] = mix.r;
+    colours[i * 3 + 1] = mix.g;
+    colours[i * 3 + 2] = mix.b;
+  }
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colours, 3));
+  return geometry;
+}
+
 const BLOBS_PER_TREE = 6;
 function treeBlobs(positions, THREE_, blobMaterial) {
   const blobs = new THREE_.InstancedMesh(
@@ -159,7 +302,11 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // divided back down by its measured ratio. Water needed the most: it was
   // washing out to near-white, so its base is a real blue now.
   const mats = {
-    concrete: material(0xc4beb4, { roughness: 0.62 }),
+    // Measured against the reference, not picked: the drawing's paving is a
+    // warm pink-grey (221,197,195 lit) and mine was landing near-neutral
+    // (213,209,200). Dividing the target back through the measured lighting
+    // gain puts the base here.
+    concrete: material(0xcbb5b2, { roughness: 0.62 }),
     concreteDeep: material(0xb8b2a6, { roughness: 0.7 }),
     block: material(0xb5a9a6, { roughness: 0.7 }),
     blockDark: material(0xa39590, { roughness: 0.75 }),
@@ -183,6 +330,13 @@ export function buildCityDistricts({ group, add, material, animated }) {
     rail: material(0x70757e, { roughness: 0.35, metalness: 0.4 }),
     white: material(0xc0b7ad, { roughness: 0.6 }),
     cream: material(0xbeb0a9, { roughness: 0.5 }),
+    // Skatepark surfaces are one-sided sheets — bowl walls, ramp faces — so
+    // they are drawn from both sides rather than gambling on winding, and the
+    // painted lips carry their colour on the vertices so bowls, kerbs and
+    // ramps in three colours still cost a single draw.
+    skateDeep: material(0xffffff, { roughness: 0.75, side: THREE.DoubleSide, vertexColors: true }),
+    skatePale: material(0xc0b7ad, { roughness: 0.6, side: THREE.DoubleSide }),
+    skateLip: material(0xffffff, { vertexColors: true, roughness: 0.35 }),
     copingRed: material(COPING.red, { roughness: 0.35 }),
     copingBlue: material(COPING.blue, { roughness: 0.35 }),
     copingYellow: material(COPING.yellow, { roughness: 0.35 }),
@@ -406,12 +560,16 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // Traffic on every avenue of the grid, both directions: six run the
   // north-south roads and four run the east-west streets, each in its own
   // lane and offset along the road so they never travel as a convoy.
+  // The carriageways come from the plan, so the traffic has to as well. These
+  // used to be hand-written numbers two to six units off the measured axes,
+  // which drove one lane of northbound cars straight across the skatepark
+  // deck. Each route now names a road the drawing actually has.
   const ROUTES = [
-    { axis: 'z', road: -20, dir: 1 }, { axis: 'z', road: -20, dir: -1 },
-    { axis: 'z', road: 16, dir: 1 }, { axis: 'z', road: 16, dir: -1 },
-    { axis: 'z', road: 44, dir: 1 }, { axis: 'z', road: -51, dir: -1 },
-    { axis: 'x', road: -19, dir: 1 }, { axis: 'x', road: -19, dir: -1 },
-    { axis: 'x', road: 16, dir: 1 }, { axis: 'x', road: 46, dir: -1 },
+    { axis: 'z', road: -19.5, dir: 1 }, { axis: 'z', road: -19.5, dir: -1 },
+    { axis: 'z', road: 18.5, dir: 1 }, { axis: 'z', road: 18.5, dir: -1 },
+    { axis: 'z', road: 41.5, dir: 1 }, { axis: 'z', road: -53.5, dir: -1 },
+    { axis: 'x', road: -18.5, dir: 1 }, { axis: 'x', road: -18.5, dir: -1 },
+    { axis: 'x', road: 18, dir: 1 }, { axis: 'x', road: 51.5, dir: -1 },
   ];
   animated?.push((time) => {
     ROUTES.forEach((route, d) => {
@@ -432,77 +590,252 @@ export function buildCityDistricts({ group, add, material, animated }) {
   });
 
   // -------------------------------------------------------------------
-  // N CENTER — the 67 skatepark, moved whole into its reference cell
-  // (x -17..16, z -48..-21). Geometry untouched: same slab, bowl, flow
-  // line, stair sets and corner quarters, rotated to the cell's aspect.
+  // N CENTER — the 67 skatepark, built from the drawing instead of
+  // sketched. The measurements live in plan-skate.js; this block only
+  // turns them into surfaces. It merges hard on the way: two bowls, two
+  // runs, two quarter pipes, four ledges, two banks, two stair sets and a
+  // rail garden come to six draw calls, where the old placeholder — one
+  // ellipse, a tube and two stairs — cost twenty-three.
   // -------------------------------------------------------------------
   const skate = new THREE.Group();
   skate.name = 'district:skatepark';
-  const skAdd = (mesh, opts = {}) => {
-    skate.add(mesh);
-    if (opts.cast) mesh.castShadow = true;
+  const LIP_COLOUR = { red: COPING.red, blue: COPING.blue, yellow: COPING.yellow };
+  const DECK_Y = SKATE_PLAZA.topY;
+  const FLOOR_Y = SKATE_PLAZA.floorY;
+  const WALL_INSET = 0.4;
+  // Shades of the deck's own colour: the floor barely under it, the wall
+  // falling to a third down, the stair treads a touch under the deck.
+  const BASIN_FLOOR_TINT = 0xc1acaa;
+  const BASIN_RIM_TINT = 0xc9b3b0;
+  const BASIN_DEEP_TINT = 0x8a7b79;
+  const STAIR_TINT = 0xbba7a4;
+
+  // Deck outline: the same squircle the drawing gives every civic slab.
+  const deckShape = (() => {
+    const shape = new THREE.Shape();
+    // Authored in world units, because the holes carved into it below are
+    // measured world outlines; a centred shape plus a translate would cut
+    // every bowl in the wrong place, which is exactly what it did.
+    const x0 = SKATE_PLAZA.x - SKATE_PLAZA.width / 2;
+    const x1 = SKATE_PLAZA.x + SKATE_PLAZA.width / 2;
+    // Shape y runs against world z, so the near edge is the larger z negated.
+    const y0 = -(SKATE_PLAZA.z + SKATE_PLAZA.depth / 2);
+    const y1 = -(SKATE_PLAZA.z - SKATE_PLAZA.depth / 2);
+    const r = SKATE_PLAZA.radius;
+    shape.moveTo(x0 + r, y0);
+    shape.lineTo(x1 - r, y0);
+    shape.quadraticCurveTo(x1, y0, x1, y0 + r);
+    shape.lineTo(x1, y1 - r);
+    shape.quadraticCurveTo(x1, y1, x1 - r, y1);
+    shape.lineTo(x0 + r, y1);
+    shape.quadraticCurveTo(x0, y1, x0, y1 - r);
+    shape.lineTo(x0, y0 + r);
+    shape.quadraticCurveTo(x0, y0, x0 + r, y0);
+    return shape;
+  })();
+
+  // Every carved run and bowl, as an outline plus the rims that carry paint.
+  const carved = [
+    { outline: SKATE_BOWL.outline, rims: [{ points: SKATE_BOWL.outline, lip: SKATE_BOWL.lip, closed: true }] },
+    ...SKATE_TROUGHS.map((trough) => {
+      const { left, right, outline } = ribbonSides(trough.line, trough.half);
+      return {
+        outline,
+        rims: [
+          { points: left, lip: trough.lips[0], closed: false },
+          { points: right, lip: trough.lips[1], closed: false },
+        ],
+      };
+    }),
+  ];
+
+  const deepParts = [];
+  const copingParts = [];
+  const paleParts = [];
+  const railParts = [];
+
+  carved.forEach(({ outline, rims }) => {
+    const floor = insetPolygon(outline, WALL_INSET);
+    // The deck is holed where the run is, so the floor below shows through
+    // instead of a slab sitting on top of one.
+    deckShape.holes.push(shapeFromPoints(outline, THREE.Path));
+    const floorGeometry = new THREE.ShapeGeometry(shapeFromPoints(floor, THREE.Shape));
+    floorGeometry.rotateX(-Math.PI / 2);
+    floorGeometry.translate(0, FLOOR_Y, 0);
+    deepParts.push(tinted(floorGeometry, BASIN_FLOOR_TINT));
+    deepParts.push(tintedByHeight(
+      wallStripGeometry(outline, floor, DECK_Y, FLOOR_Y),
+      BASIN_RIM_TINT, BASIN_DEEP_TINT, DECK_Y, FLOOR_Y,
+    ));
+    rims.forEach(({ points, lip, closed }) => {
+      copingParts.push(tinted(copingTube(points, DECK_Y + 0.04, 0.13, closed), LIP_COLOUR[lip]));
+    });
+  });
+
+  const deckGeometry = new THREE.ExtrudeGeometry(deckShape, {
+    depth: DECK_Y, bevelEnabled: false, curveSegments: 6,
+  });
+  deckGeometry.rotateX(-Math.PI / 2);
+  const skateDeck = new THREE.Mesh(deckGeometry, mats.concrete);
+  skateDeck.name = 'district:skatepark-slab';
+  skateDeck.receiveShadow = true;
+  skate.add(skateDeck);
+
+  // Painted kerbs sit on the deck with nothing carved behind them.
+  SKATE_KERBS.forEach(({ line, lip }) => {
+    copingParts.push(tinted(copingTube(line, DECK_Y + 0.04, 0.11, false), LIP_COLOUR[lip]));
+  });
+
+  // Quarter pipes: the lip stands at `height`, and the face falls towards the
+  // point the drawing shows it facing.
+  SKATE_RAMPS.forEach(({ lip, towards, run, height, colour }) => {
+    const base = lip.map(([x, z]) => {
+      const dx = towards[0] - x;
+      const dz = towards[1] - z;
+      const length = Math.hypot(dx, dz) || 1;
+      return [x + (dx / length) * run, z + (dz / length) * run];
+    });
+    const position = [];
+    const uv = [];
+    for (let i = 0; i < lip.length - 1; i += 1) {
+      const a = [lip[i][0], DECK_Y + height, lip[i][1]];
+      const b = [lip[i + 1][0], DECK_Y + height, lip[i + 1][1]];
+      const c = [base[i + 1][0], DECK_Y, base[i + 1][1]];
+      const d = [base[i][0], DECK_Y, base[i][1]];
+      // The riding face...
+      position.push(...a, ...d, ...c, ...a, ...c, ...b);
+      // ...then the short outer cheek, so the ramp is a wall and not a sheet.
+      const a0 = [lip[i][0], DECK_Y, lip[i][1]];
+      const b0 = [lip[i + 1][0], DECK_Y, lip[i + 1][1]];
+      position.push(...a, ...b, ...b0, ...a, ...b0, ...a0);
+      for (let k = 0; k < 12; k += 1) uv.push(0, 0);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(position, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geometry.computeVertexNormals();
+    paleParts.push(geometry);
+    copingParts.push(tinted(copingTube(lip, DECK_Y + height + 0.04, 0.13, false), LIP_COLOUR[colour]));
+  });
+
+  // Ledges and funboxes.
+  SKATE_LEDGES.forEach(({ x, z, width, depth, height, yaw, lip, lipEdge, rail }) => {
+    const box = new THREE.BoxGeometry(width, height, depth);
+    box.rotateY(yaw);
+    box.translate(x, DECK_Y + height / 2, z);
+    paleParts.push(box);
+    if (!lip) return;
+    // The painted edge runs along whichever face the drawing paints.
+    const half = lipEdge === 'west' ? width / 2 : depth / 2;
+    const along = lipEdge === 'west' ? depth / 2 : width / 2;
+    const ends = lipEdge === 'west'
+      ? [[-half, -along], [-half, along]]
+      : [[-along, -half], [along, -half]];
+    const line = ends.map(([lx, lz]) => [
+      x + lx * Math.cos(yaw) + lz * Math.sin(yaw),
+      z - lx * Math.sin(yaw) + lz * Math.cos(yaw),
+    ]);
+    copingParts.push(tinted(copingTube(line, DECK_Y + height + 0.03, 0.09, false), LIP_COLOUR[lip]));
+    if (rail) {
+      const bar = copingTube(line, DECK_Y + height + 0.42, 0.06, false);
+      railParts.push(bar);
+      [0, 1].forEach((end) => {
+        const post = new THREE.CylinderGeometry(0.05, 0.05, 0.42, 6);
+        post.translate(line[end][0], DECK_Y + height + 0.21, line[end][1]);
+        railParts.push(post);
+      });
+    }
+  });
+
+  // Bank ramps along the east edge: flat top, one face falling west.
+  SKATE_BANKS.forEach(({ x, z, width, depth, height }) => {
+    const shape = new THREE.Shape();
+    shape.moveTo(-width / 2, 0);
+    shape.lineTo(width / 2, 0);
+    shape.lineTo(width / 2, height);
+    const geometry = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+    geometry.rotateY(Math.PI / 2);
+    geometry.translate(x, DECK_Y, z - depth / 2);
+    paleParts.push(geometry);
+  });
+
+  // Stair sets: treads climbing north, with handrails over them.
+  SKATE_STAIRS.forEach(({ x, z, width, depth, steps, rails }) => {
+    const tread = depth / steps;
+    for (let step = 0; step < steps; step += 1) {
+      const height = 0.14 * (steps - step);
+      const box = new THREE.BoxGeometry(width, height, tread);
+      box.translate(x, DECK_Y + height / 2, z - depth / 2 + (step + 0.5) * tread);
+      deepParts.push(tinted(box, STAIR_TINT));
+    }
+    rails.forEach((offset) => {
+      const bar = copingTube(
+        [[x + offset, z - depth / 2], [x + offset, z + depth / 2]],
+        DECK_Y + 0.55,
+        0.055,
+        false,
+      );
+      railParts.push(bar);
+    });
+  });
+
+  // The rail garden: parallel grind rails with one bar laid across them.
+  {
+    const { x, z, width, length, count, cross } = SKATE_RAIL_GARDEN;
+    for (let i = 0; i < count; i += 1) {
+      const rx = x - width / 2 + (width * (i + 0.5)) / count;
+      const bar = new THREE.CylinderGeometry(0.06, 0.06, length, 6);
+      bar.rotateX(Math.PI / 2);
+      bar.translate(rx, DECK_Y + 0.24, z);
+      railParts.push(bar);
+    }
+    const crossBar = new THREE.CylinderGeometry(0.06, 0.06, cross.width, 6);
+    crossBar.rotateZ(Math.PI / 2);
+    crossBar.translate(x, DECK_Y + 0.36, cross.z);
+    railParts.push(crossBar);
+  }
+
+  // Ledge wall closing the south-west run.
+  {
+    const { line, lip, width, height } = SKATE_LEDGE_WALL;
+    for (let i = 0; i < line.length - 1; i += 1) {
+      const [ax, az] = line[i];
+      const [bx, bz] = line[i + 1];
+      const segment = Math.hypot(bx - ax, bz - az);
+      const box = new THREE.BoxGeometry(segment + width, height, width);
+      box.rotateY(-Math.atan2(bz - az, bx - ax));
+      box.translate((ax + bx) / 2, DECK_Y + height / 2, (az + bz) / 2);
+      paleParts.push(box);
+    }
+    copingParts.push(tinted(copingTube(line, DECK_Y + height + 0.03, 0.1, false), LIP_COLOUR[lip]));
+  }
+
+  const skateMeshes = [
+    ['district:skatepark-basins', deepParts, mats.skateDeep, true],
+    ['district:skatepark-coping', copingParts, mats.skateLip, false],
+    ['district:skatepark-props', paleParts, mats.skatePale, true],
+    ['district:skatepark-rails', railParts, mats.rail, true],
+  ];
+  skateMeshes.forEach(([name, parts, mat, cast]) => {
+    if (!parts.length) return;
+    // The park mixes indexed primitives with the hand-built strips for bowl
+    // walls and ramp faces, and merging refuses that mix, so everything is
+    // flattened to non-indexed first.
+    const merged = mergeGeometries(parts.map((part) => (part.index ? part.toNonIndexed() : part)), false);
+    if (!merged) return;
+    const mesh = new THREE.Mesh(merged, mat);
+    mesh.name = name;
+    mesh.castShadow = cast;
     mesh.receiveShadow = true;
-    return mesh;
-  };
-  const slab = new THREE.Mesh(new THREE.BoxGeometry(32, 0.44, 26), mats.concrete);
-  slab.position.set(0, 0.22, 0);
-  slab.name = 'district:skatepark-slab';
-  skAdd(slab);
-  const bowl = new THREE.Group();
-  bowl.name = 'district:skatepark-bowl';
-  const rim = copingArc(mats.copingRed, 4.6, 0.18, Math.PI * 2);
-  rim.scale.set(1.25, 1, 1);
-  rim.position.y = 0.5;
-  bowl.add(rim);
-  const basin = new THREE.Mesh(new THREE.CylinderGeometry(4.4, 3.4, 0.3, 24), mats.concreteDeep);
-  basin.scale.x = 1.25;
-  basin.position.y = 0.3;
-  bowl.add(basin);
-  const bowlLabel = flatLabel('67', 3);
-  if (bowlLabel) {
-    bowlLabel.position.y = 0.47;
-    bowl.add(bowlLabel);
+    skate.add(mesh);
+  });
+
+  const skateLabel = flatLabel('67', SKATE_BOWL.label.size);
+  if (skateLabel) {
+    skateLabel.position.set(SKATE_BOWL.label.x, FLOOR_Y + 0.02, SKATE_BOWL.label.z);
+    skateLabel.name = 'district:skatepark-label';
+    skate.add(skateLabel);
   }
-  bowl.position.set(-9, 0.22, -6);
-  skate.add(bowl);
-  const flowCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-12, 0.62, 9), new THREE.Vector3(-5, 0.62, 4),
-    new THREE.Vector3(-9, 0.62, -1), new THREE.Vector3(-2, 0.62, -5),
-    new THREE.Vector3(4, 0.62, 1), new THREE.Vector3(10, 0.62, -3),
-  ]);
-  const flow = new THREE.Mesh(new THREE.TubeGeometry(flowCurve, 48, 0.16, 8), mats.copingBlue);
-  flow.name = 'district:skatepark-flow';
-  skAdd(flow);
-  for (const [sx, sz, rot] of [[8, 8, 0], [10, -9, Math.PI / 6]]) {
-    const stairs = new THREE.Group();
-    for (let step = 0; step < 4; step += 1) {
-      const tread = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.22, 0.7), mats.concreteDeep);
-      tread.position.set(0, 0.11 + step * 0.22, step * 0.7);
-      stairs.add(tread);
-    }
-    for (const railX of [-1.5, 1.5]) {
-      const railMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 3.1, 8), mats.rail);
-      railMesh.rotation.x = Math.atan2(0.88, 2.8);
-      railMesh.position.set(railX, 1, 1.05);
-      stairs.add(railMesh);
-      const cap = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.5, 0.16), railX < 0 ? mats.copingBlue : mats.copingYellow);
-      cap.position.set(railX, 0.65, -0.2);
-      stairs.add(cap);
-    }
-    stairs.position.set(sx, 0.44, sz);
-    stairs.rotation.y = rot;
-    stairs.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    skate.add(stairs);
-  }
-  const neQuarter = copingArc(mats.copingBlue, 3.4, 0.16, Math.PI / 2);
-  neQuarter.position.set(13, 0.66, 10);
-  neQuarter.rotation.z = Math.PI;
-  skAdd(neQuarter);
-  const seQuarter = copingArc(mats.copingRed, 3.4, 0.16, Math.PI / 2);
-  seQuarter.position.set(13, 0.66, -10);
-  seQuarter.rotation.z = Math.PI / 2;
-  skAdd(seQuarter);
-  skate.position.set(-0.5, 0, -34.5);
   group.add(skate);
 
   // -------------------------------------------------------------------
@@ -969,7 +1302,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // Buildings whose own district authors them (skatepark, court ring, stadium,
   // market, funfair, pond park) are skipped so nothing is built twice.
   const OZEL_BOLGELER = [
-    { minX: -17, maxX: 16, minZ: -48, maxZ: -21 },   // skatepark
+    { minX: -16.5, maxX: 17.8, minZ: -50.2, maxZ: -19.3 },   // skatepark
     { minX: -48, maxX: -24, minZ: -12, maxZ: 12 },   // basketball court ring
     { minX: 20, maxX: 44, minZ: -12, maxZ: 12 },     // stadium
     { minX: -10, maxX: 6, minZ: 24, maxZ: 39 },      // market square
@@ -1563,17 +1896,34 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // catch-all bucket measure ten units or more — those are roofs and decks
   // that belong to their own districts, not props, and rendering them as
   // boxes dropped pale slabs across the city and out over the sea.
-  const ufakMi = ([, , g, d]) => g <= 3.2 && d <= 3.2;
-  const RENKLI = [...PLAN_BANKLAR, ...PLAN_SEMSIYELER, ...PLAN_HEYKELLER].filter(ufakMi);
-  const SOLUK = [...PLAN_LAMBALAR, ...PLAN_COPLER, ...PLAN_UFAKLAR].filter(ufakMi);
+  // The skatepark authors every object on its deck straight from the drawing,
+  // so seventeen records the catch-all buckets read inside that cell are its
+  // own bowls and ledges seen a second time. Dropping boxes on them stacked
+  // pale slabs across the park.
+  const skateIcinde = (x, z) => (
+    Math.abs(x - SKATE_PLAZA.x) < SKATE_PLAZA.width / 2
+    && Math.abs(z - SKATE_PLAZA.z) < SKATE_PLAZA.depth / 2
+  );
+  // Clearing the road comes first and the park test second, because the two
+  // props that ended up sitting on the bowl lip started outside the deck and
+  // were pushed onto it by the road setback. Testing the record's original
+  // spot let them through.
+  const yerlestir = ([x, z, ...rest]) => {
+    const [nx, nz] = yoldanKaydir(x, z, rest[0], rest[1]);
+    return [nx, nz, ...rest];
+  };
+  const ufakMi = ([x, z, g, d]) => g <= 3.2 && d <= 3.2 && !skateIcinde(x, z);
+  const RENKLI = [...PLAN_BANKLAR, ...PLAN_SEMSIYELER, ...PLAN_HEYKELLER]
+    .map(yerlestir).filter(ufakMi);
+  const SOLUK = [...PLAN_LAMBALAR, ...PLAN_COPLER, ...PLAN_UFAKLAR]
+    .map(yerlestir).filter(ufakMi);
   const om = new THREE.Matrix4();
   const renkliOge = new THREE.InstancedMesh(
     new THREE.BoxGeometry(1, 1, 1), mats.white, RENKLI.length + AWNING_SLOT.length,
   );
   RENKLI.forEach(([x, z, g, d, , renk], i) => {
-    const [nx, nz] = yoldanKaydir(x, z, g, d);
     om.makeScale(Math.max(g, 0.5), 0.42, Math.max(d, 0.5));
-    om.setPosition(nx, 0.24, nz);
+    om.setPosition(x, 0.24, z);
     renkliOge.setMatrixAt(i, om);
     renkliOge.setColorAt(i, new THREE.Color(renk || '#d0c4bc').multiplyScalar(0.85));
   });
@@ -1593,10 +1943,9 @@ export function buildCityDistricts({ group, add, material, animated }) {
   );
   solukOge.name = 'district:stands';
   SOLUK.forEach(([x, z, g, d], i) => {
-    const [nx, nz] = yoldanKaydir(x, z, g, d);
     const yuksek = Math.min(1.4, 0.3 + Math.max(g, d) * 0.2);
     om.makeScale(Math.max(g, 0.45), yuksek, Math.max(d, 0.45));
-    om.setPosition(nx, yuksek / 2, nz);
+    om.setPosition(x, yuksek / 2, z);
     solukOge.setMatrixAt(i, om);
   });
   STANDS.forEach(([x, z, w, d], i) => {
@@ -1625,7 +1974,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
   }
 
   return {
-    skatepark: Object.freeze({ minX: -16.5, maxX: 15.5, minZ: -47.5, maxZ: -21.5, topY: 0.44 }),
+    skatepark: Object.freeze({ minX: -15.5, maxX: 16.76, minZ: -49.21, maxZ: -20.34, topY: 0.44 }),
     stadiumPitch: Object.freeze({ x: 29.7, z: 0.3, rx: 8.5, rz: 14, topY: 0.21 }),
     blockCount: BLOCKS.length,
     colliders,
