@@ -14,6 +14,7 @@ import { createCloudSea, createSkyDome, SKY_LOW } from '../core/sky.js';
 import { registerGame } from '../core/registry.js';
 import { createPlayerState, stepPlayer } from '../player.js';
 import { spawnBot } from '../core/bots.js';
+import { friendsieRivalId } from '../core/friendsie-bot.js';
 import { cameraRelativeDirection } from '../input.js';
 import { createPartySession } from '../core/party-session.js';
 import {
@@ -29,7 +30,8 @@ import {
 
 const SIM_DT = 1 / 60;
 const BOT_COUNT = 4;
-const BOT_CHARS = ['kid', 'cat', 'robot', 'ninja'];
+// The rivals are Oscar's fRiENDSiES, rigged and running on their own skeletons.
+const BOT_CHARS = [0, 1, 2, 3].map(friendsieRivalId);
 
 // ---- Field geometry (one scene holds both stages) ----
 const FIELD_HALF_X = 11;      // sand field half width

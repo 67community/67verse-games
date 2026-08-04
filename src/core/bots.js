@@ -1,5 +1,6 @@
 // bots.js — AI-driven characters running the same deterministic sim as the player.
 import { createPlayerState, stepPlayer } from '../player.js';
+import { createFriendsieRival, isFriendsieRival } from './friendsie-bot.js';
 
 /**
  * spawnBot(ctx, scene, env, { charId, x, z, behavior })
@@ -10,11 +11,17 @@ import { createPlayerState, stepPlayer } from '../player.js';
  * The OWNER steps the bot inside its own fixed-timestep loop (deterministic!).
  */
 export async function spawnBot(ctx, scene, env, { charId, x = 0, z = 0, behavior } = {}) {
-  const character = await ctx.characters.createInstance(charId || 'kid', {
-    skinTone: ctx.save.settings.skinTone,
-    lod: 'crowd',
-    shadow: 'none',
-  });
+  // A rival can be one of Oscar's fRiENDSiES rather than a roster character.
+  // createFriendsieRival returns the same surface — root, animator.signal,
+  // animator.update, dispose — so nothing below needs to know which it got,
+  // and a model that fails to load falls back to the roster rather than
+  // leaving a race with an invisible runner in it.
+  const character = (isFriendsieRival(charId) ? await createFriendsieRival(charId) : null)
+    || await ctx.characters.createInstance(isFriendsieRival(charId) ? 'kid' : (charId || 'kid'), {
+      skinTone: ctx.save.settings.skinTone,
+      lod: 'crowd',
+      shadow: 'none',
+    });
   const group = character.root;
   scene.add(group);
   const state = createPlayerState(x, z);

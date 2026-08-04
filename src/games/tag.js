@@ -9,6 +9,7 @@ import { createCloudSea, createSkyDome, SKY_LOW } from '../core/sky.js';
 import { registerGame } from '../core/registry.js';
 import { createPlayerState, stepPlayer } from '../player.js';
 import { spawnBot } from '../core/bots.js';
+import { friendsieRivalId } from '../core/friendsie-bot.js';
 import { cameraRelativeDirection } from '../input.js';
 import { createPartySession } from '../core/party-session.js';
 import {
@@ -37,7 +38,8 @@ import { loadWorldItems } from '../world-items.js';
 const SIM_DT = 1 / 60;         // fixed timestep, same as hub (server-compatible)
 const BOT_COUNT = 4;           // player + 4 bots = 5 participants
 const ARENA_HALF = TAG_ARENA_HALF;
-const BOT_CHARS = ['kid', 'cat', 'robot', 'ninja']; // real characters.ROSTER ids
+// The rivals are Oscar's fRiENDSiES, rigged and running on their own skeletons.
+const BOT_CHARS = [0, 1, 2, 3].map(friendsieRivalId);
 
 registerGame({
   id: 'tag',

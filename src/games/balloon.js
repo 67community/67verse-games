@@ -13,6 +13,7 @@
 import { createCloudSea, createSkyDome, SKY_LOW } from '../core/sky.js';
 import { registerGame } from '../core/registry.js';
 import { spawnBot } from '../core/bots.js';
+import { friendsieRivalId } from '../core/friendsie-bot.js';
 import { createPlayerState, stepPlayer } from '../player.js';
 import { cameraRelativeDirection } from '../input.js';
 import { createPartySession } from '../core/party-session.js';
@@ -527,7 +528,10 @@ registerGame({
     let player = null;
     let ready = false;
     const equipped = ctx.characters.equippedId();
-    const botIds = BOT_POOL.filter((id) => id !== equipped).slice(0, BOT_COUNT);
+    // Rivals are Oscar's fRiENDSiES, which are authored models rather than
+    // roster ids, so the pool no longer needs to avoid whatever the player
+    // has equipped — they can never collide.
+    const botIds = Array.from({ length: BOT_COUNT }, (unused, i) => friendsieRivalId(i));
     const skinTone = ctx.save.settings.skinTone;
 
     (async () => {
