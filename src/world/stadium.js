@@ -11,7 +11,8 @@
 // the 40 kB per-chunk budget when this was rebuilt.
 
 import * as THREE from 'three';
-import { canvasTexture, squirclePath, roundedBoxGeometry } from './sekil.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { canvasTexture, squirclePath, squirclePoints, roundedBoxGeometry } from './sekil.js';
 
 export const STADIUM_PITCH = Object.freeze({
   x: 29.95, z: -0.15, rx: 4.7, rz: 11.3, topY: 0.16,
@@ -47,30 +48,66 @@ export function buildStadium(mats) {
   const TRACK_D = PITCH.d + TRACK_PAY * 2;
   const TRACK_R = PITCH.r + TRACK_PAY;
 
-  function ovalAround(rx, rz, holeW, holeD, holeR) {
-    const shape = new THREE.Shape();
-    shape.absellipse(0, 0, rx, rz, 0, Math.PI * 2, false, 0);
-    shape.holes.push(squirclePath(holeW, holeD, holeR, THREE.Path));
-    return shape;
+  // The bowl is built as three strips, not as an extruded shape with a hole.
+  // Earcut leaves four large triangles lying across the hole here — the pitch
+  // and the whole track vanished under a solid oval — and no amount of point
+  // cleanup shifted them. Strips have no triangulation to get wrong: outer
+  // face, inner face, and the ring that caps them.
+  function ellipsePoints(rx, rz, segments) {
+    const points = [];
+    for (let i = 0; i < segments; i += 1) {
+      const a = (i / segments) * Math.PI * 2;
+      points.push([Math.cos(a) * rx, Math.sin(a) * rz]);
+    }
+    return points;
   }
 
-  // The bowl wall: a real wall with a flat top, bevelled like every other
-  // block in the city so it catches the same rim of light.
-  const bowlGeometry = new THREE.ExtrudeGeometry(
-    ovalAround(BOWL.rx, BOWL.rz, TRACK_W, TRACK_D, TRACK_R),
-    {
-      depth: BOWL.height - 0.24,
-      bevelEnabled: true,
-      bevelThickness: 0.12,
-      bevelSize: 0.12,
-      bevelOffset: 0,
-      bevelSegments: 1,
-      curveSegments: 26,
-    },
+  // Both loops are walked in the same direction and with the same count, so
+  // rim[i] and hole[i] are a matching pair all the way round.
+  function pairedLoop(points, count) {
+    const out = [];
+    for (let i = 0; i < count; i += 1) {
+      const t = (i / count) * points.length;
+      const a = points[Math.floor(t) % points.length];
+      const b = points[(Math.floor(t) + 1) % points.length];
+      const f = t - Math.floor(t);
+      out.push([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]);
+    }
+    return out;
+  }
+
+  function stripBetween(a, b, aY, bY) {
+    const position = [];
+    const uv = [];
+    for (let i = 0; i < a.length; i += 1) {
+      const j = (i + 1) % a.length;
+      const p0 = [a[i][0], aY, a[i][1]];
+      const p1 = [a[j][0], aY, a[j][1]];
+      const p2 = [b[j][0], bY, b[j][1]];
+      const p3 = [b[i][0], bY, b[i][1]];
+      position.push(...p0, ...p3, ...p2, ...p0, ...p2, ...p1);
+      uv.push(0, 1, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(position, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geometry.computeVertexNormals();
+    return geometry;
+  }
+
+  const RING = 72;
+  const outerLoop = pairedLoop(ellipsePoints(BOWL.rx, BOWL.rz, 160), RING);
+  const innerLoop = pairedLoop(
+    squirclePoints(TRACK_W, TRACK_D, TRACK_R, 24).map((p) => [p.x, p.y]),
+    RING,
   );
-  bowlGeometry.rotateX(-Math.PI / 2);
-  bowlGeometry.translate(0, 0.12, 0);
-  const bowl = new THREE.Mesh(bowlGeometry, mats.white);
+  const bowlGeometry = mergeGeometries([
+    stripBetween(outerLoop, outerLoop, BOWL.height, 0),   // outer face
+    stripBetween(innerLoop, innerLoop, 0, BOWL.height),   // inner face
+    stripBetween(outerLoop, innerLoop, BOWL.height, BOWL.height), // the rim
+  ], false);
+
+  const bowl = new THREE.Mesh(bowlGeometry, mats.skatePale);
   bowl.name = 'district:stadium-bowl';
   stadium.add(bowl);
 

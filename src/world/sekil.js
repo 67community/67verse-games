@@ -17,6 +17,37 @@ export function canvasTexture(canvas) {
   return texture;
 }
 
+// A squircle as an explicit point loop, with no repeated closing point.
+// Curve-built paths end where they began, and that duplicated vertex breaks
+// the cap triangulation when the path is used as a hole: the stadium bowl came
+// out as a solid oval with four huge triangles lying across the pitch, even
+// though the hole was in the shape.
+export function squirclePoints(w, d, r, perCorner = 6) {
+  const hw = w / 2;
+  const hd = d / 2;
+  const rr = Math.max(0.001, Math.min(r, hw - 0.001, hd - 0.001));
+  const points = [];
+  const corners = [
+    [hw - rr, hd - rr, 0],
+    [-hw + rr, hd - rr, Math.PI / 2],
+    [-hw + rr, -hd + rr, Math.PI],
+    [hw - rr, -hd + rr, Math.PI * 1.5],
+  ];
+  for (const [cx, cy, start] of corners) {
+    for (let i = 0; i <= perCorner; i += 1) {
+      const a = start + (i / perCorner) * (Math.PI / 2);
+      points.push(new THREE.Vector2(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr));
+    }
+  }
+  // Drop the closing duplicate: the last corner ends on the first point.
+  if (points.length > 1) {
+    const first = points[0];
+    const last = points[points.length - 1];
+    if (first.distanceToSquared(last) < 1e-8) points.pop();
+  }
+  return points;
+}
+
 export function squirclePath(w, d, r, Ctor = THREE.Shape) {
   const path = new Ctor();
   const hw = w / 2;
