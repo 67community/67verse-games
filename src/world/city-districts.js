@@ -26,6 +26,11 @@ import {
   PLAN_COPLER, PLAN_UFAKLAR,
 } from './plan-oge.js';
 import {
+  MARINA_KIYI, MARINA_KUM_GENISLIK, MARINA_DOGU_KENAR, MARINA_PROMENAD,
+  MARINA_ISKELELER, MARINA_PARMAKLAR, MARINA_TEKNELER, MARINA_TEKNE_BOY,
+  MARINA_YELKENLI, MARINA_SEMSIYELER, MARINA_FENER,
+} from './plan-marina.js';
+import {
   SKATE_PLAZA, SKATE_BOWL, SKATE_TROUGHS, SKATE_KERBS, SKATE_RAMPS,
   SKATE_LEDGES, SKATE_BANKS, SKATE_STAIRS, SKATE_RAIL_GARDEN, SKATE_LEDGE_WALL,
 } from './plan-skate.js';
@@ -263,6 +268,22 @@ function tintedByHeight(geometry, topHex, bottomHex, topY, bottomY) {
   return geometry;
 }
 
+// Anything the plan puts seaward of the measured shore would be standing in
+// the water. One four-storey block was, a hundred metres offshore, because the
+// old sea was a slab nobody tested against. This is the test.
+function kiyiX(z) {
+  const K = MARINA_KIYI;
+  if (z <= K[0][1] || z >= K[K.length - 1][1]) return Infinity;
+  for (let i = 1; i < K.length; i += 1) {
+    if (z <= K[i][1]) {
+      const t = (z - K[i - 1][1]) / (K[i][1] - K[i - 1][1] || 1);
+      return K[i - 1][0] + (K[i][0] - K[i - 1][0]) * t;
+    }
+  }
+  return Infinity;
+}
+const denizdeMi = (x, z) => x > kiyiX(z);
+
 const BLOBS_PER_TREE = 6;
 function treeBlobs(positions, THREE_, blobMaterial) {
   const blobs = new THREE_.InstancedMesh(
@@ -314,8 +335,8 @@ export function buildCityDistricts({ group, add, material, animated }) {
     pitch: material(0x475142, { roughness: 0.92 }),
     trackRed: material(0xa9736a, { roughness: 0.9 }),
     grass: material(0x868b6e, { roughness: 0.95 }),
-    sand: material(0xaaa27f, { roughness: 0.95 }),
-    water: material(0x8db2d6, { roughness: 0.25, transparent: true, opacity: 0.97 }),
+    sand: material(0xd8bcae, { roughness: 0.95 }),
+    water: material(0x8caddf, { roughness: 0.25, transparent: true, opacity: 0.97 }),
     // The reference's roads are a warm NEUTRAL grey — its green and blue
     // channels are equal (#d8cccc). Mine had blue well under green, which is
     // exactly what read as brown. Measured and corrected: green and blue now
@@ -326,7 +347,10 @@ export function buildCityDistricts({ group, add, material, animated }) {
     kerbLight: material(0xd8c6d1, { roughness: 0.9 }),
     paint: material(0xf0e2ea, { roughness: 0.9 }),
     stone: material(0xaf9f9e, { roughness: 0.8 }),
-    wood: material(0x96693c, { flatShading: true, roughness: 1 }),
+    // The reference's timber is a soft warm tan (212,180,170 lit), not the
+    // saturated orange this was; measured off the piers and divided back
+    // through the lighting gain.
+    wood: material(0xb09492, { flatShading: true, roughness: 1 }),
     rail: material(0x70757e, { roughness: 0.35, metalness: 0.4 }),
     white: material(0xc0b7ad, { roughness: 0.6 }),
     cream: material(0xbeb0a9, { roughness: 0.5 }),
@@ -511,8 +535,9 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // centre, orientation and paint of each one Oscar's drawing shows — the
   // parking-lot rows, the kerbside cars, the racers on the kart track.
   const V = Math.PI / 2;
-  const PARKED = PLAN_ARABALAR.map(([x, z, dikey]) => [x, z, dikey ? 0 : V]);
-  const PARKED_RENK = PLAN_ARABALAR.map(([, , , renk]) => renk);
+  const KARADA = PLAN_ARABALAR.filter(([x, z]) => !denizdeMi(x, z));
+  const PARKED = KARADA.map(([x, z, dikey]) => [x, z, dikey ? 0 : V]);
+  const PARKED_RENK = KARADA.map(([, , , renk]) => renk);
   const DRIVERS = 10;
   const CAR_N = PARKED.length + DRIVERS;
   const carBodies = new THREE.InstancedMesh(new THREE.BoxGeometry(1.6, 0.55, 3.1), mats.white, CAR_N);
@@ -1132,29 +1157,64 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // EAST MARGIN — the SEA fills the whole right edge; beach cape with
   // umbrellas; the lighthouse on the point; marina rows off the coast road.
   // -------------------------------------------------------------------
-  // The sea fills the right margin exactly: from the coastline at x=46 to the
-  // terrain plane's own edge at x=75, and the full depth of that plane. Sized
-  // to the land, so the waterline is a coast rather than a slab on a lawn.
-  const sea = new THREE.Mesh(new THREE.BoxGeometry(29, 0.1, 150), mats.water);
-  sea.position.set(60.5, 0.02, 0);
+  // The old sea was a 29x150 slab down the whole right margin. The reference's
+  // water is a bay: it narrows in from the north-west corner, runs straight
+  // past the marina, swings east around the sand cape and closes at z = +16.5,
+  // with the pond park below it standing on dry land. MARINA_KIYI is that
+  // shore, read off the render's own water mask row by row.
+  const KIYI = MARINA_KIYI;
+  const kiyiSon = KIYI[KIYI.length - 1];
+  const seaShape = new THREE.Shape();
+  seaShape.moveTo(KIYI[0][0], -KIYI[0][1]);
+  KIYI.slice(1).forEach(([x, z]) => seaShape.lineTo(x, -z));
+  // Past the terrain's own edge, so the water never stops short of the map.
+  const suKenar = MARINA_DOGU_KENAR + 8;
+  seaShape.lineTo(suKenar, -(kiyiSon[1] + 1.2));
+  seaShape.lineTo(suKenar, -KIYI[0][1] + 8);
+  seaShape.closePath();
+  const seaGeometry = new THREE.ShapeGeometry(seaShape);
+  seaGeometry.rotateX(-Math.PI / 2);
+  seaGeometry.translate(0, 0.06, 0);
+  const sea = new THREE.Mesh(seaGeometry, mats.water);
   sea.name = 'district:sea';
   add(sea, { camera: false, cast: false });
 
+  // Sand follows the same shore inland, so the beach is the coast's own shape
+  // rather than a blob dropped near it. Every sample taken just inland of the
+  // waterline in the reference came back sand, right down the bay.
+  const kumIc = KIYI.map(([x, z], i) => {
+    const a = KIYI[Math.max(0, i - 1)];
+    const b = KIYI[Math.min(KIYI.length - 1, i + 1)];
+    let dx = b[0] - a[0];
+    let dz = b[1] - a[1];
+    const length = Math.hypot(dx, dz) || 1;
+    dx /= length;
+    dz /= length;
+    return [x - dz * MARINA_KUM_GENISLIK, z + dx * MARINA_KUM_GENISLIK];
+  });
   const capeShape = new THREE.Shape();
-  capeShape.moveTo(0, -14);
-  capeShape.quadraticCurveTo(9, -12, 10, -2);
-  capeShape.quadraticCurveTo(10.5, 8, 6, 14);
-  capeShape.quadraticCurveTo(1, 12, 0, 6);
-  capeShape.lineTo(0, -14);
-  const cape = new THREE.Mesh(new THREE.ShapeGeometry(capeShape, 18), mats.sand);
-  cape.rotation.x = -Math.PI / 2;
-  cape.position.set(47, 0.09, -2);
+  capeShape.moveTo(KIYI[0][0], -KIYI[0][1]);
+  KIYI.slice(1).forEach(([x, z]) => capeShape.lineTo(x, -z));
+  [...kumIc].reverse().forEach(([x, z]) => capeShape.lineTo(x, -z));
+  capeShape.closePath();
+  const capeGeometry = new THREE.ShapeGeometry(capeShape);
+  capeGeometry.rotateX(-Math.PI / 2);
+  capeGeometry.translate(0, 0.1, 0);
+  const cape = new THREE.Mesh(capeGeometry, mats.sand);
   cape.name = 'district:beach';
   add(cape, { walkable: true, camera: false, cast: false });
-  const umbrellas = new THREE.InstancedMesh(new THREE.ConeGeometry(0.9, 0.5, 10), mats.copingRed, 5);
-  [[50, -10], [53, -5], [54, 1], [52, 7], [49, 3]].forEach(([x, z], i) => {
+
+  const UMBRELLA_SITES = [
+    ...MARINA_SEMSIYELER.map(({ x, z, renk }) => [x, z, renk]),
+    // The cape's own parasols, which the promenade row does not cover.
+    [50, -10, '#d98a9a'], [53, -5, '#cfc3bb'], [54, 1, '#8fa8ce'], [52, 7, '#cf7d78'],
+  ];
+  const umbrellas = new THREE.InstancedMesh(
+    new THREE.ConeGeometry(0.9, 0.5, 10), mats.copingRed, UMBRELLA_SITES.length,
+  );
+  UMBRELLA_SITES.forEach(([x, z, renk], i) => {
     umbrellas.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 1.15, z));
-    umbrellas.setColorAt(i, new THREE.Color(CAR_PAINT[(i * 2) % CAR_PAINT.length]));
+    umbrellas.setColorAt(i, new THREE.Color(renk));
   });
   umbrellas.instanceMatrix.needsUpdate = true;
   if (umbrellas.instanceColor) umbrellas.instanceColor.needsUpdate = true;
@@ -1174,7 +1234,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
   const lhLamp = new THREE.Mesh(new THREE.SphereGeometry(0.45, 10, 8), mats.copingYellow);
   lhLamp.position.y = 6.1;
   lighthouse.add(lhLamp);
-  lighthouse.position.set(55.1, 0, -19.9);
+  lighthouse.position.set(MARINA_FENER.x, 0, MARINA_FENER.z);
   lighthouse.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
   group.add(lighthouse);
 
@@ -1186,35 +1246,88 @@ export function buildCityDistricts({ group, add, material, animated }) {
     [-52, 38, 7, 0.4, 2.6, 0], [-30, 54.5, 7, 0.4, 2.6, 0.35], [-6, 56, 7, 0.4, 2.6, 0.1],
     [16, 55, 7, 0.4, 2.6, -0.1],
   ];
-  const AHSAP_BASLANGIC = 4 + AHSAP_KOPRU.length;
+  // Three piers reaching east off a timber promenade, twelve finger docks
+  // between them, and the river bridges — all one instanced deck.
+  const AHSAP = [
+    { ...MARINA_PROMENAD, y: 0.22, tint: '#ffffff' },
+    ...MARINA_ISKELELER.map((p) => ({ ...p, y: 0.2, tint: '#ffffff' })),
+    ...MARINA_PARMAKLAR.map((p) => ({ ...p, y: 0.16, tint: '#92bef0' })),
+  ];
+  // Market tables share this timber later on, so the mesh is sized for them.
+  const AHSAP_BASLANGIC = AHSAP.length + AHSAP_KOPRU.length;
   const docks = new THREE.InstancedMesh(
     new THREE.BoxGeometry(1, 1, 1), mats.wood, AHSAP_BASLANGIC + 5,
   );
   const dkm = new THREE.Matrix4();
-  [[48.8, -47.5], [49.2, -38.9], [49.0, -29.0], [49.0, -20.0]].forEach(([x, z], i) => {
-    dkm.makeScale(11.5, 0.24, 1.3);
-    dkm.setPosition(x, 0.2, z);
+  const beyaz = new THREE.Color('#ffffff');
+  AHSAP.forEach(({ x, z, width, depth, y, tint }, i) => {
+    dkm.makeScale(width, 0.24, depth);
+    dkm.setPosition(x, y, z);
     docks.setMatrixAt(i, dkm);
+    docks.setColorAt(i, new THREE.Color(tint));
   });
   AHSAP_KOPRU.forEach(([x, z, w, h, d, rot], i) => {
     dkm.makeRotationY(rot);
     dkm.scale(new THREE.Vector3(w, h, d));
     dkm.setPosition(x, 0.36, z);
-    docks.setMatrixAt(4 + i, dkm);
+    docks.setMatrixAt(AHSAP.length + i, dkm);
+    docks.setColorAt(AHSAP.length + i, beyaz);
   });
+  if (docks.instanceColor) docks.instanceColor.needsUpdate = true;
   docks.instanceMatrix.needsUpdate = true;
   docks.name = 'district:marina-docks';
   add(docks, { camera: false, cast: false });
-  const boats = new THREE.InstancedMesh(new THREE.BoxGeometry(2.4, 0.5, 1.05), mats.white, 8);
-  [[50.6, -31.9], [54.2, -31.9], [50.6, -35.9], [54.2, -35.9], [50.6, -39.9], [54.2, -39.9], [51, -44], [57, -27]]
-    .forEach(([x, z], i) => {
-      boats.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.3, z));
-      boats.setColorAt(i, new THREE.Color(CAR_PAINT[(i + 1) % CAR_PAINT.length]));
-    });
+
+  // Hulls are pointed at both ends, not boxes: from the air that silhouette is
+  // the whole difference between a moored boat and a crate.
+  const hullShape = new THREE.Shape();
+  hullShape.moveTo(0, -0.5);
+  hullShape.bezierCurveTo(0.5, -0.3, 0.5, 0.18, 0.34, 0.42);
+  hullShape.quadraticCurveTo(0, 0.56, -0.34, 0.42);
+  hullShape.bezierCurveTo(-0.5, 0.18, -0.5, -0.3, 0, -0.5);
+  const hullGeometry = new THREE.ExtrudeGeometry(hullShape, { depth: 0.42, bevelEnabled: false, curveSegments: 4 });
+  hullGeometry.rotateX(-Math.PI / 2);
+  const MOORED = [
+    ...MARINA_TEKNELER.map(({ x, z, renk }) => ({
+      x, z, renk, yaw: 0, length: MARINA_TEKNE_BOY.length, width: MARINA_TEKNE_BOY.width,
+    })),
+    {
+      x: MARINA_YELKENLI.x, z: MARINA_YELKENLI.z, renk: '#d9d2c6',
+      yaw: MARINA_YELKENLI.yaw, length: MARINA_YELKENLI.length, width: MARINA_YELKENLI.width,
+    },
+  ];
+  const boats = new THREE.InstancedMesh(hullGeometry, mats.white, MOORED.length);
+  MOORED.forEach(({ x, z, renk, yaw, length, width }, i) => {
+    const m = new THREE.Matrix4().makeRotationY(yaw);
+    m.scale(new THREE.Vector3(width, 1, length));
+    m.setPosition(x, 0.16, z);
+    boats.setMatrixAt(i, m);
+    boats.setColorAt(i, new THREE.Color(renk));
+  });
   boats.instanceMatrix.needsUpdate = true;
   if (boats.instanceColor) boats.instanceColor.needsUpdate = true;
   boats.name = 'district:marina-boats';
   add(boats, { camera: false, cast: false });
+
+  // The one boat under sail, out past the piers.
+  // Seen from above, a sail is a triangle lying over its hull, which is how
+  // the reference draws it — so this is flat, not a vertical sheet that would
+  // vanish to a line in a bird's-eye view.
+  const sailShape = new THREE.Shape();
+  sailShape.moveTo(-MARINA_YELKENLI.length * 0.4, -MARINA_YELKENLI.width * 0.1);
+  sailShape.lineTo(MARINA_YELKENLI.length * 0.42, -MARINA_YELKENLI.width * 0.45);
+  sailShape.lineTo(MARINA_YELKENLI.length * 0.1, MARINA_YELKENLI.width * 0.75);
+  const sailGeometry = new THREE.ExtrudeGeometry(sailShape, { depth: 0.1, bevelEnabled: false });
+  sailGeometry.rotateX(-Math.PI / 2);
+  const sail = new THREE.Mesh(
+    sailGeometry,
+    material(MARINA_YELKENLI.yelken, { roughness: 0.7, side: THREE.DoubleSide }),
+  );
+  sail.rotation.y = MARINA_YELKENLI.yaw;
+  sail.position.set(MARINA_YELKENLI.x, 0.72, MARINA_YELKENLI.z);
+  sail.name = 'district:marina-sail';
+  sail.castShadow = true;
+  group.add(sail);
 
   // -------------------------------------------------------------------
   // CENTER — the framed 67 plaza with fountain, tree ring, corner towers
@@ -1326,7 +1439,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
         const h = Math.max(2, Math.min(6.5, 1.6 + Math.sqrt(w * d) * 0.62));
         return { x, z, w, h, d, renk: PLAN_BINA_RENK[i] };
       })
-      .filter(({ x, z }) => !ozelIcinde(x, z));
+      .filter(({ x, z }) => !ozelIcinde(x, z) && !denizdeMi(x, z));
 
     // The plan draws terraces that touch, so neighbours may share a wall;
     // only a real overlap is a fault.
@@ -1367,6 +1480,10 @@ export function buildCityDistricts({ group, add, material, animated }) {
     const yerlesen = [];
     for (const b of adaylar) {
       if (Math.abs(b.x) > 60 || Math.abs(b.z) > 60) continue;
+      // The shore is checked again here, not only on the way in: relaxation
+      // can push a block a long way, and one of them ended up eleven units
+      // offshore standing in the bay.
+      if (denizdeMi(b.x, b.z)) continue;
       let kondu = false;
       for (const olcek of [1, 0.86, 0.72, 0.6]) {
         const w = b.w * olcek;
@@ -1783,7 +1900,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
   const TREES = PLAN_AGACLAR.map(([x, z, g]) => {
     const [nx, nz] = yoldanKaydir(x, z, 1.8, 1.8);
     return [nx, nz, Math.max(0.7, Math.min(1.6, g / 5.5))];
-  });
+  }).filter(([x, z]) => !denizdeMi(x, z));
   const allTrees = [...TREES, ...PLAZA_TREES];
   const canopy = treeBlobs(allTrees, THREE, crownMat);
   canopy.name = 'district:tree-canopy';
@@ -1835,9 +1952,11 @@ export function buildCityDistricts({ group, add, material, animated }) {
     // east, behind the coast road
     [52, 40], [54, 50], [50, 30],
   ];
-  const houseBodies = new THREE.InstancedMesh(new THREE.BoxGeometry(3, 2.2, 3.4), mats.block, HOUSES.length);
-  const houseRoofs = new THREE.InstancedMesh(new THREE.ConeGeometry(2.5, 1.5, 4), mats.copingRed, HOUSES.length);
-  HOUSES.forEach(([x, z], i) => {
+  // The north-east row ran past the shore, so one house stood in the bay.
+  const KARADAKI_EVLER = HOUSES.filter(([x, z]) => !denizdeMi(x, z));
+  const houseBodies = new THREE.InstancedMesh(new THREE.BoxGeometry(3, 2.2, 3.4), mats.block, KARADAKI_EVLER.length);
+  const houseRoofs = new THREE.InstancedMesh(new THREE.ConeGeometry(2.5, 1.5, 4), mats.copingRed, KARADAKI_EVLER.length);
+  KARADAKI_EVLER.forEach(([x, z], i) => {
     // Alternate the plan rotation so a row of houses reads as a street of
     // separate homes rather than one repeated stamp.
     const turn = (i % 2) * (Math.PI / 2);
@@ -1912,7 +2031,7 @@ export function buildCityDistricts({ group, add, material, animated }) {
     const [nx, nz] = yoldanKaydir(x, z, rest[0], rest[1]);
     return [nx, nz, ...rest];
   };
-  const ufakMi = ([x, z, g, d]) => g <= 3.2 && d <= 3.2 && !skateIcinde(x, z);
+  const ufakMi = ([x, z, g, d]) => g <= 3.2 && d <= 3.2 && !skateIcinde(x, z) && !denizdeMi(x, z);
   const RENKLI = [...PLAN_BANKLAR, ...PLAN_SEMSIYELER, ...PLAN_HEYKELLER]
     .map(yerlestir).filter(ufakMi);
   const SOLUK = [...PLAN_LAMBALAR, ...PLAN_COPLER, ...PLAN_UFAKLAR]
