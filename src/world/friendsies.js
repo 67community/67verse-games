@@ -1,10 +1,13 @@
 // world/friendsies.js — fRiENDSiES walking around 67 Park.
 //
 // Guests, not the player: Oscar's own collection, dropped into the hub so the
-// park has people in it. The models are posed meshes with no skeleton and no
-// clips, so a walk cycle is not available — what sells the walk is the route,
-// the facing, and a step bob, which is the same trick the 67VERSE lobby uses
-// for its standers.
+// park has people in it, and they walk on their own skeletons.
+//
+// These come from the rigged set, not the posed one. A posed mesh has no skin
+// and no clips, so nothing about it can move and every guest ends up doing the
+// same bob on the spot. The rigged models carry Root, Spine, ThighL/R and
+// ArmL/R — enough to drive a gait — but no animation clip either, so the walk
+// is authored here rather than played back.
 //
 // They cost roughly five draw calls each and carry their own textures, so they
 // load on the high quality tier only and after the world is already on screen.
@@ -19,10 +22,10 @@ const BASE = `${import.meta.env?.BASE_URL ?? '/'}friendsies/`;
 // and of the activity markers, so nobody blocks a start or strolls into
 // traffic. Height is the hub's own character height.
 export const FRIENDSIE_GUESTS = Object.freeze([
-  Object.freeze({ file: 'fs_67.glb', from: [-7, 6], to: [7, 6], speed: 1.05 }),
-  Object.freeze({ file: 'friendsie.glb', from: [4, 28], to: [-6, 30], speed: 0.9 }),
-  Object.freeze({ file: 'fs_8888.glb', from: [-9, -21.5], to: [7, -21.5], speed: 1.15 }),
-  Object.freeze({ file: 'fs_2222.glb', from: [40.5, -44], to: [40.5, -31], speed: 0.95 }),
+  Object.freeze({ file: 'rig_21.glb', from: [-7, 6], to: [7, 6], speed: 1.05 }),
+  Object.freeze({ file: 'rig_18.glb', from: [4, 28], to: [-6, 30], speed: 0.9 }),
+  Object.freeze({ file: 'rig_6.glb', from: [-9, -21.5], to: [7, -21.5], speed: 1.15 }),
+  Object.freeze({ file: 'rig_56.glb', from: [40.5, -44], to: [40.5, -31], speed: 0.95 }),
 ]);
 
 const GUEST_HEIGHT = 1.8;
@@ -50,6 +53,20 @@ export function loadFriendsies({ group, animated, sampleGround }) {
         object.castShadow = true;
         object.receiveShadow = true;
       });
+      // Each bone is driven as an offset from its own bind pose. Setting a
+      // rotation absolutely folds the character up on the first frame, because
+      // the bind pose is not zero.
+      const bone = {};
+      model.traverse((object) => {
+        if (!object.isBone || bone[object.name]) return;
+        bone[object.name] = object;
+        object.userData.restX = object.rotation.x;
+      });
+      const swing = (name, amount) => {
+        const joint = bone[name];
+        if (joint) joint.rotation.x = joint.userData.restX + amount;
+      };
+
       const holder = new THREE.Group();
       holder.name = `guest:${guest.file.replace('.glb', '')}`;
       holder.userData.perfGroup = 'hub-guests';
@@ -76,7 +93,13 @@ export function loadFriendsies({ group, animated, sampleGround }) {
           forward ? bx - ax : ax - bx,
           forward ? bz - az : az - bz,
         );
-        model.position.y = -box.min.y + Math.abs(Math.sin(travelled * 3.4)) * 0.05;
+        // Thighs swing, arms counter-swing, the body rises on each step.
+        const gait = Math.sin(travelled * 3.6);
+        swing('ThighL', gait * 0.52);
+        swing('ThighR', -gait * 0.52);
+        swing('ArmL', -gait * 0.42);
+        swing('ArmR', gait * 0.42);
+        model.position.y = -box.min.y + Math.abs(gait) * 0.05;
       });
       resolve(1);
     }, undefined, () => resolve(0));
