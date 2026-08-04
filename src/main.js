@@ -477,6 +477,7 @@ const primaryPlayButton = document.getElementById('primary-play');
 // the map, so there is one place to change it.
 const SKATE_LOBBY_URL = 'https://67verse.67gamehub.workers.dev/skate';
 const primaryMapButton = document.getElementById('primary-map');
+const primaryLobbyButton = document.getElementById('primary-lobby');
 const primaryChatButton = document.getElementById('primary-chat');
 const returnSkyparkButton = document.getElementById('return-skypark');
 const modeName = document.getElementById('mode-name');
@@ -953,6 +954,11 @@ primaryMapButton?.addEventListener('click', async () => {
   } finally {
     primaryMapButton.removeAttribute('aria-busy');
   }
+});
+// The skate lobby, under the wordmark, where Oscar wants it: it leaves the
+// park, so it sits with the other top-level actions rather than inside a panel.
+primaryLobbyButton?.addEventListener('click', () => {
+  window.location.assign(SKATE_LOBBY_URL);
 });
 returnSkyparkButton?.addEventListener('click', requestReturnToSkypark);
 window.addEventListener('keydown', (e) => {
