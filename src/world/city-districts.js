@@ -216,7 +216,9 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // carriageway is not deleted — the plan drew a building there and it should
   // exist — it is pushed clear along whichever axis needs the smaller move,
   // the way a site plan resolves a clash.
-  const YOL_PAYI = ROAD_W / 2 + 1.2;
+  // The plan builds right up to the kerb, so the setback is a kerb's width,
+  // not a garden. A larger margin was rejecting terraces that genuinely fit.
+  const YOL_PAYI = ROAD_W / 2 + 0.35;
   function yoldanKaydir(x, z, w = 0, d = 0) {
     let nx = x;
     let nz = z;
@@ -233,6 +235,11 @@ export function buildCityDistricts({ group, add, material, animated }) {
       if (!carpisma) break;
     }
     return [nx, nz];
+  }
+  function yolUstunde(x, z, w = 0, d = 0) {
+    for (const rx of V_ROADS) if (Math.abs(x - rx) < YOL_PAYI + w / 2) return true;
+    for (const rz of H_ROADS) if (Math.abs(z - rz) < YOL_PAYI + d / 2) return true;
+    return false;
   }
 
   // One instanced mesh carries every arterial; scale gives each its measured
@@ -973,17 +980,78 @@ export function buildCityDistricts({ group, add, material, animated }) {
   const ozelIcinde = (x, z) => OZEL_BOLGELER.some(
     (b) => x > b.minX && x < b.maxX && z > b.minZ && z < b.maxZ,
   );
-  const BLOCKS = PLAN_BINALAR
-    .map(([x, z, w, d], i) => {
-      const alan = w * d;
-      const h = Math.max(2, Math.min(6.5, 1.6 + Math.sqrt(alan) * 0.62));
-      return [x, z, w, h, d, PLAN_BINA_RENK[i]];
-    })
-    .filter(([x, z]) => !ozelIcinde(x, z))
-    .map(([x, z, w, h, d, renk]) => {
-      const [nx, nz] = yoldanKaydir(x, z, w, d);
-      return [nx, nz, w, h, d, renk];
-    });
+  // Placement is resolved, not just nudged. Two constraints have to hold at
+  // once — clear of every carriageway, and clear of each other — and shifting
+  // for one used to break the other, which left buildings both on the road and
+  // inside their neighbours. So both are relaxed together over several passes:
+  // each round pushes a block off any road it touches, then pushes apart any
+  // pair that overlaps, until the layout settles. A block that still cannot be
+  // placed after all that is dropped rather than shipped inside another.
+  const BLOCKS = (() => {
+    const adaylar = PLAN_BINALAR
+      .map(([x, z, w, d], i) => {
+        const h = Math.max(2, Math.min(6.5, 1.6 + Math.sqrt(w * d) * 0.62));
+        return { x, z, w, h, d, renk: PLAN_BINA_RENK[i] };
+      })
+      .filter(({ x, z }) => !ozelIcinde(x, z));
+
+    // The plan draws terraces that touch, so neighbours may share a wall;
+    // only a real overlap is a fault.
+    const BOSLUK = 0.05;
+    for (let tur = 0; tur < 60; tur += 1) {
+      let oynadi = false;
+      for (const b of adaylar) {
+        const [nx, nz] = yoldanKaydir(b.x, b.z, b.w, b.d);
+        if (nx !== b.x || nz !== b.z) { b.x = nx; b.z = nz; oynadi = true; }
+      }
+      for (let i = 0; i < adaylar.length; i += 1) {
+        for (let j = i + 1; j < adaylar.length; j += 1) {
+          const a = adaylar[i];
+          const b = adaylar[j];
+          const bindirX = (a.w + b.w) / 2 + BOSLUK - Math.abs(a.x - b.x);
+          const bindirZ = (a.d + b.d) / 2 + BOSLUK - Math.abs(a.z - b.z);
+          if (bindirX <= 0 || bindirZ <= 0) continue;
+          oynadi = true;
+          // Separate along the axis that needs the smaller correction.
+          if (bindirX < bindirZ) {
+            const yon = a.x <= b.x ? -1 : 1;
+            a.x += (yon * bindirX) / 2;
+            b.x -= (yon * bindirX) / 2;
+          } else {
+            const yon = a.z <= b.z ? -1 : 1;
+            a.z += (yon * bindirZ) / 2;
+            b.z -= (yon * bindirZ) / 2;
+          }
+        }
+      }
+      if (!oynadi) break;
+    }
+
+    // Final sweep. A block that still will not fit is shrunk rather than
+    // deleted — losing a building the plan drew is worse than building it a
+    // size smaller — and only something that cannot fit even at two-thirds
+    // scale, or that has been pushed off the plan, is given up.
+    const yerlesen = [];
+    for (const b of adaylar) {
+      if (Math.abs(b.x) > 60 || Math.abs(b.z) > 60) continue;
+      let kondu = false;
+      for (const olcek of [1, 0.86, 0.72, 0.6]) {
+        const w = b.w * olcek;
+        const d = b.d * olcek;
+        if (yolUstunde(b.x, b.z, w, d)) continue;
+        const cakisiyor = yerlesen.some((o) => (
+          Math.abs(b.x - o.x) < (w + o.w) / 2 - 0.25
+          && Math.abs(b.z - o.z) < (d + o.d) / 2 - 0.25
+        ));
+        if (cakisiyor) continue;
+        yerlesen.push({ ...b, w, d });
+        kondu = true;
+        break;
+      }
+      if (!kondu) continue;
+    }
+    return yerlesen.map((b) => [b.x, b.z, b.w, b.h, b.d, b.renk]);
+  })();
   // Blocks carry the reference building's actual anatomy, read off a 4x crop
   // of the map: a soft squircle body on a wider plinth, a raised lip framing
   // the roof, an L-shaped recess inside that lip, and a striped awning at the
@@ -1491,8 +1559,13 @@ export function buildCityDistricts({ group, add, material, animated }) {
   // instanced meshes carry the lot: one for the coloured pieces, one for
   // the pale ones, so 180 objects cost two draws.
   // -------------------------------------------------------------------
-  const RENKLI = [...PLAN_BANKLAR, ...PLAN_SEMSIYELER, ...PLAN_HEYKELLER];
-  const SOLUK = [...PLAN_LAMBALAR, ...PLAN_COPLER, ...PLAN_UFAKLAR];
+  // Street furniture is small by definition. Some records in the plan's
+  // catch-all bucket measure ten units or more — those are roofs and decks
+  // that belong to their own districts, not props, and rendering them as
+  // boxes dropped pale slabs across the city and out over the sea.
+  const ufakMi = ([, , g, d]) => g <= 3.2 && d <= 3.2;
+  const RENKLI = [...PLAN_BANKLAR, ...PLAN_SEMSIYELER, ...PLAN_HEYKELLER].filter(ufakMi);
+  const SOLUK = [...PLAN_LAMBALAR, ...PLAN_COPLER, ...PLAN_UFAKLAR].filter(ufakMi);
   const om = new THREE.Matrix4();
   const renkliOge = new THREE.InstancedMesh(
     new THREE.BoxGeometry(1, 1, 1), mats.white, RENKLI.length + AWNING_SLOT.length,
