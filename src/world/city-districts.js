@@ -26,6 +26,7 @@ import { PLAN_BINALAR, PLAN_BINA_RENK, PLAN_AGACLAR, PLAN_ARABALAR } from './pla
 import {
   PLAN_ANA_YOLLAR, PLAN_PATIKALAR, PLAN_ZEBRALAR, PLAN_KAVSAKLAR, PLAN_PAZAR,
   PLAN_SPOR_OLCU, PLAN_KART,
+  PLAN_MERKEZ_MEYDAN, PLAN_MERKEZ_CESME, PLAN_PLAZA_KULELERI,
 } from './plan-ek.js';
 import { buildFunfair } from './city-funfair.js';
 import {
@@ -607,24 +608,51 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // Traffic on every avenue of the grid, both directions: six run the
   // north-south roads and four run the east-west streets, each in its own
   // lane and offset along the road so they never travel as a convoy.
-  // The carriageways come from the plan, so the traffic has to as well. These
-  // used to be hand-written numbers two to six units off the measured axes,
-  // which drove one lane of northbound cars straight across the skatepark
-  // deck. Each route now names a road the drawing actually has.
+  // The carriageways come from the plan, so the traffic has to as well —
+  // including where each road ENDS. A route without a span drove its car over
+  // the whole map width: at x 41.5 the asphalt stops at z 19.4 and the car
+  // kept going, across the pond park and onto the beach. Oscar's rule is that
+  // a road never ends into sand or a house, and neither does a car: every
+  // route now carries the measured extent of its own carriageway and the car
+  // loops inside it.
+  // The spans above were typed by hand and five of the ten did not match the
+  // asphalt underneath them. The z 51.5 street exists out to x -32.9 and again
+  // from x 17.2; the car drove the fifty units of sand in between, which is the
+  // beach Oscar saw. The 1.15 lane offset had the same fault — it is wider than
+  // half of a 2.32 carriageway, so those cars rode the verge.
+  // So a route now names its carriageway and takes the extent, the width and
+  // therefore the lane off the plan. A car cannot leave the asphalt because its
+  // route IS a measured piece of asphalt.
+  const SEGMENTS = PLAN_ANA_YOLLAR.map(([x, z, g, d]) => (g >= d
+    ? { axis: 'x', road: z, width: d, from: x - g / 2, to: x + g / 2 }
+    : { axis: 'z', road: x, width: g, from: z - d / 2, to: z + d / 2 }));
+  // The longest carriageway within a lane's reach of the named centre line;
+  // the short stubs that share a centre would strand the car at their end.
+  const segmentFor = (axis, road) => SEGMENTS
+    .filter((s) => s.axis === axis && Math.abs(s.road - road) < 1.6)
+    .sort((a, b) => (b.to - b.from) - (a.to - a.from))[0] || null;
   const ROUTES = [
-    { axis: 'z', road: -19.5, dir: 1 }, { axis: 'z', road: -19.5, dir: -1 },
-    { axis: 'z', road: 18.5, dir: 1 }, { axis: 'z', road: 18.5, dir: -1 },
-    { axis: 'z', road: 41.5, dir: 1 }, { axis: 'z', road: -53.5, dir: -1 },
-    { axis: 'x', road: -18.5, dir: 1 }, { axis: 'x', road: -18.5, dir: -1 },
-    { axis: 'x', road: 18, dir: 1 }, { axis: 'x', road: 51.5, dir: -1 },
-  ];
+    ['z', -19.5, 1], ['z', -19.5, -1],
+    ['z', 18.5, 1], ['z', 18.5, -1],
+    ['z', 41.5, 1], ['z', -53.5, -1],
+    ['x', -18.5, 1], ['x', -18.5, -1],
+    ['x', 18, 1], ['x', 51.5, -1],
+  ].map(([axis, road, dir]) => {
+    const seg = segmentFor(axis, road);
+    if (!seg) return null;
+    // A quarter of the width keeps the car inside its own half of the road
+    // whatever that road measures, where a fixed offset could not.
+    return { axis, dir, from: seg.from, to: seg.to, lane: seg.road + dir * seg.width * 0.26 };
+  }).filter(Boolean);
   animated?.push((time) => {
     ROUTES.forEach((route, d) => {
       const index = PARKED.length + d;
-      const lane = route.road + route.dir * 1.15;
-      const span = 96;
-      const along = ((time * 4.5 + d * 19) % span) - span / 2;
-      const travel = route.dir > 0 ? along : -along;
+      const lane = route.lane;
+      const span = route.to - route.from;
+      const phase = (time * 4.5 + d * 19) % span;
+      // Direction decides which end of the measured carriageway the car
+      // enters from; either way it never leaves the asphalt.
+      const travel = route.dir > 0 ? route.from + phase : route.to - phase;
       if (route.axis === 'z') {
         placeCar(index, lane, travel, route.dir > 0 ? Math.PI : 0);
       } else {
@@ -1326,53 +1354,148 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   group.add(sail);
 
   // -------------------------------------------------------------------
-  // CENTER — the framed 67 plaza with fountain, tree ring, corner towers
+  // CENTER — the 67 plaza: platform, fountain, planted trees, round towers
   // -------------------------------------------------------------------
-  const plazaPlate = new THREE.Mesh(new THREE.BoxGeometry(30, 0.16, 30), mats.stone);
-  plazaPlate.position.set(-2, 0.08, -1.5);
+  // Every piece of this used to be built around (-2, -1.5), which is why the
+  // whole centre of the map sat off its own axis. It comes off the plan now:
+  // PLAN_MERKEZ_MEYDAN for the platform, PLAN_MERKEZ_CESME for the fountain
+  // and PLAN_PLAZA_KULELERI for the corners, all measured on the reference.
+  //
+  // The platform is two plates rather than a plate with a bar around it: the
+  // reference has a brighter perimeter walk (218,197,196) about 2.75 wide
+  // inside the edge and a warmer floor (198,169,163) inside that, so the
+  // lower plate is the walk and the inner one is laid on top of it.
+  const [meydanX, meydanZ] = PLAN_MERKEZ_MEYDAN.merkez;
+  const { genislik: meydanW, derinlik: meydanD, yurumeYolu: yuruyus } = PLAN_MERKEZ_MEYDAN;
+  // The walk runs 1.10x the floor in red and 1.17x in green and blue, so it
+  // is brighter and cooler, not the near-white bar the old frame laid down.
+  // Stone captures (201,188,182) here, so the walk has to capture (221,219,219).
+  // Set at that ratio the tone map gave back only half of it — (210,205,203)
+  // against the floor, 1.05 where 1.10 was wanted — so the base carries the
+  // shortfall as well as the ratio.
+  const plazaWalkMat = material(0xcac5cd, { roughness: 0.85 });
+  const plazaPlate = new THREE.Mesh(new THREE.BoxGeometry(meydanW, 0.16, meydanD), plazaWalkMat);
+  plazaPlate.position.set(meydanX, 0.08, meydanZ);
   plazaPlate.name = 'district:plaza';
   add(plazaPlate, { walkable: true, camera: false, cast: false });
-  const plazaFrame = new THREE.InstancedMesh(new THREE.BoxGeometry(30.8, 0.3, 0.5), mats.white, 4);
-  [[-2, -16.65, 0], [-2, 13.65, 0], [-17.15, -1.5, Math.PI / 2], [13.15, -1.5, Math.PI / 2]].forEach(([x, z, rot], i) => {
-    const m = new THREE.Matrix4().makeRotationY(rot);
-    m.setPosition(x, 0.18, z);
-    plazaFrame.setMatrixAt(i, m);
-  });
-  plazaFrame.instanceMatrix.needsUpdate = true;
-  add(plazaFrame, { camera: false, cast: false });
-  const fBase = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 2.9, 0.6, 16), mats.stone);
-  fBase.position.set(-2, 0.46, -1.5);
-  add(fBase, { camera: false, cast: false });
-  const fPool = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.3, 0.12, 16), mats.water);
-  fPool.position.set(-2, 0.78, -1.5);
+  // Laid a centimetre proud of the walk. Sunk into it, the walk's own top face
+  // wins the whole plate and the two tones collapse into one.
+  const plazaFloor = new THREE.Mesh(
+    new THREE.BoxGeometry(meydanW - yuruyus * 2, 0.16, meydanD - yuruyus * 2),
+    mats.stone,
+  );
+  plazaFloor.position.set(meydanX, 0.09, meydanZ);
+  add(plazaFloor, { camera: false, cast: false });
+
+  // The fountain is four rings, not three plain cylinders. The apron was
+  // missing entirely — beyond the old kerb the floor sampled the same value
+  // in every direction — and the water was sky blue where the reference has
+  // a violet slate.
+  const [cesmeX, cesmeZ] = PLAN_MERKEZ_CESME.merkez;
+  const [havuzX, havuzZ] = PLAN_MERKEZ_CESME.havuzMerkez;
+  // The apron reads (172,147,151) against the plaza floor's (185,165,174) in
+  // the same light: darker and warmer, not lighter. That is stone taken down
+  // to 0.9 with its blue pulled under its red by the same margin.
+  const apronMat = material(0x9f8b86, { roughness: 0.9 });
+  const fApron = new THREE.Mesh(
+    new THREE.CylinderGeometry(PLAN_MERKEZ_CESME.avluCapi / 2, PLAN_MERKEZ_CESME.avluCapi / 2, 0.1, 40),
+    apronMat,
+  );
+  fApron.position.set(cesmeX, 0.2, cesmeZ);
+  add(fApron, { camera: false, cast: false });
+  const fBase = new THREE.Mesh(
+    new THREE.CylinderGeometry(PLAN_MERKEZ_CESME.havuzCapi / 2, PLAN_MERKEZ_CESME.havuzCapi / 2 + 0.05, 0.5, 28),
+    mats.stone,
+  );
+  fBase.position.set(havuzX, 0.49, havuzZ);
+  add(fBase, { camera: false, cast: true });
+  // Water: the reference's mean over the ring r 1.2..2.0 is (137,126,141) —
+  // red and blue level with each other and green a dozen under both, a violet
+  // slate. Against its own paving that is 0.74 of the floor, so here it has to
+  // capture (149,144,147), which is this base once the scene lifts it. The old
+  // 0x8caddf captured as a flat pale blue disc, which is what read as a
+  // swimming pool dropped into the square. It also sat below the basin's rim
+  // and so was not visible at all from above.
+  const fountainWaterMat = material(0x747179, { roughness: 0.6 });
+  const fPool = new THREE.Mesh(
+    new THREE.CylinderGeometry(PLAN_MERKEZ_CESME.suCapi / 2, PLAN_MERKEZ_CESME.suCapi / 2, 0.12, 28),
+    fountainWaterMat,
+  );
+  fPool.position.set(havuzX, 0.7, havuzZ);
   add(fPool, { camera: false, cast: false });
-  const fColumn = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.45, 1.5, 10), mats.stone);
-  fColumn.position.set(-2, 1.4, -1.5);
-  add(fColumn, { camera: false, cast: true });
-  const plazaLabel = flatLabel('67', 6);
+  // The sculpture is 2.2 across, not the 0.9 stub that was here, and stepped:
+  // seen from above the tiers are the concentric rings the reference draws
+  // around its centre. Height is not in a top-down plan, so the profile keeps
+  // the tiers in proportion to the measured base radius.
+  const heykelR = PLAN_MERKEZ_CESME.heykelCapi / 2;
+  const heykelProfil = [
+    [1, 0], [1, 0.13], [0.78, 0.17], [0.78, 0.33], [0.56, 0.39],
+    [0.56, 0.58], [0.36, 0.66], [0.36, 0.85], [0.16, 0.96], [0, 1.02],
+  ].map(([r, y]) => new THREE.Vector2(r * heykelR, y * heykelR * 1.3));
+  const fSculpture = new THREE.Mesh(new THREE.LatheGeometry(heykelProfil, 20), mats.cream);
+  fSculpture.position.set(havuzX, 0.76, havuzZ);
+  add(fSculpture, { camera: false, cast: true });
+
+  // The glyphs run x -2.62..2.52 by z 5.62..8.91 in the reference, centre
+  // (-0.05, 7.27). The old label was both off-centre and half that size.
+  const plazaLabel = flatLabel('67', 9.8);
   if (plazaLabel) {
-    plazaLabel.position.set(-2, 0.17, 6.5);
+    plazaLabel.position.set(-0.05, 0.19, 7.27);
     group.add(plazaLabel);
   }
-  const PLAZA_TREES = [[-11, -10, 0.8], [7, -10, 0.8], [-11, 7, 0.8], [7, 7, 0.8],
-    [-2, -12, 0.75], [-2, 9, 0.75], [-14, -1.5, 0.8], [10, -1.5, 0.8]];
-  // Sage-olive canopy, matched against the reference by eye after a numeric
-  // pass proved unreliable: the "darkest green" sampler kept landing on
-  // shadowed lawn rather than foliage, so its answer pulled the trees toward
-  // a dark teal the reference never had.
-  const crownMat = material(0x87946f, { roughness: 0.95, flatShading: true });
-  const TOWERS = [[-15.5, -15], [11.5, -15], [-15.5, 12], [11.5, 12]];
-  const towerShafts = new THREE.InstancedMesh(new THREE.CylinderGeometry(1.05, 1.15, 4.6, 12), mats.white, TOWERS.length);
-  const towerCaps = new THREE.InstancedMesh(new THREE.SphereGeometry(1.05, 12, 8), mats.cream, TOWERS.length);
-  TOWERS.forEach(([x, z], i) => {
-    towerShafts.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 2.3, z));
-    towerCaps.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 4.7, z));
+  // Foliage is 0.86 of what it was. The reference's lit plaza crown reads
+  // (133,139,106) against the paving's (214,188,185) beside it, and the
+  // game's read (158,166,126) in the same place — a fifth too bright. The
+  // suburb crowns confirm the same scale: (145,150,131) there against a
+  // canopy that was landing near (165,172,140).
+  const crownMat = material(0x747f63, { roughness: 0.95, flatShading: true });
+  // Each plaza tree stands in a round planter. Radially around the lit
+  // south-west one the kerb is the band from r 1.5 to 1.65, peaking at
+  // (213,189,188) nine levels over the (204,180,180) paving outside it, with
+  // the planter's own shade at (168,153,143) inside — so the ring is a little
+  // wider than the 2.91 PLAN_AGACLAR carries for the canopy. One thin annulus
+  // per tree, four in a single draw.
+  // Shifted the same way the canopy shifts them, so a kerb never ends up
+  // beside the tree it is meant to hold.
+  const PLAZA_SAKSILAR = PLAN_AGACLAR
+    .filter(([x, z]) => Math.abs(x) < 9 && Math.abs(z) < 9)
+    .map(([x, z]) => yoldanKaydir(x, z, 1.8, 1.8));
+  const planterGeo = new THREE.RingGeometry(1.48, 1.7, 26);
+  planterGeo.rotateX(-Math.PI / 2);
+  // The kerb is only 1.045 of the paving beside it, far short of the walk's
+  // 1.10, so it gets its own tone rather than borrowing the walk's — carrying
+  // the same doubling for the tone map that the walk needs.
+  const planterMat = material(0xbfadac, { roughness: 0.85 });
+  const planters = new THREE.InstancedMesh(planterGeo, planterMat, PLAZA_SAKSILAR.length);
+  PLAZA_SAKSILAR.forEach(([x, z], i) => {
+    planters.setMatrixAt(i, new THREE.Matrix4().makeTranslation(x, 0.19, z));
   });
-  towerShafts.instanceMatrix.needsUpdate = true;
-  towerCaps.instanceMatrix.needsUpdate = true;
-  towerShafts.name = 'district:plaza-towers';
-  add(towerShafts, { camera: true, cast: true });
-  add(towerCaps, { camera: false, cast: true });
+  planters.instanceMatrix.needsUpdate = true;
+  planters.name = 'district:plaza-planters';
+  add(planters, { camera: false, cast: false });
+
+  // The corners are round towers. The four capped posts that used to stand at
+  // (-15.5,-15), (11.5,-15), (-15.5,12) and (11.5,12) were inside the ring's
+  // buildings — three of them sampled roof, not sky — and the reference has
+  // nothing at any of those points. One stepped lathe, four instances, one
+  // draw, replacing two draws of hidden posts.
+  const kuleProfil = [
+    [0, 0], [2.85, 0], [2.85, 1.9], [2.62, 2.05], [2.62, 3.5],
+    [2.42, 3.65], [2.42, 4.9], [2.25, 5.05], [2.25, 5.3], [0, 5.3],
+  ].map(([r, y]) => new THREE.Vector2(r, y));
+  const plazaTowers = new THREE.InstancedMesh(
+    new THREE.LatheGeometry(kuleProfil, 24), mats.white, PLAN_PLAZA_KULELERI.length,
+  );
+  PLAN_PLAZA_KULELERI.forEach(([x, z, w, d, renk], i) => {
+    const m = new THREE.Matrix4().makeScale(w / 5.7, 1, d / 5.7);
+    m.setPosition(x, 0.15, z);
+    plazaTowers.setMatrixAt(i, m);
+    plazaTowers.setColorAt(i, new THREE.Color(renk));
+  });
+  plazaTowers.instanceMatrix.needsUpdate = true;
+  if (plazaTowers.instanceColor) plazaTowers.instanceColor.needsUpdate = true;
+  plazaTowers.name = 'district:plaza-towers';
+  add(plazaTowers, { camera: true, cast: true });
 
   // -------------------------------------------------------------------
   // E CELL — the 67 stadium in its reference position right of the plaza
@@ -1410,6 +1533,11 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     { minX: 18, maxX: 46, minZ: -50, maxZ: -18 },    // funfair
     { minX: 18, maxX: 46, minZ: 18, maxZ: 46 },      // pond park
     { minX: -40, maxX: -22, minZ: -50, maxZ: -34 },  // gym + parking
+    // The plaza's four corner towers are lathed above, so their own rows are
+    // held back from the block loop rather than boxed by it a second time.
+    ...PLAN_PLAZA_KULELERI.map(([x, z, w, d]) => ({
+      minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2,
+    })),
   ];
   const ozelIcinde = (x, z) => OZEL_BOLGELER.some(
     (b) => x > b.minX && x < b.maxX && z > b.minZ && z < b.maxZ,
@@ -2072,7 +2200,10 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     const [nx, nz] = yoldanKaydir(x, z, 1.8, 1.8);
     return [nx, nz, Math.max(0.7, Math.min(1.6, g / 5.5))];
   }).filter(([x, z]) => !denizdeMi(x, z));
-  const allTrees = [...TREES, ...PLAZA_TREES];
+  // The plaza's own trees are PLAN_AGACLAR rows like every other tree — the
+  // eight extra crowns that used to be spread in here put twelve trees in a
+  // window the reference gives four.
+  const allTrees = TREES;
   const canopy = treeBlobs(allTrees, THREE, crownMat);
   canopy.name = 'district:tree-canopy';
   add(canopy, { camera: false, cast: true });
@@ -2350,14 +2481,22 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     { minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, topY: h }
   ));
   colliders.push({ minX: -36.5, maxX: -25.5, minZ: -45.5, maxZ: -38.5, topY: 4.2 });
+  // The suburb belt was the one kind of building the player could walk
+  // straight through: every other block is in this list and the houses were
+  // not. Same rule now — a building is solid unless you enter it with E.
+  for (const [x, z] of KARADAKI_EVLER) {
+    colliders.push({ minX: x - EV_G / 2, maxX: x + EV_G / 2, minZ: z - EV_D / 2, maxZ: z + EV_D / 2, topY: 2.2 });
+  }
   colliders.push(...landmarkFootprints);
   for (const [dx, dz, w, d, h] of COURT_BLOCKS) {
     const x = COURT.x + dx;
     const z = COURT.z + dz;
     colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, topY: h });
   }
-  for (const [x, z] of TOWERS) {
-    colliders.push({ minX: x - 1.15, maxX: x + 1.15, minZ: z - 1.15, maxZ: z + 1.15, topY: 4.6 });
+  // The plaza's corner towers are solid to the player the same way a block
+  // is, on their own measured footprints rather than the posts' old ones.
+  for (const [x, z, w, d] of PLAN_PLAZA_KULELERI) {
+    colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, topY: 5.65 });
   }
 
   return {
