@@ -569,14 +569,18 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   const PARKED_RENK = KARADA.map(([, , , renk]) => renk);
   const DRIVERS = 10;
   const CAR_N = PARKED.length + DRIVERS;
-  const carBodies = new THREE.InstancedMesh(new THREE.BoxGeometry(1.6, 0.55, 3.1), mats.white, CAR_N);
-  const carCabins = new THREE.InstancedMesh(new THREE.BoxGeometry(1.35, 0.45, 1.5), mats.carDark, CAR_N);
+  // The carriageways measure about 2.5 wide, so a 1.6-wide car filled the whole
+  // road and read as driving down the middle — two-way traffic could not fit.
+  // Scaled to 1.05 wide it sits inside its own half of the road with the
+  // oncoming lane clear, the way a street actually works.
+  const carBodies = new THREE.InstancedMesh(new THREE.BoxGeometry(1.05, 0.5, 2.5), mats.white, CAR_N);
+  const carCabins = new THREE.InstancedMesh(new THREE.BoxGeometry(0.85, 0.4, 1.15), mats.carDark, CAR_N);
   const carWheels = new THREE.InstancedMesh(
-    new THREE.CylinderGeometry(0.28, 0.28, 0.22, 10),
+    new THREE.CylinderGeometry(0.22, 0.22, 0.18, 10),
     mats.tire,
     CAR_N * 4,
   );
-  const WHEEL_OFFSETS = [[-0.72, 1.0], [0.72, 1.0], [-0.72, -1.0], [0.72, -1.0]];
+  const WHEEL_OFFSETS = [[-0.48, 0.82], [0.48, 0.82], [-0.48, -0.82], [0.48, -0.82]];
   const carM = new THREE.Matrix4();
   const carQ = new THREE.Quaternion();
   const carE = new THREE.Euler();
@@ -584,15 +588,15 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   function placeCar(index, x, z, yaw) {
     carE.set(0, yaw, 0);
     carQ.setFromEuler(carE);
-    carM.compose(new THREE.Vector3(x, 0.55, z), carQ, new THREE.Vector3(1, 1, 1));
+    carM.compose(new THREE.Vector3(x, 0.42, z), carQ, new THREE.Vector3(1, 1, 1));
     carBodies.setMatrixAt(index, carM);
-    carM.compose(new THREE.Vector3(x, 0.98, z).add(new THREE.Vector3(0, 0, -0.25).applyQuaternion(carQ)), carQ, new THREE.Vector3(1, 1, 1));
+    carM.compose(new THREE.Vector3(x, 0.75, z).add(new THREE.Vector3(0, 0, -0.2).applyQuaternion(carQ)), carQ, new THREE.Vector3(1, 1, 1));
     carCabins.setMatrixAt(index, carM);
     for (let w = 0; w < 4; w += 1) {
       const [ox, oz] = WHEEL_OFFSETS[w];
       const offset = new THREE.Vector3(ox, 0, oz).applyQuaternion(carQ);
       carM.compose(
-        new THREE.Vector3(x + offset.x, 0.28, z + offset.z),
+        new THREE.Vector3(x + offset.x, 0.22, z + offset.z),
         carQ.clone().multiply(wheelSpin),
         new THREE.Vector3(1, 1, 1),
       );
@@ -1555,7 +1559,7 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     // procedural suburb house onto it — a filter on the raw positions could
     // not, because the solver moves things afterwards, which is how a grey box
     // and a red-roofed house kept surfacing between Oscar's houses.
-    { minX: -6, maxX: 17, minZ: -62, maxZ: -53.5 },  // house row strip (west of x18.7 road)
+    { minX: -12, maxX: 26, minZ: -62, maxZ: -53.5 },  // house row strip
     { minX: 18, maxX: 46, minZ: 18, maxZ: 46 },      // pond park
     { minX: -40, maxX: -22, minZ: -50, maxZ: -34 },  // gym + parking
     // The plaza's four corner towers are lathed above, so their own rows are
@@ -1764,12 +1768,12 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     // and the 0.82 that used to be here landed them at 191,172,159 — forty
     // levels dark, which is most of why the city read as cardboard.
     blockBodies.setColorAt(i, new THREE.Color(BLOCKS[i][5] || '#c9bcb8'));
-    // Sidewalk, not a plinth: the raised pad read as a pedestal the building
-    // was standing on. Oscar wants it on the ground, so this is a flush paving
-    // slab a little wider than the block — adjacent blocks' slabs merge into a
-    // continuous pavement — laid just over the street, toy-soft like the rest.
-    bm.makeScale(w + 1.7, 0.08, d + 1.7);
-    bm.setPosition(x, 0.04, z);
+    // A tight curb hugging the block, not a wide pad: at w+1.7 the slabs poked
+    // out past their buildings and reached into the house row and each other —
+    // the "stones going into the houses". A thin lip just proud of the wall
+    // reads as a kerb without sticking into anything.
+    bm.makeScale(w + 0.24, 0.06, d + 0.24);
+    bm.setPosition(x, 0.03, z);
     blockPlinths.setMatrixAt(i, bm);
     // Roof lip: a thin raised frame just inside the roof edge.
     bm.makeScale(w * 0.9, 0.24, d * 0.9);
@@ -2362,7 +2366,7 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     // The authored house row's strip: a fixed obstacle so the suburb-house
     // solver keeps its red-roof boxes off it, the same strip the block loop
     // and the special-zone list hold clear.
-    { x: 5.5, z: -57.75, w: 23, d: 8.5, sabit: true },   // house row (west of road)
+    { x: 7, z: -57.75, w: 38, d: 8.5, sabit: true },   // house row
   ];
   const KARADAKI_EVLER = (() => {
     const yerlesik = [
@@ -2502,7 +2506,12 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     const [nx, nz] = yoldanKaydir(x, z, rest[0], rest[1]);
     return [nx, nz, ...rest];
   };
-  const ufakMi = ([x, z, g, d]) => g <= 3.2 && d <= 3.2 && !skateIcinde(x, z) && !denizdeMi(x, z);
+  // The authored house row owns the top strip; a bin or lamp dropped between
+  // the houses read as a grey stone sitting in the front yard, so props are
+  // held off it the way the blocks and suburb houses are.
+  const evSeridindeOge = (x, z) => z < -53 && x > -12 && x < 26;
+  const ufakMi = ([x, z, g, d]) => g <= 3.2 && d <= 3.2
+    && !skateIcinde(x, z) && !denizdeMi(x, z) && !evSeridindeOge(x, z);
   // PLAN_SEMSIYELER is deliberately not in here: the parasols are drawn as
   // cones by the beach and promenade run above, and dropping a coloured slab
   // on each of them as well stacked a box under every umbrella.
