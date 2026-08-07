@@ -1297,6 +1297,13 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
       depth, bevelEnabled: false, curveSegments: 4,
     });
     geometry.rotateX(-Math.PI / 2);
+    // The decks ride a material with vertexColors on, and an extruded shape
+    // carries no colour attribute. The shader then reads the missing attribute
+    // as (0,0,0) and multiplies the instance colour away: every measured hull
+    // in the marina came out black, which is what read as leaves on the water.
+    // A white attribute leaves the instance colour as the only tint.
+    const white = new Float32Array(geometry.attributes.position.count * 3).fill(1);
+    geometry.setAttribute('color', new THREE.BufferAttribute(white, 3));
     return geometry;
   }
 
