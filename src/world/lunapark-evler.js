@@ -7,6 +7,7 @@
 // with a shader tweak, so the model file is never touched.
 
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { roundedBoxGeometry } from './sekil.js';
 
 const EV_BASE = `${import.meta.env?.BASE_URL ?? '/'}assets/lunapark/`;
 
@@ -38,8 +39,25 @@ export function buildLunaparkEvler({ THREE, scene }) {
     // Model 0..h spanned; drop it so its base sits on the ground after scaling.
     const box = new THREE.Box3().setFromObject(kaynak);
     const tabanY = box.min.y;
+    // The house's own footprint and its local centre, so the base pad below it
+    // lands exactly under the walls whether or not the model is centred.
+    const genislik = (box.max.x - box.min.x) * OLCEK;
+    const derinlik = (box.max.z - box.min.z) * OLCEK;
+    const merkezX = (box.min.x + box.max.x) / 2 * OLCEK;
+    const merkezZ = (box.min.z + box.max.z) / 2 * OLCEK;
+
+    // One base pad per house — a soft paving slab a touch wider than the walls,
+    // flush on the ground, directly under each house. Replaces the single
+    // stray patch that sat off-centre with a clean plot beneath every house.
+    const padGeo = roundedBoxGeometry(genislik + 1.0, derinlik + 1.0, 0.14, 0.3, 0.05);
+    const padMat = new THREE.MeshStandardMaterial({ color: 0xd7cec4, roughness: 0.92 });
 
     for (const ev of EVLER) {
+      const pad = new THREE.Mesh(padGeo, padMat);
+      pad.position.set(ev.x + merkezX, 0, ev.z + merkezZ);
+      pad.receiveShadow = true;
+      kok.add(pad);
+
       const kopya = kaynak.clone(true);
       kopya.scale.setScalar(OLCEK);
       kopya.position.set(ev.x, -tabanY * OLCEK, ev.z);
