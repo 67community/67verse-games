@@ -29,6 +29,7 @@ import {
   PLAN_MERKEZ_MEYDAN, PLAN_MERKEZ_CESME, PLAN_PLAZA_KULELERI,
 } from './plan-ek.js';
 import { buildFunfair } from './city-funfair.js';
+import { buildMekanlar } from './mekanlar.js';
 import {
   PLAN_BANKLAR, PLAN_SEMSIYELER, PLAN_LAMBALAR, PLAN_HEYKELLER,
   PLAN_COPLER, PLAN_UFAKLAR,
@@ -1145,6 +1146,10 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     THREE, group, add, material, animated, mats,
     olculenRenk, ISIK_KAZANCI, CAR_PAINT, canvasTexture,
   });
+
+  // The venues stand on their own plots past the world edge, so they never
+  // take ground the plan measured. buildMekanlar explains why.
+  buildMekanlar({ THREE, group, add, material, mats });
 
   // -------------------------------------------------------------------
   // EAST MARGIN — the SEA fills the whole right edge; beach cape with
