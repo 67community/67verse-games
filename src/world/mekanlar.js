@@ -13,6 +13,8 @@
 // Every position is a fraction of its reference image, so the layouts read at
 // whatever plot size a venue is given: measure once on the drawing, scale here.
 
+import { roundedBoxGeometry } from './sekil.js';
+
 export const MEKAN_PLOT = 26;          // a venue plot is 26 units square
 export const MEKAN_BASLANGIC = 200;    // first plot centre, x; venues step east
 
@@ -50,6 +52,20 @@ const HAVUZ = Object.freeze({
   palmiye: Object.freeze([[0.115, 0.075], [0.885, 0.075], [0.110, 0.865], [0.890, 0.865]]),
 });
 
+
+// A geometry handed to a vertexColors material must carry a colour attribute.
+// Without one the shader reads the missing attribute as (0,0,0) and multiplies
+// the instance colour away — the whole loungers-and-parasols row went black the
+// moment the boxes became squircle extrusions, the same fault that turned the
+// marina's hulls into leaves. White here leaves the instance tint alone.
+function beyazRenk(THREE, geo) {
+  const n = geo.attributes.position.count;
+  if (!geo.attributes.color) {
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(1), 3));
+  }
+  return geo;
+}
+
 export function buildMekanlar({ THREE, group, add, material, mats }) {
   const kok = new THREE.Group();
   kok.name = 'mekanlar';
@@ -65,7 +81,17 @@ function havuzKulubu({ THREE, kok, add, material, mats, mekan }) {
   const S = MEKAN_PLOT;
   // Fraction of the drawing to a world point on this plot.
   const P = (u, v) => [mekan.x + (u - 0.5) * S, mekan.z + (v - 0.5) * S];
-  const kutu = (g, y, d) => new THREE.BoxGeometry(g, y, d);
+  // Every box in the reference has a rounded edge — that soft toy-plastic
+  // corner is most of what the drawing's look is. Built from raw BoxGeometry
+  // the club read flat and painted, so each one is a squircle extrusion with
+  // a bevel, which sekil.js already had and this file was not using.
+  // roundedBoxGeometry spans 0..h, so the caller's centre y shifts down by h/2.
+  const kutu = (g, y, d) => {
+    const r = Math.min(g, d) * 0.16;
+    const geo = roundedBoxGeometry(g, d, y, r, Math.min(y, Math.min(g, d)) * 0.13);
+    geo.translate(0, -y / 2, 0);
+    return beyazRenk(THREE, geo);
+  };
   const koy = (mesh, u, v, y) => {
     const [x, z] = P(u, v);
     mesh.position.set(x, y, z);
@@ -147,7 +173,7 @@ function havuzKulubu({ THREE, kok, add, material, mats, mekan }) {
       m.identity(); m.setPosition(x, 1.15, z); mesh.setMatrixAt(i, m);
     });
   const tabureRenk = ['#7fb6d8', '#e79aa6', '#7fb6d8', '#e79aa6'];
-  seri(new THREE.CylinderGeometry(0.34, 0.3, 0.62, 10),
+  seri(beyazRenk(THREE, new THREE.CylinderGeometry(0.34, 0.3, 0.62, 10)),
     material(0xffffff, { roughness: 0.6, vertexColors: true }), HAVUZ.tabure.length,
     (i, m, mesh) => {
       const [x, z] = P(HAVUZ.tabure[i], HAVUZ.tabureZ);
@@ -171,7 +197,7 @@ function havuzKulubu({ THREE, kok, add, material, mats, mekan }) {
     const [x, z] = P(b.u + b.yon * 0.045, b.v);
     m.identity(); m.setPosition(x, 1.05, z); mesh.setMatrixAt(i, m);
   });
-  seri(new THREE.CylinderGeometry(1.55, 1.55, 0.11, 14), tint, BAY.length, (i, m, mesh) => {
+  seri(beyazRenk(THREE, new THREE.CylinderGeometry(1.55, 1.55, 0.11, 14)), tint, BAY.length, (i, m, mesh) => {
     const b = BAY[i];
     const [x, z] = P(b.u + b.yon * 0.045, b.v);
     m.identity(); m.setPosition(x, 2.05, z); mesh.setMatrixAt(i, m);
