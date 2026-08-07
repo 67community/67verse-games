@@ -1729,7 +1729,7 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
       }`);
   };
   const blockBodies = new THREE.InstancedMesh(blockGeo, binaCephe, BLOCKS.length);
-  const blockPlinths = new THREE.InstancedMesh(roundedBoxGeometry(1, 1, 1, 0.22, 0.05), mats.concrete, BLOCKS.length);
+  const blockPlinths = new THREE.InstancedMesh(roundedBoxGeometry(1, 1, 1, 0.30, 0.03), material(0xd7cdc6, { roughness: 0.9 }), BLOCKS.length);
   // The roof lip is a frame, not a lid: the tray it encloses is what the
   // reference shows inside every parapet.
   const blockLips = new THREE.InstancedMesh(roundedBoxGeometry(1, 1, 1, 0.16, 0.045, 0.74), mats.white, BLOCKS.length);
@@ -1761,9 +1761,12 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     // and the 0.82 that used to be here landed them at 191,172,159 — forty
     // levels dark, which is most of why the city read as cardboard.
     blockBodies.setColorAt(i, new THREE.Color(BLOCKS[i][5] || '#c9bcb8'));
-    // Plinth: a slightly wider, very low pad the body sits on.
-    bm.makeScale(w + 1.1, 0.26, d + 1.1);
-    bm.setPosition(x, 0.13, z);
+    // Sidewalk, not a plinth: the raised pad read as a pedestal the building
+    // was standing on. Oscar wants it on the ground, so this is a flush paving
+    // slab a little wider than the block — adjacent blocks' slabs merge into a
+    // continuous pavement — laid just over the street, toy-soft like the rest.
+    bm.makeScale(w + 1.7, 0.08, d + 1.7);
+    bm.setPosition(x, 0.04, z);
     blockPlinths.setMatrixAt(i, bm);
     // Roof lip: a thin raised frame just inside the roof edge.
     bm.makeScale(w * 0.9, 0.24, d * 0.9);
