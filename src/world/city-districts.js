@@ -1752,7 +1752,10 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   const bm = new THREE.Matrix4();
   BLOCKS.forEach(([x, z, w, h, d], i) => {
     bm.makeScale(w, h, d);
-    bm.setPosition(x, h / 2, z);
+    // roundedBoxGeometry spans 0..1 in Y, not -0.5..0.5, so h/2 floated the body
+    // half its own height off the ground while its doors, awning and roof lip —
+    // all placed for a body that runs 0..h — stayed put. y = 0 lands it flush.
+    bm.setPosition(x, 0, z);
     blockBodies.setMatrixAt(i, bm);
     // Each block wears the colour measured off its own footprint in the plan,
     // divided back through this scene's exposure so it lands on the drawing's
