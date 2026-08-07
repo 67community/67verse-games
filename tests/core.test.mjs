@@ -2151,7 +2151,11 @@ test('town lobby stays inside the draw budget at both quality tiers', () => {
   applySceneQuality(scene, 'high');
   const high = analyzeSceneAttribution(scene, { scope: 'hub-high' });
 
-  assert.ok(high.estimatedDraws <= 120);
+  // Oscar's call, backed by a measurement: the city renders at 109 draws and
+  // 226k triangles, and a venue adds sixteen. 150 is the ceiling now — a
+  // number a modern GPU does not notice — so the guardrail catches a real
+  // regression instead of blocking a room.
+  assert.ok(high.estimatedDraws <= 150);
   assert.ok(low.estimatedDraws <= high.estimatedDraws);
 
   world.group.traverse((object) => {

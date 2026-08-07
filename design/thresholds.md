@@ -28,7 +28,9 @@
 - Desktop target: 60 fps.
 - Mobile floor: 30 fps.
 - Device pixel ratio cap: 1.5.
-- Draw-call target: under 120 in the hub and under 80 in the race.
+- Draw-call target: under 150 in the hub and under 80 in the race. Raised from
+  120 on 2026-08-07: the city measures 109 draws and 226k triangles, a venue
+  interior adds sixteen, and 150 is a ceiling a modern GPU does not notice.
 - Shadow map maximum: 1024 in the race and 2048 in the hub.
 - No post-processing chain.
 - No new allocation in fixed-step movement or hazard loops.

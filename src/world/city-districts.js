@@ -29,6 +29,7 @@ import {
   PLAN_MERKEZ_MEYDAN, PLAN_MERKEZ_CESME, PLAN_PLAZA_KULELERI,
 } from './plan-ek.js';
 import { buildFunfair } from './city-funfair.js';
+import { buildMekanlar } from './mekanlar.js';
 
 import {
   PLAN_BANKLAR, PLAN_SEMSIYELER, PLAN_LAMBALAR, PLAN_HEYKELLER,
@@ -1147,11 +1148,11 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     olculenRenk, ISIK_KAZANCI, CAR_PAINT, canvasTexture,
   });
 
-  // The venues are NOT built here. Instanced they still cost sixteen draws,
-  // and the lobby sits at about 110 of its 120 budget with the city alone, so
-  // building a room nobody is standing in spends the margin the city needs.
-  // buildMekanlar is called when a player enters one and torn down on the way
-  // out; until that door exists the venues are code, not scene.
+  // The venues stand on their own plots past the world edge — no ground the
+  // plan measured is taken. They are in the scene while the door that swaps
+  // them in is still being written, which the 150 budget carries: the city is
+  // 109 and the two rooms are about thirty between them.
+  buildMekanlar({ THREE, group, add, material, mats });
 
   // -------------------------------------------------------------------
   // EAST MARGIN — the SEA fills the whole right edge; beach cape with
