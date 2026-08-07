@@ -71,6 +71,18 @@ function havuzKulubu({ THREE, kok, add, material, mats, mekan }) {
     return mesh;
   };
 
+  // Everything that repeats rides an instanced mesh. Built as separate meshes
+  // the club cost about sixty draws on its own and pushed the lobby over the
+  // 120 budget; instanced it is under twenty for the same furniture.
+  const M4 = new THREE.Matrix4();
+  const seri = (geo, mat, n, yerlestir) => {
+    const mesh = new THREE.InstancedMesh(geo, mat, n);
+    for (let i = 0; i < n; i += 1) yerlestir(i, M4, mesh);
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    kok.add(mesh);
+    return mesh;
+  };
   const deckMat = material(0xefe9e2, { roughness: 0.9 });
   const suMat = material(0x6fc9d8, { roughness: 0.25 });
   const ahsapMat = material(0xd8bc94, { roughness: 0.8 });
@@ -90,15 +102,22 @@ function havuzKulubu({ THREE, kok, add, material, mats, mekan }) {
     { g: duvarKalin, d: S * (1 - d * 2), u: d, v: 0.5 },              // west
     { g: duvarKalin, d: S * (1 - d * 2), u: 1 - d, v: 0.5 },          // east
   ];
-  for (const k of kenar) {
-    koy(new THREE.Mesh(kutu(k.g, duvarYuk, k.d), duvarMat), k.u, k.v, duvarYuk / 2);
-  }
-  // South wall in two pieces so the doorway stays open.
+  // South wall comes in two pieces so the doorway stays open; all five run on
+  // one unit box scaled per instance.
   const acik = HAVUZ.kapiGenislik;
   const yan = (0.5 - d - acik / 2);
-  for (const u of [d + yan / 2, 1 - d - yan / 2]) {
-    koy(new THREE.Mesh(kutu(S * yan, duvarYuk, duvarKalin), duvarMat), u, 1 - d, duvarYuk / 2);
-  }
+  const duvarlar = [
+    ...kenar,
+    { g: S * yan, d: duvarKalin, u: d + yan / 2, v: 1 - d },
+    { g: S * yan, d: duvarKalin, u: 1 - d - yan / 2, v: 1 - d },
+  ];
+  seri(kutu(1, 1, 1), duvarMat, duvarlar.length, (i, m, mesh) => {
+    const k = duvarlar[i];
+    const [x, z] = P(k.u, k.v);
+    m.makeScale(k.g, duvarYuk, k.d);
+    m.setPosition(x, duvarYuk / 2, z);
+    mesh.setMatrixAt(i, m);
+  });
 
   // The pool: a coping ring with the water set inside and below it.
   const [px0, pz0, px1, pz1] = HAVUZ.havuz;
@@ -119,49 +138,79 @@ function havuzKulubu({ THREE, kok, add, material, mats, mekan }) {
   const [tx0, tz0, tx1, tz1] = HAVUZ.barTente;
   koy(new THREE.Mesh(kutu((tx1 - tx0) * S, 0.16, (tz1 - tz0) * S), suMat),
     (tx0 + tx1) / 2, (tz0 + tz1) / 2, 2.3);
-  const direkGeo = new THREE.CylinderGeometry(0.09, 0.09, 2.3, 6);
-  for (const u of [tx0 + 0.02, tx1 - 0.02]) {
-    koy(new THREE.Mesh(direkGeo, material(0xe79aa6, { roughness: 0.6 })), u, (tz0 + tz1) / 2, 1.15);
-  }
-  const tabureGeo = new THREE.CylinderGeometry(0.34, 0.3, 0.62, 10);
+  const barDirekU = [tx0 + 0.02, tx1 - 0.02];
+  seri(new THREE.CylinderGeometry(0.09, 0.09, 2.3, 6),
+    material(0xe79aa6, { roughness: 0.6 }), 2, (i, m, mesh) => {
+      const [x, z] = P(barDirekU[i], (tz0 + tz1) / 2);
+      m.identity(); m.setPosition(x, 1.15, z); mesh.setMatrixAt(i, m);
+    });
   const tabureRenk = ['#7fb6d8', '#e79aa6', '#7fb6d8', '#e79aa6'];
-  HAVUZ.tabure.forEach((u, i) => {
-    koy(new THREE.Mesh(tabureGeo, material(tabureRenk[i], { roughness: 0.6 })), u, HAVUZ.tabureZ, 0.31);
-  });
+  seri(new THREE.CylinderGeometry(0.34, 0.3, 0.62, 10),
+    material(0xffffff, { roughness: 0.6, vertexColors: true }), HAVUZ.tabure.length,
+    (i, m, mesh) => {
+      const [x, z] = P(HAVUZ.tabure[i], HAVUZ.tabureZ);
+      m.identity();
+      m.setPosition(x, 0.31, z);
+      mesh.setMatrixAt(i, m);
+      mesh.setColorAt(i, new THREE.Color(tabureRenk[i]));
+    });
 
   // Lounger bays. Umbrella, lounger and side table, four down each side, the
   // parasols alternating the two tones the reference uses.
-  const semsiyeGolge = new THREE.CylinderGeometry(1.55, 1.55, 0.11, 14);
-  const semsiyeDirek = new THREE.CylinderGeometry(0.07, 0.07, 2.1, 6);
-  const yatakGeo = kutu(2.4, 0.34, 1.05);
-  const masaGeo = new THREE.CylinderGeometry(0.34, 0.3, 0.5, 8);
-  [['sol', HAVUZ.solX, -1], ['sag', HAVUZ.sagX, 1]].forEach(([, u, yon]) => {
-    HAVUZ.yatakZ.forEach((v, i) => {
-      const semU = u + yon * 0.045;
-      koy(new THREE.Mesh(semsiyeDirek, mats.cream), semU, v, 1.05);
-      koy(new THREE.Mesh(semsiyeGolge, material(HAVUZ.semsiyeRenk[i], { roughness: 0.6 })), semU, v, 2.05);
-      koy(new THREE.Mesh(yatakGeo, material(HAVUZ.yatakRenk[i], { roughness: 0.7 })), u - yon * 0.03, v + 0.028, 0.42);
-      koy(new THREE.Mesh(masaGeo, ahsapMat), u + yon * 0.075, v + 0.045, 0.25);
-    });
+  // Eight bays: four down each side, each an umbrella, a lounger and a table.
+  // One instanced mesh per part rather than four meshes per bay.
+  const BAY = [];
+  for (const [u, yon] of [[HAVUZ.solX, -1], [HAVUZ.sagX, 1]]) {
+    HAVUZ.yatakZ.forEach((v, i) => BAY.push({ u, v, yon, i }));
+  }
+  const tint = material(0xffffff, { roughness: 0.62, vertexColors: true });
+  seri(new THREE.CylinderGeometry(0.07, 0.07, 2.1, 6), mats.cream, BAY.length, (i, m, mesh) => {
+    const b = BAY[i];
+    const [x, z] = P(b.u + b.yon * 0.045, b.v);
+    m.identity(); m.setPosition(x, 1.05, z); mesh.setMatrixAt(i, m);
+  });
+  seri(new THREE.CylinderGeometry(1.55, 1.55, 0.11, 14), tint, BAY.length, (i, m, mesh) => {
+    const b = BAY[i];
+    const [x, z] = P(b.u + b.yon * 0.045, b.v);
+    m.identity(); m.setPosition(x, 2.05, z); mesh.setMatrixAt(i, m);
+    mesh.setColorAt(i, new THREE.Color(HAVUZ.semsiyeRenk[b.i]));
+  });
+  seri(kutu(2.4, 0.34, 1.05), tint, BAY.length, (i, m, mesh) => {
+    const b = BAY[i];
+    const [x, z] = P(b.u - b.yon * 0.03, b.v + 0.028);
+    m.identity(); m.setPosition(x, 0.42, z); mesh.setMatrixAt(i, m);
+    mesh.setColorAt(i, new THREE.Color(HAVUZ.yatakRenk[b.i]));
+  });
+  seri(new THREE.CylinderGeometry(0.34, 0.3, 0.5, 8), ahsapMat, BAY.length, (i, m, mesh) => {
+    const b = BAY[i];
+    const [x, z] = P(b.u + b.yon * 0.075, b.v + 0.045);
+    m.identity(); m.setPosition(x, 0.25, z); mesh.setMatrixAt(i, m);
   });
 
   // Palms in their round planters at the four corners.
-  const govdeGeo = new THREE.CylinderGeometry(0.16, 0.22, 2.1, 7);
-  const yaprakGeo = new THREE.SphereGeometry(1.05, 8, 6);
-  const saksiGeo = new THREE.CylinderGeometry(0.85, 0.85, 0.3, 12);
-  HAVUZ.palmiye.forEach(([u, v]) => {
-    koy(new THREE.Mesh(saksiGeo, duvarMat), u, v, 0.15);
-    koy(new THREE.Mesh(govdeGeo, material(0x9a7550, { roughness: 0.85 })), u, v, 1.35);
-    const yaprak = koy(new THREE.Mesh(yaprakGeo, material(0x7fa86a, { roughness: 0.9, flatShading: true })), u, v, 2.6);
-    yaprak.scale.set(1, 0.52, 1);
+  const PALM = HAVUZ.palmiye;
+  seri(new THREE.CylinderGeometry(0.85, 0.85, 0.3, 12), duvarMat, PALM.length, (i, m, mesh) => {
+    const [x, z] = P(PALM[i][0], PALM[i][1]);
+    m.identity(); m.setPosition(x, 0.15, z); mesh.setMatrixAt(i, m);
   });
+  seri(new THREE.CylinderGeometry(0.16, 0.22, 2.1, 7), material(0x9a7550, { roughness: 0.85 }),
+    PALM.length, (i, m, mesh) => {
+      const [x, z] = P(PALM[i][0], PALM[i][1]);
+      m.identity(); m.setPosition(x, 1.35, z); mesh.setMatrixAt(i, m);
+    });
+  seri(new THREE.SphereGeometry(1.05, 8, 6),
+    material(0x7fa86a, { roughness: 0.9, flatShading: true }), PALM.length, (i, m, mesh) => {
+      const [x, z] = P(PALM[i][0], PALM[i][1]);
+      m.makeScale(1, 0.52, 1); m.setPosition(x, 2.6, z); mesh.setMatrixAt(i, m);
+    });
 
   // Two ladders on the pool's long sides.
-  const merdivenGeo = new THREE.TorusGeometry(0.34, 0.055, 6, 10, Math.PI);
-  for (const u of [px0 - 0.012, px1 + 0.012]) {
-    const m = koy(new THREE.Mesh(merdivenGeo, material(0xc9ccd2, { roughness: 0.4 })), u, (pz0 + pz1) / 2, 0.62);
-    m.rotation.y = Math.PI / 2;
-  }
+  const merdivenU = [px0 - 0.012, px1 + 0.012];
+  seri(new THREE.TorusGeometry(0.34, 0.055, 6, 10, Math.PI),
+    material(0xc9ccd2, { roughness: 0.4 }), 2, (i, m, mesh) => {
+      const [x, z] = P(merdivenU[i], (pz0 + pz1) / 2);
+      m.makeRotationY(Math.PI / 2); m.setPosition(x, 0.62, z); mesh.setMatrixAt(i, m);
+    });
 
   add?.(deck, { walkable: true, camera: false, cast: false });
 }
