@@ -261,9 +261,11 @@ function fireGrabFeedback() {
 // Arrival: the south end of the boulevard, clear of the market stalls and
 // the blocks either side, facing the 67 plaza up the street. The Quick Start
 // arc still runs north to the plaza, which is where it completes.
-// You start at the funfair, on Oscar's call. Ground was checked at this spot
-// rather than assumed: solid, dry, and clear of every ride.
-const sim = createPlayerState(26, -24);
+// You start at the funfair, on Oscar's call. Open ground between the ferris
+// wheel and the carousel: the first spot I picked sat under the coaster's
+// loops, and the chase camera ended up inside the track with the player
+// nowhere on screen.
+const sim = createPlayerState(33, -41);
 const input = createInput();
 
 // ---------- Shared ctx + module shell ----------
@@ -822,6 +824,41 @@ function travelToPoint({ x, z, label = null }) {
     ctx.ui.toast('That is open water.');
     return false;
   }
+  // A tap can land on a rooftop, and arriving inside a building is the bug
+  // Oscar reported: the sim leaked to y 0 inside the walls. Walk the point out
+  // of any solid footprint it falls in, one nearest face at a time, before
+  // teleporting. A spot the walk cannot clear is refused rather than fudged.
+  let tx = x;
+  let tz = z;
+  for (let guard = 0; guard < 8; guard += 1) {
+    const ground = world.sampleGround(tx, tz);
+    const box = ground?.box2;
+    if (!box) break;
+    const exits = [
+      [box.minX - 0.9, tz], [box.maxX + 0.9, tz],
+      [tx, box.minZ - 0.9], [tx, box.maxZ + 0.9],
+    ];
+    let best = null;
+    let bestCost = Infinity;
+    for (const [ex, ez] of exits) {
+      const cost = Math.hypot(ex - tx, ez - tz);
+      if (cost < bestCost) { bestCost = cost; best = [ex, ez]; }
+    }
+    tx = best[0];
+    tz = best[1];
+    if (guard === 7) {
+      ctx.ui.toast('No open ground there.');
+      return false;
+    }
+  }
+  // The walk-out can drift toward the shore when the building hugs it, so
+  // water is checked again on the final spot, not only on the tapped one.
+  if (world.isWater?.(tx, tz)) {
+    ctx.ui.toast('That is open water.');
+    return false;
+  }
+  x = tx;
+  z = tz;
   if (hubActivities.snapshot().active) hubActivities.cancel('map-travel');
   sim.pos.x = x;
   sim.pos.z = z;
