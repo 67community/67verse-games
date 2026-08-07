@@ -4,6 +4,7 @@
 // per-chunk budget and the coaster's traced centre line does not fit inside
 // it. Every number here comes from PLAN_LUNAPARK, which measured them off the
 // 1280 px reference; nothing is chosen.
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { PLAN_LUNAPARK } from './plan-ek.js';
 
 // THREE and canvasTexture arrive as arguments rather than imports: a named
@@ -148,29 +149,75 @@ export function buildFunfair({
   // carousels cost the same as before.
   const rideDrums = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1, 1, 18), mats.cream, RIDES.length);
   const rideDecks = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1.06, 0.5, 16), mats.white, RIDES.length);
-  const rideSeats = new THREE.InstancedMesh(new THREE.BoxGeometry(0.42, 0.5, 0.42), mats.white, RIDES.length * 8);
+  // The reference carries horses on brass poles, not the cubes that stood here.
+  // A horse is five boxes merged into one geometry, so eight of them per ride
+  // still ride a single instanced mesh and cost the draw the cubes cost.
+  function horseGeometry() {
+    const govde = new THREE.BoxGeometry(0.46, 0.24, 0.17);
+    govde.translate(0, 0.34, 0);
+    const boyun = new THREE.BoxGeometry(0.12, 0.26, 0.13);
+    boyun.rotateZ(-0.5);
+    boyun.translate(0.19, 0.5, 0);
+    const bas = new THREE.BoxGeometry(0.2, 0.11, 0.11);
+    bas.translate(0.3, 0.6, 0);
+    const onBacak = new THREE.BoxGeometry(0.07, 0.3, 0.07);
+    onBacak.translate(0.15, 0.15, 0);
+    const arkaBacak = new THREE.BoxGeometry(0.07, 0.3, 0.07);
+    arkaBacak.translate(-0.15, 0.15, 0);
+    return mergeGeometries([govde, boyun, bas, onBacak, arkaBacak], false);
+  }
+  const rideSeats = new THREE.InstancedMesh(horseGeometry(), mats.white, RIDES.length * 8);
+  // The pole each horse rides, deck to canopy. One instanced mesh for both
+  // rides, so the horses cost one draw more than the cubes did in total.
+  const ridePoles = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(0.028, 0.028, 1, 5), mats.cream, RIDES.length * 8,
+  );
   const rm4 = new THREE.Matrix4();
   RIDES.forEach((ride, i) => {
     rm4.makeScale(ride.r * 0.88, 1, ride.r * 0.88);
     rm4.setPosition(ride.x, 0.25, ride.z);
     rideDecks.setMatrixAt(i, rm4);
-    rm4.makeScale(ride.r * 0.86, ride.govde, ride.r * 0.86);
+    // The drum is the ride's centre column, not its whole body. Built at 0.86
+    // of the radius it swallowed the horses: they stood at 0.95 and half of
+    // each one was inside the wall. The reference shows an open ring — you see
+    // through between the horses to the far side of the canopy.
+    rm4.makeScale(ride.r * 0.42, ride.govde, ride.r * 0.42);
     rm4.setPosition(ride.x, 0.5 + ride.govde / 2, ride.z);
     rideDrums.setMatrixAt(i, rm4);
+    const kanopiAlt = 0.5 + ride.govde;
     for (let s = 0; s < 8; s += 1) {
       const a = (s / 8) * Math.PI * 2;
-      rideSeats.setMatrixAt(i * 8 + s, new THREE.Matrix4().makeTranslation(
-        ride.x + Math.cos(a) * ride.r * 0.95,
-        0.5 + ride.govde * 0.45,
-        ride.z + Math.sin(a) * ride.r * 0.95,
-      ));
-      rideSeats.setColorAt(i * 8 + s, new THREE.Color(CAR_PAINT[s % CAR_PAINT.length]));
+      const hx = ride.x + Math.cos(a) * ride.r * 0.78;
+      const hz = ride.z + Math.sin(a) * ride.r * 0.78;
+      // Each horse faces the way it travels, which is around the ride.
+      const m = new THREE.Matrix4().makeRotationY(-a);
+      m.setPosition(hx, 0.5 + ride.govde * 0.28, hz);
+      rideSeats.setMatrixAt(i * 8 + s, m);
+      // The reference's horses are white with the paint on their tack, so the
+      // instance tint is a wash rather than the flat body colour it was.
+      rideSeats.setColorAt(i * 8 + s, new THREE.Color(CAR_PAINT[s % CAR_PAINT.length]).lerp(new THREE.Color(0xffffff), 0.62));
+      const poleBoy = kanopiAlt - 0.5;
+      const p = new THREE.Matrix4().makeScale(1, poleBoy, 1);
+      p.setPosition(hx, 0.5 + poleBoy / 2, hz);
+      ridePoles.setMatrixAt(i * 8 + s, p);
     }
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(ride.r * 1.06, 1.5, 16), ride.canopy);
-    roof.position.set(ride.x, 0.5 + ride.govde + 0.75, ride.z);
+    // Canopy: the cone, the scalloped valance hanging off its rim and the
+    // finial on top, merged so the whole roof is still one draw. The old flat
+    // cone read as a pinwheel; the reference's canopy is taller than it is
+    // wide at the eaves and its skirt is what gives it the tent silhouette.
+    const cone = new THREE.ConeGeometry(ride.r * 1.06, 1.5, 16);
+    cone.translate(0, 0.75, 0);
+    const etek = new THREE.CylinderGeometry(ride.r * 1.06, ride.r * 0.98, 0.26, 16, 1, true);
+    etek.translate(0, -0.13, 0);
+    const tepe = new THREE.SphereGeometry(0.12, 8, 6);
+    tepe.translate(0, 1.56, 0);
+    const roofGeo = mergeGeometries([cone, etek, tepe], false);
+    const roof = new THREE.Mesh(roofGeo, ride.canopy);
+    roof.material.side = THREE.DoubleSide;
+    roof.position.set(ride.x, kanopiAlt, ride.z);
     add(roof, { camera: false, cast: true });
   });
-  for (const mesh of [rideDrums, rideDecks, rideSeats]) {
+  for (const mesh of [rideDrums, rideDecks, rideSeats, ridePoles]) {
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }
@@ -178,6 +225,7 @@ export function buildFunfair({
   add(rideDrums, { camera: false, cast: true });
   add(rideDecks, { camera: false, cast: true });
   add(rideSeats, { camera: false, cast: true });
+  add(ridePoles, { camera: false, cast: false });
   const lawnDisc = new THREE.Mesh(new THREE.CylinderGeometry(5.2, 5.2, 0.1, 22), mats.grass);
   lawnDisc.position.set(34.1, 0.05, -36.1);
   add(lawnDisc, { camera: false, cast: false });
