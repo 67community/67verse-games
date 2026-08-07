@@ -1697,7 +1697,38 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // the roof, an L-shaped recess inside that lip, and a striped awning at the
   // street face. Five instanced meshes cover every block in the city.
   const blockGeo = roundedBoxGeometry(1, 1, 1, 0.16, 0.075);
-  const blockBodies = new THREE.InstancedMesh(blockGeo, mats.white, BLOCKS.length);
+  // Kimi's grey buildings read better than flat boxes because their walls carry
+  // a window grid — rows of panes, some lit warm, some cool. Ported here as a
+  // shader on the instanced body so every block gets a facade for no extra
+  // draw: windows are drawn on the vertical faces only, over each block's own
+  // measured colour, and the top face (roof) is left clean.
+  const binaCephe = mats.white.clone();
+  binaCephe.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vYerelPos;\nvarying vec3 vYerelNorm;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvYerelPos = position;\nvYerelNorm = normal;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vYerelPos;\nvarying vec3 vYerelNorm;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+      {
+        vec3 n = normalize(vYerelNorm);
+        if (abs(n.y) < 0.5) {                       // sadece dik cepheler
+          float yatay = abs(n.x) > abs(n.z) ? vYerelPos.z : vYerelPos.x;  // -0.5..0.5
+          float dikey = vYerelPos.y;                // 0..1
+          vec2 hucre = vec2((yatay + 0.5) * 5.0, dikey * 7.0);
+          vec2 f = fract(hucre);
+          vec2 kimlik = floor(hucre);
+          float pencere = step(0.20, f.x) * step(f.x, 0.80) * step(0.24, f.y) * step(f.y, 0.82);
+          float h = fract(sin(dot(kimlik, vec2(41.3, 7.7))) * 4531.7);
+          vec3 yanik = vec3(0.98, 0.86, 0.50);
+          vec3 sonuk = vec3(0.62, 0.72, 0.80);
+          vec3 camRenk = mix(sonuk, yanik, step(0.82, h));
+          float govde = step(0.06, dikey) * step(dikey, 0.93);   // saçak ve taban hariç
+          diffuseColor.rgb = mix(diffuseColor.rgb, camRenk, pencere * govde * 0.9);
+        }
+      }`);
+  };
+  const blockBodies = new THREE.InstancedMesh(blockGeo, binaCephe, BLOCKS.length);
   const blockPlinths = new THREE.InstancedMesh(roundedBoxGeometry(1, 1, 1, 0.22, 0.05), mats.concrete, BLOCKS.length);
   // The roof lip is a frame, not a lid: the tray it encloses is what the
   // reference shows inside every parapet.
