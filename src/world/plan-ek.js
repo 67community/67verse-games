@@ -564,3 +564,41 @@ export const PLAN_SU = Object.freeze([
   [45.24, 32.65, 5.62, 5.62, '#bdc4d7'], // kucuk yuvarlak golet
 ]);
 
+// --- 67 meydani -----------------------------------------------------------
+// These three were measured once before and the file that held them was lost
+// with the iCloud eviction, so they are read off the same render again with
+// the same transform. Treat the numbers as re-measured, not as the originals.
+
+// The plate the plaza sits on. Its edge runs x -16.6..16.6 and z -16.7..16.5
+// on the render; the brighter perimeter walk is 2.75 wide inside that edge
+// and the warmer floor is laid inside the walk.
+export const PLAN_MERKEZ_MEYDAN = Object.freeze({
+  merkez: Object.freeze([0.0, -0.1]),
+  genislik: 33.2,
+  derinlik: 33.2,
+  yurumeYolu: 2.75,
+});
+
+// The fountain, read across its own centre line: the apron spans x -3.93..4.16,
+// the basin x -2.96..2.75 and the water x -1.91..1.83. The basin sits a third
+// of a unit south of the apron, which is why it carries its own centre.
+export const PLAN_MERKEZ_CESME = Object.freeze({
+  merkez: Object.freeze([0.1, 0.0]),
+  havuzMerkez: Object.freeze([-0.05, 0.3]),
+  avluCapi: 8.4,
+  havuzCapi: 5.6,
+  suCapi: 3.8,
+  heykelCapi: 2.2,
+});
+
+// The four round towers on the block's corners. The lathe profile is built to
+// a 5.7 base, so the width and depth here are read as diameters against it.
+// The render's four tints differ by up to 60 levels, but that is the sun
+// crossing the block, not four materials — so they all carry the same stone.
+export const PLAN_PLAZA_KULELERI = Object.freeze([
+  Object.freeze([-13.8, -14.1, 5.7, 5.7, '#f1e9e2']),
+  Object.freeze([13.7, -14.1, 5.9, 5.9, '#f1e9e2']),
+  Object.freeze([-13.8, 13.8, 5.6, 5.6, '#f1e9e2']),
+  Object.freeze([13.7, 13.8, 5.8, 5.8, '#f1e9e2']),
+]);
+
