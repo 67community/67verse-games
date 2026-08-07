@@ -560,7 +560,11 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // centre, orientation and paint of each one Oscar's drawing shows — the
   // parking-lot rows, the kerbside cars, the racers on the kart track.
   const V = Math.PI / 2;
-  const KARADA = PLAN_ARABALAR.filter(([x, z]) => !denizdeMi(x, z));
+  // The house row's strip (lunapark-evler.js) has no box buildings now, and it
+  // must have no parked cars either: one sat at (19.3, -59.7), right under a
+  // house, and read as a car driving out of the wall. Drop cars on that strip.
+  const evSeridiAraba = (x, z) => z < -53 && x > -6 && x < 27;
+  const KARADA = PLAN_ARABALAR.filter(([x, z]) => !denizdeMi(x, z) && !evSeridiAraba(x, z));
   const PARKED = KARADA.map(([x, z, dikey]) => [x, z, dikey ? 0 : V]);
   const PARKED_RENK = KARADA.map(([, , , renk]) => renk);
   const DRIVERS = 10;
@@ -1546,6 +1550,12 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
       maxZ: PLAN_PAZAR.zemin[1] + PLAN_PAZAR.zemin[3] / 2,
     },                                               // market square
     { minX: 18, maxX: 46, minZ: -50, maxZ: -18 },    // funfair
+    // The authored house row (lunapark-evler.js) owns this top strip beside the
+    // funfair. As a keep-out the layout solver can never walk a box or a
+    // procedural suburb house onto it — a filter on the raw positions could
+    // not, because the solver moves things afterwards, which is how a grey box
+    // and a red-roofed house kept surfacing between Oscar's houses.
+    { minX: -6, maxX: 17, minZ: -62, maxZ: -53.5 },  // house row strip (west of x18.7 road)
     { minX: 18, maxX: 46, minZ: 18, maxZ: 46 },      // pond park
     { minX: -40, maxX: -22, minZ: -50, maxZ: -34 },  // gym + parking
     // The plaza's four corner towers are lathed above, so their own rows are
@@ -1590,12 +1600,17 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // pair that overlaps, until the layout settles. A block that still cannot be
   // placed after all that is dropped rather than shipped inside another.
   const BLOCKS = (() => {
+    // The house row by the funfair (lunapark-evler.js) stands on the top strip
+    // between x -6 and 27 above z -53. The plan's box terraces sat there too —
+    // the authored houses were landing on top of them. That strip is the
+    // houses' now, so its boxes are dropped here.
+    const evSeridi = (x, z) => z < -53 && x > -6 && x < 27;
     const adaylar = PLAN_BINALAR
       .map(([x, z, w, d], i) => {
         const h = Math.max(2, Math.min(6.5, 1.6 + Math.sqrt(w * d) * 0.62));
         return { x, z, w, h, d, renk: PLAN_BINA_RENK[i] };
       })
-      .filter(({ x, z }) => !ozelIcinde(x, z) && !denizdeMi(x, z));
+      .filter(({ x, z }) => !ozelIcinde(x, z) && !denizdeMi(x, z) && !evSeridi(x, z));
     for (const b of adaylar) {
       b.yasak = OZEL_BOLGELER.filter((k) => !kutuBindirmesi(b.x, b.z, b.w, b.d, k));
     }
@@ -2307,14 +2322,22 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     // because the stadium already carries its own keep-out box.
     ...DECKS.slice(0, 3).map(([x, z, w, d]) => ({ x, z, w, d, sabit: true })),
     { x: -52.8, z: -52.65, w: 18.4, d: 18.5, sabit: true },   // kart lawn
+    // The authored house row's strip: a fixed obstacle so the suburb-house
+    // solver keeps its red-roof boxes off it, the same strip the block loop
+    // and the special-zone list hold clear.
+    { x: 5.5, z: -57.75, w: 23, d: 8.5, sabit: true },   // house row (west of road)
   ];
   const KARADAKI_EVLER = (() => {
     const yerlesik = [
       ...BLOCKS.map(([x, z, w, , d]) => ({ x, z, w, d, sabit: true })),
       ...EV_YASAK,
     ];
+    // The red-roofed procedural suburb houses were poking up through the
+    // authored house row on the top strip. That strip belongs to
+    // lunapark-evler.js, so drop the box houses there too.
+    const evSeridiEv = (x, z) => z < -53 && x > -6 && x < 27;
     const evler = HOUSES
-      .filter(([x, z]) => !denizdeMi(x, z))
+      .filter(([x, z]) => !denizdeMi(x, z) && !evSeridiEv(x, z))
       .map(([x, z]) => ({ x, z, w: EV_G, d: EV_D, sabit: false }));
     const hepsi = [...yerlesik, ...evler];
     for (let tur = 0; tur < 40; tur += 1) {

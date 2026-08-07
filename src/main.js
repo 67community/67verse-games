@@ -6,6 +6,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createSkyDome } from './core/sky.js';
 import { buildWorld, PALETTE } from './world.js';
 import { loadWorldItems } from './world-items.js';
+import { buildLunaparkEvler } from './world/lunapark-evler.js';
 import { cameraRelativeDirection, createInput } from './input.js';
 import { createPlayerState, stepPlayer } from './player.js';
 import { createCtx } from './core/ctx.js';
@@ -225,6 +226,8 @@ const world = buildWorld(scene, {
 loadWorldItems()
   .then((items) => { world.applyItems?.(items); })
   .catch(() => {});
+// The house row by the funfair, from Oscar's authored model.
+buildLunaparkEvler({ THREE, scene });
 queueMicrotask(() => {
   runHooks('hub', ctx, { scene, world, getSim: () => sim });
   ctx.quality?.applyScene(scene);
