@@ -40,12 +40,21 @@ export function kurBasketAtisi({ ctx, scene, getSim }) {
     const canvas = document.createElement('canvas');
     canvas.width = 320; canvas.height = 40;
     canvas.style.cssText = 'display:block;border-radius:10px;';
+    // A phone has no SPACE key, so a meter that only answered to SPACE left
+    // the shot unplayable there — the line swept forever and nothing fired.
+    const atisBtn = document.createElement('button');
+    atisBtn.type = 'button';
+    atisBtn.textContent = 'SHOOT';
+    atisBtn.style.cssText = 'display:block;width:100%;margin-top:10px;border:none;'
+      + 'border-radius:13px;padding:14px 0;background:#17223a;color:#fff;'
+      + 'font-family:inherit;font-weight:700;font-size:15px;letter-spacing:0.08em;'
+      + 'cursor:pointer;box-shadow:0 8px 20px #17223a44;';
     const ipucu = document.createElement('div');
     ipucu.style.cssText = 'font-size:11.5px;color:#6b7280;margin-top:7px;';
-    ipucu.textContent = 'SPACE — freeze the line inside the gold band';
-    kok.append(baslikEl, canvas, ipucu);
+    ipucu.textContent = 'Freeze the line inside the gold band';
+    kok.append(baslikEl, canvas, atisBtn, ipucu);
     document.body.appendChild(kok);
-    return { kok, canvas, c: canvas.getContext('2d'), baslikEl };
+    return { kok, canvas, c: canvas.getContext('2d'), baslikEl, atisBtn };
   }
 
   function olcekCiz(ui, deger) {
@@ -146,12 +155,10 @@ export function kurBasketAtisi({ ctx, scene, getSim }) {
     ui.baslikEl.textContent = `SHOT 1/${TUR_SAYISI} — you`;
     ctx.ui.toast('Hoop Shot — freeze the line in the gold band.');
 
-    const tusYakala = (e) => {
-      if (!aktif) return;
-      if (e.code === 'Escape') { e.stopPropagation(); bitir(); return; }
-      if (e.code !== 'Space' || aktif.sira !== 'sen' || aktif.kilit) return;
-      e.stopPropagation();
-      e.preventDefault();
+    // One shot path, reached by the button or the key — never by only one of
+    // them, which is how the phone ended up with an unplayable meter.
+    const atisiBirak = () => {
+      if (!aktif || aktif.sira !== 'sen' || aktif.kilit) return;
       aktif.kilit = true;
       const deger = aktif.deger;
       const sonuc = atisiCoz(deger);
@@ -164,6 +171,16 @@ export function kurBasketAtisi({ ctx, scene, getSim }) {
         aktif.sira = 'rakip';
         aktif.bekle = 0.7;
       });
+    };
+    ui.atisBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); atisiBirak(); });
+
+    const tusYakala = (e) => {
+      if (!aktif) return;
+      if (e.code === 'Escape') { e.stopPropagation(); bitir(); return; }
+      if (e.code !== 'Space') return;
+      e.stopPropagation();
+      e.preventDefault();
+      atisiBirak();
     };
     window.addEventListener('keydown', tusYakala, true);
     aktif.tusYakala = tusYakala;

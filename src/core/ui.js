@@ -21,6 +21,8 @@ const CSS = `
 .uv-toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 18px);transform:translateX(-50%);max-width:calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 20px);background:#060c21;color:#fff;padding:10px 20px;border-radius:999px;font:500 13px -apple-system,system-ui,sans-serif;z-index:80;box-shadow:0 8px 24px rgba(6,12,33,.22);pointer-events:none}
 .uv-hudbar{position:fixed;top:calc(env(safe-area-inset-top) + 12px);right:calc(env(safe-area-inset-right) + 12px);z-index:50;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;max-width:60vw}
 .uv-hudbar button{width:auto;min-width:44px;height:44px;padding:0 14px;border-radius:10px;border:1px solid #e5e5ea;background:rgba(255,255,255,.92);font:500 13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:0;white-space:nowrap;cursor:pointer;box-shadow:none;color:#060c21;backdrop-filter:blur(12px) saturate(180%);transition:transform 150ms ease-out,background 150ms ease-out,border-color 150ms ease-out}
+.uv-hudbar button.ikonlu{width:44px;padding:0;border-radius:50%;background:rgba(255,255,255,.82);display:inline-flex;align-items:center;justify-content:center}
+.uv-hudbar button.ikonlu svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
 .uv-hudbar button:hover{background:#fff;border-color:#a9a9b1}
 .uv-hudbar button:active{transform:scale(.98)}
 .uv-hudbar button[aria-busy="true"]{opacity:.55;cursor:wait}
@@ -60,6 +62,16 @@ body.in-game .uv-hudbar{display:none}
 `;
 
 let injected = false;
+// Line glyphs for the HUD corner. Drawn on a 22x22 box, stroked by the
+// stylesheet so they inherit the button's ink and never carry a fill.
+const HUD_GLIFLERI = Object.freeze({
+  cosmetics: '<path d="M7 4.5 4 6.4v3.1l2.2-.9V18h9.6V8.6l2.2.9V6.4L15 4.5a3 3 0 0 1-8 0z"/>',
+  collection: '<circle cx="11" cy="7.6" r="3.4"/><path d="M4.2 18.4a6.8 6.8 0 0 1 13.6 0"/>',
+  settings: '<circle cx="11" cy="11" r="2.9"/><path d="M11 2.6v2.2M11 17.2v2.2M19.4 11h-2.2M4.8 11H2.6M16.9 5.1l-1.6 1.6M6.7 15.3l-1.6 1.6M16.9 16.9l-1.6-1.6M6.7 6.7 5.1 5.1"/>',
+  chat: '<path d="M4 5.2h14a1.2 1.2 0 0 1 1.2 1.2v7.2a1.2 1.2 0 0 1-1.2 1.2h-7.4L6.4 18.4V14.8H4a1.2 1.2 0 0 1-1.2-1.2V6.4A1.2 1.2 0 0 1 4 5.2z"/>',
+  emotes: '<circle cx="11" cy="11" r="8"/><path d="M7.4 12.6a4.4 4.4 0 0 0 7.2 0"/><path d="M8.2 8.4h.02M13.8 8.4h.02"/>',
+});
+
 function inject() {
   if (injected) return; injected = true;
   const st = document.createElement('style');
@@ -229,10 +241,21 @@ export function createUi(ctx) {
       document.body.appendChild(t);
       setTimeout(() => t.remove(), 2500);
     },
+    // A line glyph where one exists, the word only as a fallback. Three
+    // shouted labels across the top corner read as a stock template rather
+    // than a game — Oscar's call, and the icons carry the same meaning in a
+    // third of the width, which is what let the mobile row stop clipping.
     hudIcon(id, emoji, title) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.textContent = emoji; b.title = title;
+      const glif = HUD_GLIFLERI[id];
+      if (glif) {
+        b.innerHTML = `<svg viewBox="0 0 22 22" aria-hidden="true">${glif}</svg>`;
+        b.classList.add('ikonlu');
+      } else {
+        b.textContent = emoji;
+      }
+      b.title = title;
       b.setAttribute('aria-label', title);
       b.onclick = () => {
         const sys = ctx.systems.get(id);

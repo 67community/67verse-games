@@ -37,12 +37,23 @@ export function kurFutbolAtisi({ ctx, scene, getSim }) {
     const canvas = document.createElement('canvas');
     canvas.width = 320; canvas.height = 40;
     canvas.style.cssText = 'display:block;border-radius:10px;';
+    // A phone has no SPACE key. The meter used to say "SPACE — freeze the
+    // line" and offer nothing to press, so on a phone you walked into the
+    // penalty spot, the meter swept forever and you could never take a shot.
+    // The button is the control on every device; the key is the shortcut.
+    const atisBtn = document.createElement('button');
+    atisBtn.type = 'button';
+    atisBtn.textContent = 'SHOOT';
+    atisBtn.style.cssText = 'display:block;width:100%;margin-top:10px;border:none;'
+      + 'border-radius:13px;padding:14px 0;background:#17223a;color:#fff;'
+      + 'font-family:inherit;font-weight:700;font-size:15px;letter-spacing:0.08em;'
+      + 'cursor:pointer;box-shadow:0 8px 20px #17223a44;';
     const ipucu = document.createElement('div');
     ipucu.style.cssText = 'font-size:11.5px;color:#6b7280;margin-top:7px;';
-    ipucu.textContent = 'SPACE — freeze the line inside the gold band';
-    kok.append(baslikEl, canvas, ipucu);
+    ipucu.textContent = 'Freeze the line inside the gold band';
+    kok.append(baslikEl, canvas, atisBtn, ipucu);
     document.body.appendChild(kok);
-    return { kok, canvas, c: canvas.getContext('2d'), baslikEl };
+    return { kok, canvas, c: canvas.getContext('2d'), baslikEl, atisBtn };
   }
 
   function olcekCiz(ui, deger) {
@@ -119,12 +130,10 @@ export function kurFutbolAtisi({ ctx, scene, getSim }) {
     ui.baslikEl.textContent = `SHOT 1/${TUR_SAYISI}`;
     ctx.ui.toast('Goal Shot — freeze the line in the band.');
 
-    const tusYakala = (e) => {
-      if (!aktif) return;
-      if (e.code === 'Escape') { e.stopPropagation(); bitir(false); return; }
-      if (e.code !== 'Space' || aktif.kilit) return;
-      e.stopPropagation();
-      e.preventDefault();
+    // One shot path, reached by the button or the key — never by only one of
+    // them, which is how the phone ended up with an unplayable meter.
+    const atisiBirak = () => {
+      if (!aktif || aktif.kilit) return;
       aktif.kilit = true;
       const sonuc = atisiCoz(aktif.deger);
       if (window.__67VERSE_QA__) console.log('[futbol-qa]', JSON.stringify({ tur: aktif.tur, deger: +aktif.deger.toFixed(3), sonuc }));
@@ -138,6 +147,16 @@ export function kurFutbolAtisi({ ctx, scene, getSim }) {
         aktif.faz = 0;
         aktif.ui.baslikEl.textContent = `SHOT ${aktif.tur}/${TUR_SAYISI}`;
       });
+    };
+    ui.atisBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); atisiBirak(); });
+
+    const tusYakala = (e) => {
+      if (!aktif) return;
+      if (e.code === 'Escape') { e.stopPropagation(); bitir(false); return; }
+      if (e.code !== 'Space' || aktif.kilit) return;
+      e.stopPropagation();
+      e.preventDefault();
+      atisiBirak();
     };
     window.addEventListener('keydown', tusYakala, true);
     aktif.tusYakala = tusYakala;

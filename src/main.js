@@ -1126,6 +1126,10 @@ const camYonTmp = new THREE.Vector3();
 // speed reads on screen instead of only in the odometer.
 let sprintFovKatki = 0;
 camera.position.copy(camPos);
+// The river's surface sits at y 0.05; a swimmer floats with the body half
+// under it rather than standing on top of the plane.
+const SU_SEVIYE = -0.22;
+let yuzuyor = false;
 let destinationCooldown = 0;
 let nearbyDestination = null;
 let queuedGrabPressed = false;
@@ -1258,6 +1262,27 @@ function frame(now) {
     const wasGrounded = sim.grounded;
     const landingVelocity = sim.vel.y;
     stepPlayer(sim, simInput, SIM_DT, world);
+    // Water behaves like water. Walk off a bank and you are swimming: the
+    // body settles to the surface, the stroke is slower than a walk and there
+    // is no jumping out of it — you swim to a bank and step up. A bridge deck
+    // stands above the channel, so crossing on one keeps you dry: the ground
+    // under you is the deck, not the river bed.
+    // Standing on a deck means the sim already resolved the ground ABOVE the
+    // channel, so height is the honest test — but it has to be tested against
+    // the deck, not against zero, or a player at ground level counts as dry.
+    const kopruUstunde = sim.pos.y > 0.3;
+    const suda = !kopruUstunde && Boolean(world.isWater?.(sim.pos.x, sim.pos.z));
+    if (suda) {
+      sim.pos.y = SU_SEVIYE;
+      sim.vel.y = 0;
+      sim.grounded = true;
+      sim.vel.x *= 0.86;
+      sim.vel.z *= 0.86;
+    }
+    if (suda !== yuzuyor) {
+      yuzuyor = suda;
+      ctx.ui.toast(suda ? 'Swimming — head for a bank.' : 'Out of the water.');
+    }
     acc -= SIM_DT;
 
     if (sim.jumpEvent) hubCharacter?.animator.signal('jump');

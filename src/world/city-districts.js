@@ -651,7 +651,12 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     return [nx, nz, dikey ? 0 : V];
   });
   const PARKED_RENK = KARADA.map(([, , , renk]) => renk);
-  const DRIVERS = 10;
+  // Oscar's call: the driving cars go. Their model never read well at speed
+  // and a box sliding down the street was doing more harm to the town than
+  // the life it was meant to add. The parked cars stay — those are scenery
+  // and they sit still. Everything downstream reads this, so the routes, the
+  // wheel spin and the live traffic colliders all fall away with it.
+  const DRIVERS = 0;
   const CAR_N = PARKED.length + DRIVERS;
   // The carriageways measure about 2.5 wide, so a 1.6-wide car filled the whole
   // road and read as driving down the middle — two-way traffic could not fit.
@@ -1368,11 +1373,51 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // The bridges at (-54,-19) and (-53,-44) are gone with the water they used
   // to span: the river's head is at z = -14 now, so both were standing on dry
   // ground — the second of them out on the kart circuit's lawn.
-  const AHSAP_KOPRU = [
-    [-54, 16, 7, 0.4, 2.6, 0],
-    [-52, 38, 7, 0.4, 2.6, 0], [-30, 54.5, 7, 0.4, 2.6, 0.35], [-6, 56, 7, 0.4, 2.6, 0.1],
-    [16, 55, 7, 0.4, 2.6, -0.1],
-  ];
+  // The river used to swing east along z 52..57 and run the whole width of the
+  // town — straight through the southern suburb row and across the southern
+  // avenues. Audited against the plan, that route put EIGHT carriageways, two
+  // park walks and two crossings in the water, with only five bridges: the
+  // "water coming out in the middle of the city with a footpath on top of it"
+  // Oscar photographed twice. It hugs the west margin now and leaves at the
+  // south-west corner, which measures zero walks and zero crossings in the
+  // channel and leaves five road crossings, every one of them bridged below.
+  const riverCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(-59.5, 0.05, -14), new THREE.Vector3(-58, 0.05, -6),
+    new THREE.Vector3(-57.6, 0.05, 2), new THREE.Vector3(-57.6, 0.05, 12),
+    new THREE.Vector3(-57.4, 0.05, 22), new THREE.Vector3(-57.6, 0.05, 32),
+    new THREE.Vector3(-58, 0.05, 42), new THREE.Vector3(-58.6, 0.05, 52),
+    new THREE.Vector3(-59.4, 0.05, 62), new THREE.Vector3(-60, 0.05, 70),
+  ]);
+  // Bridges are DERIVED, not typed. A hand-written list is a list that stops
+  // being true the moment the river moves — which is how carriageways ended
+  // up driving into open water while bridges stood on dry ground. Every road
+  // is walked against the river's own polyline; wherever one genuinely
+  // crosses, a deck is laid across it at that spot, square to the road.
+  const NEHIR_YOLU = riverCurve.getPoints(160);
+  const AHSAP_KOPRU = (() => {
+    const kopruler = [];
+    for (const [x, z, g, d] of PLAN_ANA_YOLLAR) {
+      const yatay = yatayMi(g, d);
+      const uzun = Math.max(g, d);
+      let enYakin = null;
+      for (let t = -uzun / 2; t <= uzun / 2; t += 0.6) {
+        const px = yatay ? x + t : x;
+        const pz = yatay ? z : z + t;
+        for (const p of NEHIR_YOLU) {
+          const mesafe = Math.hypot(p.x - px, p.z - pz);
+          if (mesafe < 2.4 && (!enYakin || mesafe < enYakin.mesafe)) {
+            enYakin = { mesafe, px, pz };
+          }
+        }
+      }
+      if (!enYakin) continue;
+      // Long enough to land on both banks, wide enough to walk comfortably.
+      kopruler.push(yatay
+        ? [enYakin.px, enYakin.pz, 7.5, 0.4, yolKalinlik(g, d) + 1.2, 0]
+        : [enYakin.px, enYakin.pz, yolKalinlik(g, d) + 1.2, 0.4, 7.5, 0]);
+    }
+    return kopruler;
+  })();
   // Three piers reaching east off a timber promenade, twelve finger docks
   // between them, and the river bridges — all one instanced deck.
   const AHSAP = [
@@ -1397,6 +1442,14 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     dkm.setPosition(x, 0.36, z);
     docks.setMatrixAt(AHSAP.length + i, dkm);
     docks.setColorAt(AHSAP.length + i, beyaz);
+    // The deck is real ground, not a picture of one. Without this the player
+    // swam straight through a bridge — the ground under them was still the
+    // river bed — which is the opposite of Oscar's "you cross on the bridge".
+    colliders.push({
+      minX: x - w / 2, maxX: x + w / 2,
+      minZ: z - d / 2, maxZ: z + d / 2,
+      topY: 0.56,
+    });
   });
   if (docks.instanceColor) docks.instanceColor.needsUpdate = true;
   docks.instanceMatrix.needsUpdate = true;
@@ -1821,6 +1874,12 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
         const w = b.w * olcek;
         const d = b.d * olcek;
         if (yolUstunde(b.x, b.z, w, d)) continue;
+        // The solver knew about roads, the sea and the keep-out zones, but not
+        // about the river, so four blocks were standing in the channel. The
+        // whole footprint has to be dry, not just the centre point.
+        if (NEHIR_YOLU.some((p) => (
+          Math.abs(p.x - b.x) < 2.4 + w / 2 && Math.abs(p.z - b.z) < 2.4 + d / 2
+        ))) continue;
         if (b.yasak.some((k) => kutuBindirmesi(b.x, b.z, w, d, k))) continue;
         const cakisiyor = yerlesen.some((o) => (
           Math.abs(b.x - o.x) < (w + o.w) / 2 - 0.25
@@ -2521,13 +2580,6 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // the kart circuit. Row centres down the west reach read -57.2 at z = -8,
   // -56.6 at z = -4, -56.5 at z = 10 and -55.6 at z = 20, so the northern
   // control points are those rather than the guesses they replace.
-  const riverCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-59.5, 0.05, -14), new THREE.Vector3(-57.2, 0.05, -8),
-    new THREE.Vector3(-56.6, 0.05, -1), new THREE.Vector3(-56.4, 0.05, 10),
-    new THREE.Vector3(-55.4, 0.05, 19), new THREE.Vector3(-53.5, 0.05, 25),
-    new THREE.Vector3(-52, 0.05, 38), new THREE.Vector3(-44, 0.05, 52),
-    new THREE.Vector3(-24, 0.05, 56), new THREE.Vector3(0, 0.05, 57),
-  ]);
   const river = new THREE.Mesh(new THREE.TubeGeometry(riverCurve, 72, 2.4, 6), mats.water);
   river.scale.y = 0.03;
   river.position.y = 0.05;
@@ -2541,27 +2593,20 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // bridge crosses so the crossings still work. Water is not a wall you climb,
   // so the tops sit just above stepping height and no lower.
   const NEHIR_YARICAP = 2.4;
-  const nehirNoktalari = riverCurve.getPoints(120);
-  const kopruNoktasi = (x, z) => AHSAP_KOPRU.some(([bx, bz, bw]) => (
-    Math.hypot(bx - x, bz - z) < bw / 2 + 1.6
+  const nehirNoktalari = NEHIR_YOLU;
+  const kopruNoktasi = (x, z) => AHSAP_KOPRU.some(([bx, bz, bw, , bd]) => (
+    Math.abs(bx - x) < bw / 2 + 1.2 && Math.abs(bz - z) < bd / 2 + 1.2
   ));
   // Same chain, used by isWater so a map tap cannot land in the channel — but
   // a bridge deck is dry land, so tapping a crossing still works.
   nehirdeMi = (x, z) => !kopruNoktasi(x, z) && nehirNoktalari.some((p) => (
     Math.abs(p.x - x) < NEHIR_YARICAP && Math.abs(p.z - z) < NEHIR_YARICAP
   ));
-  for (let i = 0; i < nehirNoktalari.length - 1; i += 1) {
-    const a = nehirNoktalari[i];
-    const b = nehirNoktalari[i + 1];
-    const mx = (a.x + b.x) / 2;
-    const mz = (a.z + b.z) / 2;
-    if (kopruNoktasi(mx, mz)) continue;
-    const yariX = Math.max(Math.abs(b.x - a.x) / 2, 0) + NEHIR_YARICAP * 0.72;
-    const yariZ = Math.max(Math.abs(b.z - a.z) / 2, 0) + NEHIR_YARICAP * 0.72;
-    colliders.push({
-      minX: mx - yariX, maxX: mx + yariX, minZ: mz - yariZ, maxZ: mz + yariZ, topY: 0.7,
-    });
-  }
+  // The river is NOT a wall. Blocking it stopped the player walking on water,
+  // but Oscar's point is that water should behave like water: you cross it on
+  // a bridge, and if you go in, you swim. So nothing is pushed into the
+  // collider list here — `isWater` marks the channel and the hub turns that
+  // into a swim.
 
   // The suburbs ring the whole plan in the reference, not just one strip:
   // rows outside the river to the west, along the south edge, up the north
