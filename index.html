@@ -88,6 +88,12 @@
     }
     #primary-play:hover { background: #11182f; }
     #primary-play:active { transform: scale(0.98); }
+    /* Inline line icons inside the action row — SVG, never emoji. */
+    #hub-actions .ikon { width: 13px; height: 13px; margin-right: 7px; vertical-align: -2px;
+      fill: currentColor; }
+    #hub-actions .ikon.cizgi { fill: none; stroke: currentColor; stroke-width: 1.4;
+      stroke-linejoin: round; }
+    #primary-play, #primary-chat { display: inline-flex; align-items: center; }
     #hub-actions {
       position: absolute;
       top: calc(var(--safe-top) + 58px);
@@ -372,9 +378,25 @@
       font-family: inherit;
     }
     .tbtn:active, .tbtn.held { background: rgba(6, 12, 33, 0.14); transform: scale(0.94); }
+    .tbtn svg { width: 30px; height: 30px; fill: none; stroke: var(--ink); stroke-width: 2.4;
+      stroke-linecap: round; stroke-linejoin: round; opacity: 0.88; }
     #btn-jump { width: 84px; height: 84px; background: rgba(208, 119, 94, 0.55); border-color: rgba(208,119,94,0.7); }
-    #btn-sprint { background: rgba(90, 156, 216, 0.5); border-color: rgba(90,156,216,0.7); }
-    #btn-board { background: rgba(232, 130, 124, 0.5); border-color: rgba(232,130,124,0.7); }
+    #btn-jump svg { width: 36px; height: 36px; }
+    /* The cluster rises toward the thumb: board low, sprint mid, jump anchor. */
+    #btn-board { margin-bottom: 4px; background: rgba(232, 130, 124, 0.5); border-color: rgba(232,130,124,0.7); }
+    #btn-sprint { margin-bottom: 26px; background: rgba(90, 156, 216, 0.5); border-color: rgba(90,156,216,0.7); }
+    /* FAST is a latch: lit while locked on. */
+    #btn-sprint.on { background: rgba(90, 156, 216, 0.95); border-color: rgba(56, 122, 186, 1);
+      box-shadow: 0 6px 20px rgba(90, 156, 216, 0.5); }
+    #btn-sprint.on svg { stroke: #fff; opacity: 1; }
+    /* Context pill: hidden until something is in reach, then it names the verb. */
+    #btn-grab { pointer-events: auto; position: absolute; right: 4px; bottom: 128px;
+      height: 46px; padding: 0 24px; border-radius: 999px; border: none;
+      background: rgba(6, 12, 33, 0.92); color: #fff; font-family: inherit;
+      font-weight: 700; font-size: 13px; letter-spacing: 0.07em;
+      box-shadow: 0 12px 28px rgba(6, 12, 33, 0.35); }
+    #btn-grab[hidden] { display: none; }
+    #btn-grab:active { transform: scale(0.95); }
 
     /* Keep the full hub visible on phones: two compact icon rows share the
        top safe area with the wordmark instead of covering the city horizon. */
@@ -431,7 +453,10 @@
     @media (max-height: 540px) and (orientation: landscape) {
       #touch-buttons { right: calc(var(--safe-right) + 12px); bottom: calc(var(--safe-bottom) + 10px); gap: 10px; }
       .tbtn { width: 60px; height: 60px; font-size: 11px; }
+      .tbtn svg { width: 26px; height: 26px; }
       #btn-jump { width: 68px; height: 68px; }
+      #btn-sprint { margin-bottom: 18px; }
+      #btn-grab { bottom: 96px; height: 42px; }
       body.touch #hint { display: none; }
       #mode-nav { max-width: min(58vw, 440px); }
     }
@@ -445,9 +470,9 @@
   <div id="hud">
     <div id="wordmark"><img src="/brand/67park-logo.png" alt="67 Park" /></div>
     <div id="hub-actions" role="navigation" aria-label="Skypark actions">
-      <button id="primary-play" type="button" aria-label="Choose a game">▶ PLAY GAMES</button>
+      <button id="primary-play" type="button" aria-label="Choose a game"><svg class="ikon" viewBox="0 0 14 14" aria-hidden="true"><path d="M4 2.6v8.8l7.2-4.4z"/></svg>PLAY GAMES</button>
       <button id="primary-map" type="button" aria-label="Open the park map">MAP</button>
-      <button id="primary-chat" type="button" aria-label="Open on-device chat">💬 LOCAL CHAT</button>
+      <button id="primary-chat" type="button" aria-label="Open on-device chat"><svg class="ikon cizgi" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3.2h10a1 1 0 0 1 1 1v5.6a1 1 0 0 1-1 1H8.4L5 13.6v-2.8H3a1 1 0 0 1-1-1V4.2a1 1 0 0 1 1-1z"/></svg>LOCAL CHAT</button>
       <button id="primary-lobby" type="button" aria-label="Open the 67VERSE skate lobby">SKATE LOBBY</button>
     </div>
     <section id="hub-activity" aria-label="Hub activity" hidden>
@@ -486,10 +511,19 @@
   <div id="touch-ui" inert aria-hidden="true">
     <div id="stick-base"><div id="stick-knob"></div></div>
     <div id="touch-buttons">
-      <button class="tbtn" id="btn-board" type="button" aria-label="Skateboard">BOARD</button>
-      <button class="tbtn" id="btn-sprint" type="button" aria-label="Sprint">FAST</button>
-      <button class="tbtn" id="btn-grab" type="button" aria-label="Grab or interact">GRAB</button>
-      <button class="tbtn" id="btn-jump" type="button" aria-label="Jump">JUMP</button>
+      <!-- Line-SVG icons, no words: Oscar's call — labelled circles read as a
+           prototype. The interact pill is the one control that keeps text,
+           because its verb changes with what is in front of you. -->
+      <button id="btn-grab" type="button" aria-label="Interact" hidden>ENTER</button>
+      <button class="tbtn" id="btn-board" type="button" aria-label="Skateboard">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 18.5c3 2.7 7.2 3.5 12 3.5s9-.8 12-3.5"/><circle cx="11.5" cy="26" r="2.4"/><circle cx="20.5" cy="26" r="2.4"/></svg>
+      </button>
+      <button class="tbtn" id="btn-sprint" type="button" aria-label="Sprint">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 8l8 8-8 8"/><path d="M17 8l8 8-8 8"/></svg>
+      </button>
+      <button class="tbtn" id="btn-jump" type="button" aria-label="Jump">
+        <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 20l8-9 8 9"/></svg>
+      </button>
     </div>
   </div>
   <script type="module" src="/src/main.js"></script>

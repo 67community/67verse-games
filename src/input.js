@@ -155,7 +155,16 @@ export function createInput() {
   }
   bindButton(btnJump, () => { touchJump = true; }, () => { touchJump = false; });
   bindButton(btnGrab, () => { touchGrab = true; }, () => { touchGrab = false; });
-  bindButton(document.getElementById('btn-sprint'), () => { touchSprint = true; }, () => { touchSprint = false; });
+  // FAST is a latch, not a hold: holding it fought the camera-look thumb and
+  // read as "the button does nothing". One tap locks the run and lights the
+  // button; the next tap releases it.
+  const sprintButton = document.getElementById('btn-sprint');
+  sprintButton.addEventListener('pointerdown', (e) => {
+    if (inputIsBlocked()) return;
+    e.preventDefault();
+    touchSprint = !touchSprint;
+    sprintButton.classList.toggle('on', touchSprint);
+  });
 
   // ----- Frame polling -----
   let prevGrab = false;

@@ -65,6 +65,43 @@ function pushOutOfBox(s, box) {
   return true;
 }
 
+// Wall contact for every solid the player's own circle touches, not just the
+// one standing directly under them.
+//
+// The ground sample only reports a box when the player's CENTRE is inside it,
+// so walking into a wall went: step in (centre crosses the face) -> eject the
+// full radius back out -> next frame no box is found -> step in again. That
+// is a 0.35-unit shudder every frame while you hold a direction against a
+// wall, and it is the bug Oscar sees when he bumps a car. Testing the
+// inflated bounds instead makes contact a rest: the circle slides along the
+// face with its tangential speed intact, the way the skate lobby's radial
+// push-out does. Three passes resolve a corner wedged between two solids.
+function slideAlongSolids(s, solids) {
+  if (!solids?.length) return;
+  const r = TUNING.radius;
+  const ayak = s.pos.y + TUNING.stepUp;
+  for (let tur = 0; tur < 3; tur += 1) {
+    let temas = false;
+    for (const solid of solids) {
+      // A surface at or below stepping height is floor, not wall.
+      if (solid.topY <= ayak) continue;
+      const minX = solid.minX - r, maxX = solid.maxX + r;
+      const minZ = solid.minZ - r, maxZ = solid.maxZ + r;
+      const { x, z } = s.pos;
+      if (x <= minX || x >= maxX || z <= minZ || z >= maxZ) continue;
+      const dxMin = x - minX, dxMax = maxX - x;
+      const dzMin = z - minZ, dzMax = maxZ - z;
+      const m = Math.min(dxMin, dxMax, dzMin, dzMax);
+      if (m === dxMin) { s.pos.x = minX; if (s.vel.x > 0) s.vel.x = 0; }
+      else if (m === dxMax) { s.pos.x = maxX; if (s.vel.x < 0) s.vel.x = 0; }
+      else if (m === dzMin) { s.pos.z = minZ; if (s.vel.z > 0) s.vel.z = 0; }
+      else { s.pos.z = maxZ; if (s.vel.z < 0) s.vel.z = 0; }
+      temas = true;
+    }
+    if (!temas) break;
+  }
+}
+
 /**
  * Advance the player by one fixed step.
  * input: { dirX, dirZ, moving, jumpHeld, grabPressed }  (dir is world-space, normalized)
@@ -144,6 +181,11 @@ export function stepPlayer(s, input, dt, env) {
     s.pos.x = Math.max(-env.bounds, Math.min(env.bounds, s.pos.x));
     s.pos.z = Math.max(-env.bounds, Math.min(env.bounds, s.pos.z));
   }
+
+  // --- Wall contact ---
+  // Resolved before the ground sample so the sample sees where the player
+  // actually ended up, never a frame inside a wall.
+  slideAlongSolids(s, env.solids);
 
   // --- Ground / wall resolution ---
   // Raycast down from above the head: walkable surfaces within stepUp are

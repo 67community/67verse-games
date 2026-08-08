@@ -86,8 +86,14 @@ skyDome.userData.perfGroup = 'hub-sky';
 scene.add(skyDome);
 
 // ---------- Camera ----------
+// Oscar wants the skate lobby's look on the big map. The lobby frames its
+// town through a 46-degree lens; 58 was a fisheye that bent every building
+// outward at the edges and made the streets read as a cheap toy set. 50 is
+// the compromise that keeps enough of the town in frame on a phone while
+// the perspective compresses the way the lobby's does.
+const baseCameraFov = 50;
 const camera = new THREE.PerspectiveCamera(
-  58, window.innerWidth / window.innerHeight, 0.1, 400
+  baseCameraFov, window.innerWidth / window.innerHeight, 0.1, 400
 );
 
 // ---------- Post-processing: ambient occlusion ----------
@@ -1089,6 +1095,17 @@ const camFocus = new THREE.Vector3();
 const camResolved = new THREE.Vector3();
 const cameraRay = new THREE.Raycaster();
 const camPos = new THREE.Vector3(sim.pos.x, sim.pos.y + 4.2, sim.pos.z + 6.35);
+// Occlusion distance memory: snaps IN instantly (never clips into a wall)
+// and only recovers OUT after the chase line has stayed clear for a beat —
+// a corner-grazing ray that flickers hit/miss would otherwise saw the lens
+// in and out every frame, which is the pop Oscar saw when walking into
+// cars and walls.
+let camSonMesafe = null;
+let camAcikSure = 0;
+const camYonTmp = new THREE.Vector3();
+// Sprint feel: the FOV eases toward a wider angle while FAST is held, so the
+// speed reads on screen instead of only in the odometer.
+let sprintFovKatki = 0;
 camera.position.copy(camPos);
 let destinationCooldown = 0;
 let nearbyDestination = null;
@@ -1318,11 +1335,17 @@ function frame(now) {
   }
   world.focusDestination = hubActivity.active ? null : nearbyDestination?.id || null;
   if (grabButton) {
-    grabButton.textContent = hubActivity.active
+    // Context pill: it only exists when there is something to act on. The
+    // idle 'WAVE' state read as a dead button — Oscar's call, it is gone.
+    const grabEtiket = hubActivity.active
       ? 'EXIT'
       : nearbyDestination
         ? 'ENTER'
-        : devMode ? 'GRAB' : 'WAVE';
+        : devMode ? 'GRAB' : null;
+    grabButton.hidden = grabEtiket === null;
+    if (grabEtiket !== null && grabButton.textContent !== grabEtiket) {
+      grabButton.textContent = grabEtiket;
+    }
   }
 
   // ----- Rig from sim state -----
@@ -1375,8 +1398,10 @@ function frame(now) {
   // Phones sit much further back — Oscar's call: on a portrait screen the
   // avatar filled half the view, so the chase pulls out and up with the
   // aspect instead of hugging the shoulders.
-  const chaseDistance = 5.45 + portrait * 3.4;
-  const chaseHeight = 3.65 + portrait * 1.2;
+  // A narrower lens shows less, so the chase pulls back to keep the same
+  // amount of street in frame as before.
+  const chaseDistance = 6.2 + portrait * 3.6;
+  const chaseHeight = 3.9 + portrait * 1.3;
   camFocus.set(sim.pos.x, sim.pos.y, sim.pos.z);
   camLook.set(
     sim.pos.x + sim.vel.x * 0.11,
@@ -1404,8 +1429,40 @@ function frame(now) {
   } else {
     camResolved.copy(camPos);
   }
-  camera.position.copy(camResolved);
+  // The hard resolve above guarantees the lens is never inside a wall, but a
+  // corner-grazing ray flickers hit/miss and used to pop the camera between
+  // near and far every frame. The distance snaps in with the resolve and
+  // eases back out, so the pop becomes a steady hold.
+  // The lens NEVER teleports. Walking into a car or a wall used to snap the
+  // chase distance in the same frame the ray first hit, and a corner that
+  // grazes flickers hit/miss — together they sawed the camera back and forth
+  // (measured: the camera moved further per frame than the player did).
+  // Now the distance eases in quickly and eases back out slowly, and only
+  // after the line has stayed clear for a beat.
+  camYonTmp.copy(camResolved).sub(camLook);
+  const camMesafe = Math.max(camYonTmp.length(), 0.001);
+  camYonTmp.multiplyScalar(1 / camMesafe);
+  if (camSonMesafe === null) {
+    camSonMesafe = camMesafe;
+  } else if (camMesafe <= camSonMesafe) {
+    camAcikSure = 0;
+    camSonMesafe += (camMesafe - camSonMesafe) * (1 - Math.exp(-14 * frameDt));
+  } else {
+    camAcikSure += frameDt;
+    if (camAcikSure > 0.3) {
+      camSonMesafe += (camMesafe - camSonMesafe) * (1 - Math.exp(-3.2 * frameDt));
+    }
+  }
+  camera.position.copy(camLook).addScaledVector(camYonTmp, camSonMesafe);
   camera.lookAt(camLook);
+  // FAST reads on screen: a gentle FOV push while sprinting at speed.
+  const sprintHedef = (pad.sprintHeld && Math.hypot(sim.vel.x, sim.vel.z) > 4.5) ? 7 : 0;
+  const yeniKatki = sprintFovKatki + (sprintHedef - sprintFovKatki) * (1 - Math.exp(-6 * frameDt));
+  if (Math.abs(yeniKatki - sprintFovKatki) > 0.01) {
+    sprintFovKatki = yeniKatki;
+    camera.fov = baseCameraFov + sprintFovKatki;
+    camera.updateProjectionMatrix();
+  }
 
   // World animation hooks (portal pulse, label bob).
   for (const fn of world.animated) fn(t, frameDt);

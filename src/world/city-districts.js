@@ -360,8 +360,14 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     // match on the road, its kerb and its paint.
     // The sun is warm (0xffefd4), so it drags blue down on every surface it
     // touches; the base colours carry extra blue to land neutral once lit.
-    road: material(0xc7b6c1, { roughness: 0.95 }),
-    kerbLight: material(0xd8c6d1, { roughness: 0.9 }),
+    // Asphalt has to be DARKER than the paving it runs through. At 0xc7b6c1
+    // the carriageway landed within a few percent of the town floor (#c0b6b5)
+    // and the whole map read as one flat field with white dashes painted on
+    // it — the "çöp" Oscar saw next to the skate lobby, where road, kerb and
+    // ground are three clearly separate tones. Same warm-neutral family, real
+    // separation: asphalt, then a pale kerb, then the paving.
+    road: material(0x9c8f99, { roughness: 0.95 }),
+    kerbLight: material(0xded0d8, { roughness: 0.9 }),
     paint: material(0xf0e2ea, { roughness: 0.9 }),
     stone: material(0xaf9f9e, { roughness: 0.8 }),
     // The reference's timber is a soft warm tan (212,180,170 lit), not the
@@ -2384,7 +2390,37 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // The plaza's own trees are PLAN_AGACLAR rows like every other tree — the
   // eight extra crowns that used to be spread in here put twelve trees in a
   // window the reference gives four.
-  const allTrees = TREES;
+  //
+  // Street planting: the town read as one flat mauve field from above because
+  // the drawing plants its groves in the parks and leaves the avenues bare.
+  // Oscar wants the skate lobby's greenery on the big map, so the widened
+  // arterials get an avenue of trees down both verges — spaced, never on the
+  // asphalt, never inside a building, and skipped where a park or a pitch
+  // already carries its own planting.
+  const AGAC_ARALIK = 11;
+  const sokakAgaclari = [];
+  const agacUygun = (x, z) => (
+    !denizdeMi(x, z)
+    && !yolUstunde(x, z, 2.2, 2.2)
+    && !TREES.some(([tx, tz]) => Math.hypot(tx - x, tz - z) < 6)
+    && !sokakAgaclari.some(([sx, sz]) => Math.hypot(sx - x, sz - z) < 7)
+    && !OZEL_BOLGELER.some((b) => x > b.minX - 1 && x < b.maxX + 1 && z > b.minZ - 1 && z < b.maxZ + 1)
+    && !colliders.some((c) => x > c.minX - 1.2 && x < c.maxX + 1.2 && z > c.minZ - 1.2 && z < c.maxZ + 1.2)
+  );
+  PLAN_ANA_YOLLAR.forEach(([x, z, g, d]) => {
+    const yatay = yatayMi(g, d);
+    const uzun = Math.max(g, d);
+    if (uzun < 16) return;                      // stubs get no avenue
+    const kenar = yolKalinlik(g, d) / 2 + 1.9;  // clear of kerb and lane
+    for (let t = -uzun / 2 + 6; t < uzun / 2 - 5; t += AGAC_ARALIK) {
+      for (const yon of [-1, 1]) {
+        const ax = yatay ? x + t : x + yon * kenar;
+        const az = yatay ? z + yon * kenar : z + t;
+        if (agacUygun(ax, az)) sokakAgaclari.push([ax, az, 0.82]);
+      }
+    }
+  });
+  const allTrees = TREES.concat(sokakAgaclari);
   const canopy = treeBlobs(allTrees, THREE, crownMat);
   canopy.name = 'district:tree-canopy';
   add(canopy, { camera: false, cast: true });
