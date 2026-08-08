@@ -254,13 +254,12 @@ function havuzKulubu({ THREE, kok, add, material, mats, mekan }) {
   // Two low deck chairs by the pool's waist — the small pair the reference
   // parks between the lounger rows and the water.
   const sandalyeU = [px0 - 0.055, px1 + 0.055];
-  seri(kutu(0.72, 0.16, 0.95), ahsapMat, 2, (i, m, mesh) => {
-    const [x, z] = P(sandalyeU[i], (pz0 + pz1) / 2 - 0.06);
-    m.identity(); m.setPosition(x, 0.3, z); mesh.setMatrixAt(i, m);
-  });
-  seri(kutu(0.72, 0.5, 0.14), ahsapMat, 2, (i, m, mesh) => {
-    const [x, z] = P(sandalyeU[i], (pz0 + pz1) / 2 - 0.083);
-    m.identity(); m.setPosition(x, 0.62, z); mesh.setMatrixAt(i, m);
+  seri(kutu(1, 1, 1), ahsapMat, 4, (i, m, mesh) => {
+    const koltuk = i < 2;
+    const [x, z] = P(sandalyeU[i % 2], (pz0 + pz1) / 2 - (koltuk ? 0.06 : 0.083));
+    m.makeScale(0.72, koltuk ? 0.16 : 0.5, koltuk ? 0.95 : 0.14);
+    m.setPosition(x, koltuk ? 0.3 : 0.62, z);
+    mesh.setMatrixAt(i, m);
   });
 
   // A cocktail on every side table, and a bottle rank along the back bar.
@@ -489,22 +488,30 @@ function butik({ THREE, kok, add, material, mekan }) {
     kok.add(mesh);
     return mesh;
   };
-  const tek = (geo, mat, u, v, y) => {
-    const m = new THREE.Mesh(geo, mat);
-    const [x, z] = P(u, v);
-    m.position.set(x, y, z);
-    kok.add(m);
-    return m;
-  };
 
   const zeminMat = material(0xdde4e4, { roughness: 0.85 });
   const duvarMat = material(0xe6d9c8, { roughness: 0.9 });
   const ahsap = material(0xcaa877, { roughness: 0.75 });
+  const metal = material(0x8a8f98, { roughness: 0.4 });
   const kumasRenk = ['#e8a8a5', '#a8c3e0', '#b9d3b2', '#e7cfa1', '#c9b6dd', '#f0e6da', '#9fb9d8', '#e0b6ad'];
 
-  // Floor and shell.
-  const zemin = tek(new THREE.BoxGeometry(S, 0.4, S), zeminMat, 0.5, 0.5, -0.2);
+  // The whole boutique is nine draws of furniture: every wooden box, every
+  // pole and every hanging piece rides a shared instanced mesh — the first
+  // pass built them one mesh each and blew the lobby's draw budget.
+  const ahsapKutular = [];   // [u, v, y, w, h, d]
+  const silindirler = [];    // [u, v, y, r, len, yatay]
+  const askilar = [];        // [u, v, y, renkIdx]
+  const katlar = [];         // [u, v, y, renkIdx, olcek]
+
+  const zemin = new THREE.Mesh(new THREE.BoxGeometry(S, 0.4, S), zeminMat);
+  {
+    const [x, z] = P(0.5, 0.5);
+    zemin.position.set(x, -0.2, z);
+  }
   zemin.name = 'mekan:magaza-zemin';
+  kok.add(zemin);
+
+  // Shell walls with the south doorway.
   const d = BUTIK.duvar;
   const yuk = 1.5;
   const kal = 0.4;
@@ -515,157 +522,162 @@ function butik({ THREE, kok, add, material, mekan }) {
     { g: kal, dd: S * (1 - d * 2), u: 1 - d, v: 0.5 },
     { g: S * (ka - d), dd: kal, u: d + (ka - d) / 2, v: 1 - d },
     { g: S * (1 - d - kb), dd: kal, u: kb + (1 - d - kb) / 2, v: 1 - d },
+    // Fitting-room shells share the wall material and mesh.
+    { g: 2.2 / S * S, dd: 2.0, u: BUTIK.kabinler[0][0], v: BUTIK.kabinler[0][1], h: 2.1 },
+    { g: 2.2, dd: 2.0, u: BUTIK.kabinler[1][0], v: BUTIK.kabinler[1][1], h: 2.1 },
   ];
   seri(new THREE.BoxGeometry(1, 1, 1), duvarMat, duvarlar.length, (i, m, mesh) => {
     const k = duvarlar[i];
     const [x, z] = P(k.u, k.v);
-    m.makeScale(k.g, yuk, k.dd);
-    m.setPosition(x, yuk / 2, z);
+    const h = k.h || yuk;
+    m.makeScale(k.g, h, k.dd);
+    m.setPosition(x, h / 2, z);
     mesh.setMatrixAt(i, m);
   });
 
-  // West wall: a run of cubbies, each holding two folded stacks.
+  // West wall cubbies with folded stacks.
   const raf = BUTIK.batiRaf;
-  const rafAdet = raf.adet;
-  seri(new THREE.BoxGeometry(1.3, 1.05, uz(raf.z0, raf.z1) / rafAdet - 0.12), ahsap,
-    rafAdet, (i, m, mesh) => {
-      const v = raf.z0 + ((i + 0.5) / rafAdet) * (raf.z1 - raf.z0);
-      const [x, z] = P(raf.u, v);
-      m.identity(); m.setPosition(x, 0.55, z); mesh.setMatrixAt(i, m);
-    });
-  const katGeo = new THREE.BoxGeometry(0.5, 0.14, 0.6);
-  const katMat = material(0xffffff, { roughness: 0.8, vertexColors: true });
-  {
-    const n = katGeo.attributes.position.count;
-    katGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(1), 3));
+  for (let i = 0; i < raf.adet; i += 1) {
+    const v = raf.z0 + ((i + 0.5) / raf.adet) * (raf.z1 - raf.z0);
+    ahsapKutular.push([raf.u, v, 0.55, 1.3, 1.05, uz(raf.z0, raf.z1) / raf.adet - 0.12]);
+    for (let kat = 0; kat < 4; kat += 1) {
+      katlar.push([
+        raf.u + 0.012, v + (kat % 2 === 0 ? -0.006 : 0.006), 0.28 + Math.floor(kat / 2) * 0.5,
+        (i * 3 + kat) % kumasRenk.length, 1,
+      ]);
+    }
   }
-  seri(katGeo, katMat, rafAdet * 4, (i, m, mesh) => {
-    const bolme = Math.floor(i / 4);
-    const kat = i % 4;
-    const v = raf.z0 + ((bolme + 0.5) / rafAdet) * (raf.z1 - raf.z0);
-    const [x, z] = P(raf.u + 0.012, v);
-    m.identity();
-    m.setPosition(x, 0.28 + Math.floor(kat / 2) * 0.5, z + (kat % 2 === 0 ? -0.16 : 0.16));
-    mesh.setMatrixAt(i, m);
-    mesh.setColorAt(i, new THREE.Color(kumasRenk[(bolme * 3 + kat) % kumasRenk.length]));
-  });
 
-  // North unit: shelf of folded stacks above a rail of hanging pieces.
+  // North unit: shelf over a rail of hangers.
   const [nx0, nz0, nx1, nz1] = BUTIK.kuzeyRaf;
-  tek(new THREE.BoxGeometry(uz(nx0, nx1), 0.1, uz(nz0, nz1)), ahsap,
-    (nx0 + nx1) / 2, (nz0 + nz1) / 2, 1.28);
-  tek(new THREE.CylinderGeometry(0.035, 0.035, uz(nx0, nx1), 8), material(0x8a8f98, { roughness: 0.4 }),
-    (nx0 + nx1) / 2, (nz0 + nz1) / 2, 1.05)
-    .rotation.z = Math.PI / 2;
-  const askiGeo = new THREE.BoxGeometry(0.34, 0.72, 0.06);
-  {
-    const n = askiGeo.attributes.position.count;
-    askiGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(n * 3).fill(1), 3));
-  }
-  const askiMat = material(0xffffff, { roughness: 0.75, vertexColors: true });
+  ahsapKutular.push([(nx0 + nx1) / 2, (nz0 + nz1) / 2, 1.28, uz(nx0, nx1), 0.1, uz(nz0, nz1)]);
+  silindirler.push([(nx0 + nx1) / 2, (nz0 + nz1) / 2, 1.05, 0.035, uz(nx0, nx1), true]);
   const kuzeyAski = 14;
-  seri(askiGeo, askiMat, kuzeyAski, (i, m, mesh) => {
-    const u = nx0 + ((i + 0.5) / kuzeyAski) * (nx1 - nx0);
-    const [x, z] = P(u, (nz0 + nz1) / 2 + 0.012);
-    m.identity(); m.setPosition(x, 0.66, z); mesh.setMatrixAt(i, m);
-    mesh.setColorAt(i, new THREE.Color(kumasRenk[i % kumasRenk.length]));
-  });
+  for (let i = 0; i < kuzeyAski; i += 1) {
+    askilar.push([nx0 + ((i + 0.5) / kuzeyAski) * (nx1 - nx0), (nz0 + nz1) / 2 + 0.012, 0.66,
+      i % kumasRenk.length]);
+  }
 
-  // Rack islands: two posts, a rail, hanging clothes.
+  // Rack islands.
   for (const [ax0, az0, ax1, az1] of BUTIK.askiAda) {
     const orta = (az0 + az1) / 2;
-    tek(new THREE.BoxGeometry(uz(ax0, ax1), 0.08, 0.5), ahsap, (ax0 + ax1) / 2, orta, 0.04);
-    for (const u of [ax0 + 0.012, ax1 - 0.012]) {
-      tek(new THREE.CylinderGeometry(0.035, 0.035, 1.3, 8), ahsap, u, orta, 0.65);
-    }
-    tek(new THREE.CylinderGeometry(0.03, 0.03, uz(ax0, ax1) - 0.3, 8),
-      material(0x8a8f98, { roughness: 0.4 }), (ax0 + ax1) / 2, orta, 1.28)
-      .rotation.z = Math.PI / 2;
+    ahsapKutular.push([(ax0 + ax1) / 2, orta, 0.04, uz(ax0, ax1), 0.08, 0.5]);
+    silindirler.push([ax0 + 0.012, orta, 0.65, 0.035, 1.3, false]);
+    silindirler.push([ax1 - 0.012, orta, 0.65, 0.035, 1.3, false]);
+    silindirler.push([(ax0 + ax1) / 2, orta, 1.28, 0.03, uz(ax0, ax1) - 0.3, true]);
     const adet = Math.max(4, Math.round(uz(ax0, ax1) / 0.42));
-    seri(askiGeo, askiMat, adet, (i, m, mesh) => {
-      const u = ax0 + 0.02 + ((i + 0.5) / adet) * (ax1 - ax0 - 0.04);
-      const [x, z] = P(u, orta);
-      m.identity(); m.setPosition(x, 0.88, z); mesh.setMatrixAt(i, m);
-      mesh.setColorAt(i, new THREE.Color(kumasRenk[(i * 5 + 2) % kumasRenk.length]));
-    });
-  }
-
-  // Display tables with folded piles, a bag and a hat.
-  for (const [tx0, tz0, tx1, tz1] of BUTIK.masa) {
-    tek(new THREE.BoxGeometry(uz(tx0, tx1), 0.09, uz(tz0, tz1)), ahsap,
-      (tx0 + tx1) / 2, (tz0 + tz1) / 2, 0.62);
-    for (const u of [tx0 + 0.02, tx1 - 0.02]) {
-      for (const v of [tz0 + 0.015, tz1 - 0.015]) {
-        tek(new THREE.CylinderGeometry(0.035, 0.035, 0.6, 8), ahsap, u, v, 0.3);
-      }
+    for (let i = 0; i < adet; i += 1) {
+      askilar.push([ax0 + 0.02 + ((i + 0.5) / adet) * (ax1 - ax0 - 0.04), orta, 0.88,
+        (i * 5 + 2) % kumasRenk.length]);
     }
-    const yigin = 6;
-    seri(katGeo, katMat, yigin, (i, m, mesh) => {
-      const u = tx0 + 0.025 + ((i % 3 + 0.5) / 3) * (tx1 - tx0 - 0.05);
-      const v = tz0 + 0.02 + (Math.floor(i / 3) + 0.5) / 2 * (tz1 - tz0 - 0.04);
-      const [x, z] = P(u, v);
-      m.makeScale(0.8, 1, 0.7);
-      m.setPosition(x, 0.74, z);
-      mesh.setMatrixAt(i, m);
-      mesh.setColorAt(i, new THREE.Color(kumasRenk[(i * 7 + 1) % kumasRenk.length]));
-    });
-  }
-  // Bag on table one, hat beside it.
-  {
-    const [tx0, tz0, tx1] = BUTIK.masa[0];
-    tek(new THREE.BoxGeometry(0.34, 0.4, 0.2), material(0x9a86c9, { roughness: 0.5 }),
-      (tx0 + tx1) / 2, tz0 + 0.028, 0.9);
-    tek(new THREE.CylinderGeometry(0.24, 0.28, 0.1, 12), material(0xe7cfa1, { roughness: 0.7 }),
-      tx1 - 0.03, tz0 + 0.028, 0.72);
   }
 
-  // Fitting rooms: box shells with pink curtains, and the standing mirror.
-  for (const [ku, kv] of BUTIK.kabinler) {
+  // Display tables with piles.
+  for (const [tx0, tz0, tx1, tz1] of BUTIK.masa) {
+    ahsapKutular.push([(tx0 + tx1) / 2, (tz0 + tz1) / 2, 0.62, uz(tx0, tx1), 0.09, uz(tz0, tz1)]);
+    for (const u of [tx0 + 0.02, tx1 - 0.02]) {
+      for (const v of [tz0 + 0.015, tz1 - 0.015]) silindirler.push([u, v, 0.3, 0.035, 0.6, false]);
+    }
+    for (let i = 0; i < 6; i += 1) {
+      katlar.push([
+        tx0 + 0.025 + ((i % 3 + 0.5) / 3) * (tx1 - tx0 - 0.05),
+        tz0 + 0.02 + ((Math.floor(i / 3) + 0.5) / 2) * (tz1 - tz0 - 0.04),
+        0.74, (i * 7 + 1) % kumasRenk.length, 0.8,
+      ]);
+    }
+  }
+
+  // Mirror frame, counter and till ride the wooden instanced mesh too.
+  ahsapKutular.push([BUTIK.ayna[0], BUTIK.ayna[1], 0.95, 0.8, 1.9, 0.08]);
+  const [cx0, cz0, cx1, cz1] = BUTIK.kasa;
+  ahsapKutular.push([(cx0 + cx1) / 2, cz0 + (cz1 - cz0) * 0.18, 0.5, uz(cx0, cx1), 1.0, uz(cz0, cz1) * 0.35]);
+
+  seri(new THREE.BoxGeometry(1, 1, 1), ahsap, ahsapKutular.length, (i, m, mesh) => {
+    const [u, v, y, w, h, dd] = ahsapKutular[i];
+    const [x, z] = P(u, v);
+    m.makeScale(w, h, dd);
+    m.setPosition(x, y, z);
+    mesh.setMatrixAt(i, m);
+  });
+  seri(new THREE.CylinderGeometry(1, 1, 1, 8), metal, silindirler.length, (i, m, mesh) => {
+    const [u, v, y, r, len, yatay] = silindirler[i];
+    const [x, z] = P(u, v);
+    if (yatay) m.makeRotationZ(Math.PI / 2); else m.identity();
+    const olcekM = new THREE.Matrix4().makeScale(r, len, r);
+    m.multiply(olcekM);
+    m.setPosition(x, y, z);
+    mesh.setMatrixAt(i, m);
+  });
+  const askiGeo = beyazRenk(THREE, new THREE.BoxGeometry(0.34, 0.72, 0.06));
+  const kumas = material(0xffffff, { roughness: 0.75, vertexColors: true });
+  seri(askiGeo, kumas, askilar.length, (i, m, mesh) => {
+    const [u, v, y, renk] = askilar[i];
+    const [x, z] = P(u, v);
+    m.identity();
+    m.setPosition(x, y, z);
+    mesh.setMatrixAt(i, m);
+    mesh.setColorAt(i, new THREE.Color(kumasRenk[renk]));
+  });
+  const katGeo = beyazRenk(THREE, new THREE.BoxGeometry(0.5, 0.14, 0.6));
+  seri(katGeo, kumas, katlar.length, (i, m, mesh) => {
+    const [u, v, y, renk, olcek] = katlar[i];
+    const [x, z] = P(u, v);
+    m.makeScale(olcek, 1, olcek * 0.9);
+    m.setPosition(x, y, z);
+    mesh.setMatrixAt(i, m);
+    mesh.setColorAt(i, new THREE.Color(kumasRenk[renk]));
+  });
+
+  // The handful of one-offs: curtains, mirror glass, rug, pouf, bag, hat, till.
+  const tekil = (geo, mat, u, v, y, rotY = 0) => {
+    const m = new THREE.Mesh(geo, mat);
+    const [x, z] = P(u, v);
+    m.position.set(x, y, z);
+    m.rotation.y = rotY;
+    kok.add(m);
+    return m;
+  };
+  const perdeGeo = new THREE.BoxGeometry(1.7, 1.7, 0.06);
+  const perdeMat = material(0xe8a8a5, { roughness: 0.85 });
+  seri(perdeGeo, perdeMat, BUTIK.kabinler.length, (i, m, mesh) => {
+    const [ku, kv] = BUTIK.kabinler[i];
     const [x, z] = P(ku, kv);
-    const oda = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.1, 2.0), duvarMat);
-    oda.position.set(x, 1.05, z);
-    kok.add(oda);
-    const perde = new THREE.Mesh(
-      new THREE.BoxGeometry(1.7, 1.7, 0.06),
-      material(0xe8a8a5, { roughness: 0.85 }),
-    );
-    perde.position.set(x, 0.95, z + 1.03);
-    kok.add(perde);
-  }
-  {
-    const [x, z] = P(BUTIK.ayna[0], BUTIK.ayna[1]);
-    const cerceve = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.9, 0.08), ahsap);
-    cerceve.position.set(x, 0.95, z);
-    cerceve.rotation.y = -0.4;
-    kok.add(cerceve);
-    const cam = new THREE.Mesh(
-      new THREE.BoxGeometry(0.62, 1.7, 0.02),
-      material(0xbfd9dd, { roughness: 0.1, metalness: 0.6 }),
-    );
-    cam.position.set(x - 0.02, 0.95, z + 0.05);
-    cam.rotation.y = -0.4;
-    kok.add(cam);
-  }
-  // Rug + pouf.
-  {
-    const [x, z] = P(BUTIK.hali[0], BUTIK.hali[1]);
-    const hali = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.04, 24),
-      material(0xc9a8bb, { roughness: 0.95 }));
-    hali.position.set(x, 0.03, z);
-    kok.add(hali);
-    const puf = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.5, 0.5, 14),
-      material(0x9db4c9, { roughness: 0.8 }));
-    puf.position.set(x, 0.25, z);
-    kok.add(puf);
-  }
-  // Counter with till.
-  {
-    const [cx0, cz0, cx1, cz1] = BUTIK.kasa;
-    tek(new THREE.BoxGeometry(uz(cx0, cx1), 1.0, uz(cz0, cz1) * 0.35), ahsap,
-      (cx0 + cx1) / 2, cz0 + (cz1 - cz0) * 0.18, 0.5);
-    tek(new THREE.BoxGeometry(0.34, 0.26, 0.3), material(0x2c2f38, { roughness: 0.5 }),
-      (cx0 + cx1) / 2, cz0 + (cz1 - cz0) * 0.14, 1.14);
-  }
+    m.identity();
+    m.setPosition(x, 0.95, z + 1.03);
+    mesh.setMatrixAt(i, m);
+  });
+  tekil(new THREE.BoxGeometry(0.62, 1.7, 0.02),
+    material(0xbfd9dd, { roughness: 0.1, metalness: 0.6 }),
+    BUTIK.ayna[0] - 0.002, BUTIK.ayna[1] + 0.004, 0.95, -0.4);
+  // Rug, pouf and the straw hat share one tinted cylinder mesh; the bag and
+  // the till share one tinted box mesh — six one-offs down to two draws.
+  const renkliSilindir = [
+    [BUTIK.hali[0], BUTIK.hali[1], 0.03, 1.5, 0.04, '#c9a8bb'],
+    [BUTIK.puf[0], BUTIK.puf[1], 0.25, 0.47, 0.5, '#9db4c9'],
+    [BUTIK.masa[0][2] - 0.03, BUTIK.masa[0][1] + 0.028, 0.72, 0.26, 0.1, '#e7cfa1'],
+  ];
+  seri(beyazRenk(THREE, new THREE.CylinderGeometry(1, 1, 1, 20)), kumas,
+    renkliSilindir.length, (i, m, mesh) => {
+      const [u, v, y, r, h, renk] = renkliSilindir[i];
+      const [x, z] = P(u, v);
+      m.makeScale(r, h, r);
+      m.setPosition(x, y, z);
+      mesh.setMatrixAt(i, m);
+      mesh.setColorAt(i, new THREE.Color(renk));
+    });
+  const renkliKutu = [
+    [(BUTIK.masa[0][0] + BUTIK.masa[0][2]) / 2, BUTIK.masa[0][1] + 0.028, 0.9, 0.34, 0.4, 0.2, '#9a86c9'],
+    [(cx0 + cx1) / 2, cz0 + (cz1 - cz0) * 0.14, 1.14, 0.34, 0.26, 0.3, '#2c2f38'],
+  ];
+  seri(beyazRenk(THREE, new THREE.BoxGeometry(1, 1, 1)), kumas,
+    renkliKutu.length, (i, m, mesh) => {
+      const [u, v, y, w, h, dd, renk] = renkliKutu[i];
+      const [x, z] = P(u, v);
+      m.makeScale(w, h, dd);
+      m.setPosition(x, y, z);
+      mesh.setMatrixAt(i, m);
+      mesh.setColorAt(i, new THREE.Color(renk));
+    });
 
   add?.(zemin, { walkable: true, camera: false, cast: false });
 }
