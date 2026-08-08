@@ -344,6 +344,21 @@ export function createCharacters(ctx, {
     variant = 'default',
     shadow = 'hero',
   } = {}) {
+    // The gorilla and every `friendsie:` pick are authored rigged models, not
+    // roster geometry, so they have no manifest here and fell through to the
+    // generic runner — which is why Oscar's chosen character walked the park
+    // but never showed up in a mini game. The hub already mounts them through
+    // the rival factory; every game takes the same road now, and what comes
+    // back carries the same root / animator / dispose shape a game expects.
+    if (typeof id === 'string' && (id === 'gorilla' || id.startsWith('friendsie:'))) {
+      try {
+        const rigged = await import('./friendsie-bot.js');
+        const ornek = await rigged.createFriendsieRival(id, { height: 1.38 });
+        if (ornek) return ornek;
+      } catch {
+        /* fall through to roster geometry rather than leave a game bodiless */
+      }
+    }
     const candidateManifest = candidateManifests.find((entry) => entry.id === id);
     if (
       candidateManifest
