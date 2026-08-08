@@ -416,6 +416,9 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // and 52. Several earlier guesses were two to six units out, which is what
   // pushed plan-placed buildings onto the carriageway.
   const ROAD_W = 4.6;
+  // Filled once the river curve exists, further down; the returned world
+  // object closes over it.
+  let nehirdeMi = () => false;
   // Oscar, from the phone screenshots: the map reads cramped — "daracik
   // yollar". The drawing's carriageways measure 2.3-4.3 units, alley-width
   // next to the blocks. Every arterial is widened here at build time, and
@@ -2401,6 +2404,7 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   const sokakAgaclari = [];
   const agacUygun = (x, z) => (
     !denizdeMi(x, z)
+    && !nehirdeMi(x, z)
     && !yolUstunde(x, z, 2.2, 2.2)
     && !TREES.some(([tx, tz]) => Math.hypot(tx - x, tz - z) < 6)
     && !sokakAgaclari.some(([sx, sz]) => Math.hypot(sx - x, sz - z) < 7)
@@ -2459,6 +2463,35 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   river.position.y = 0.05;
   river.name = 'district:river';
   add(river, { camera: false, cast: false });
+
+  // The river was painted on but never solid: `isWater` only ever covered the
+  // sea, so the whole length of it was open ground and the player walked
+  // straight down the middle of the water. It blocks now, the way the buildings
+  // do — a chain of short boxes stepped along the curve, each skipped where a
+  // bridge crosses so the crossings still work. Water is not a wall you climb,
+  // so the tops sit just above stepping height and no lower.
+  const NEHIR_YARICAP = 2.4;
+  const nehirNoktalari = riverCurve.getPoints(120);
+  const kopruNoktasi = (x, z) => AHSAP_KOPRU.some(([bx, bz, bw]) => (
+    Math.hypot(bx - x, bz - z) < bw / 2 + 1.6
+  ));
+  // Same chain, used by isWater so a map tap cannot land in the channel — but
+  // a bridge deck is dry land, so tapping a crossing still works.
+  nehirdeMi = (x, z) => !kopruNoktasi(x, z) && nehirNoktalari.some((p) => (
+    Math.abs(p.x - x) < NEHIR_YARICAP && Math.abs(p.z - z) < NEHIR_YARICAP
+  ));
+  for (let i = 0; i < nehirNoktalari.length - 1; i += 1) {
+    const a = nehirNoktalari[i];
+    const b = nehirNoktalari[i + 1];
+    const mx = (a.x + b.x) / 2;
+    const mz = (a.z + b.z) / 2;
+    if (kopruNoktasi(mx, mz)) continue;
+    const yariX = Math.max(Math.abs(b.x - a.x) / 2, 0) + NEHIR_YARICAP * 0.72;
+    const yariZ = Math.max(Math.abs(b.z - a.z) / 2, 0) + NEHIR_YARICAP * 0.72;
+    colliders.push({
+      minX: mx - yariX, maxX: mx + yariX, minZ: mz - yariZ, maxZ: mz + yariZ, topY: 0.7,
+    });
+  }
 
   // The suburbs ring the whole plan in the reference, not just one strip:
   // rows outside the river to the west, along the south edge, up the north
@@ -2537,6 +2570,17 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
       for (const ev of evler) {
         const [nx, nz] = yoldanKaydir(ev.x, ev.z, ev.w, ev.d);
         if (nx !== ev.x || nz !== ev.z) { ev.x = nx; ev.z = nz; oynadi = true; }
+        // Off the water and onto the nearest bank. Dropping the west row for
+        // standing in the channel emptied the whole riverside; the drawing puts
+        // houses THERE, so they move to dry land instead of disappearing.
+        for (const p of nehirNoktalari) {
+          const payX = NEHIR_YARICAP + ev.w / 2 + 0.3 - Math.abs(p.x - ev.x);
+          const payZ = NEHIR_YARICAP + ev.d / 2 + 0.3 - Math.abs(p.z - ev.z);
+          if (payX <= 0 || payZ <= 0) continue;
+          oynadi = true;
+          if (payX < payZ) ev.x += (ev.x <= p.x ? -1 : 1) * payX;
+          else ev.z += (ev.z <= p.z ? -1 : 1) * payZ;
+        }
       }
       for (const ev of evler) {
         for (const other of hepsi) {
@@ -2567,9 +2611,18 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     // and forty-odd houses long; losing a few beats shipping one inside a
     // building, which is what "the houses have got into each other" was.
     const tutulan = [];
+    // A house standing in the water was the one Oscar photographed: the sweep
+    // checked the sea and the roads but never the river, so the west row
+    // planted its walls straight in the channel. The whole footprint has to
+    // clear the water, not just its centre point.
+    const evNehirde = (ev) => nehirNoktalari.some((p) => (
+      Math.abs(p.x - ev.x) < NEHIR_YARICAP + ev.w / 2
+      && Math.abs(p.z - ev.z) < NEHIR_YARICAP + ev.d / 2
+    ));
     for (const ev of evler) {
       if (Math.abs(ev.x) > 61 || Math.abs(ev.z) > 61) continue;
       if (denizdeMi(ev.x, ev.z)) continue;
+      if (evNehirde(ev)) continue;
       if (yolUstunde(ev.x, ev.z, ev.w, ev.d)) continue;
       const cakisiyor = [...yerlesik, ...tutulan].some((o) => (
         Math.abs(ev.x - o.x) < (ev.w + o.w) / 2 - 0.2
@@ -2787,7 +2840,9 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     blockCount: BLOCKS.length,
     // The map lets you tap anywhere, so it needs the same shore test the
     // city uses to keep buildings out of the bay.
-    isWater: denizdeMi,
+    // The river counts as water too, so a map tap can no longer drop the
+    // player into the middle of it.
+    isWater: (x, z) => denizdeMi(x, z) || nehirdeMi(x, z),
     colliders,
   };
 }
