@@ -16,6 +16,7 @@ import { registerHook } from '../core/registry.js';
 import { MEKAN_PLOT, mekanMerkezi } from './mekanlar.js';
 import { COSMETICS } from '../systems/cosmetics.js';
 import { createFriendsieRival } from '../core/friendsie-bot.js';
+import { acMikroOyun } from './arcade-oyunlar.js';
 
 const PLOT = MEKAN_PLOT;
 
@@ -87,6 +88,11 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
   const kulupBar = kf(0.245, 0.39);          // in front of the west bar
   const kulupVipUst = kf(0.77, 0.18);        // VIP LOUNGE sofa
   const kulupVipAlt = kf(0.16, 0.73);        // VIP AREA sofa
+  const arcade = mekanMerkezi('arcade');
+  const af = (u, v) => ({ x: arcade.x + (u - 0.5) * PLOT, z: arcade.z + (v - 0.5) * PLOT });
+  const arcadeHop = af(0.31, 0.352);         // first sit-in cabinet row
+  const arcadeDodge = af(0.41, 0.522);       // second row
+  const arcadeKafe = af(0.64, 0.88);         // cafe corner table
   let karakter = null;
   ctx.bus.on('player-ready', (data) => { karakter = data?.instance || karakter; });
 
@@ -101,6 +107,7 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     { ad: 'No. 777', dosya: 'friendsie:fr_777.glb', x: kulupVipUst.x - 1.1, z: kulupVipUst.z, tarz: 'otur' },
     { ad: 'No. 2222', dosya: 'friendsie:fr_2222.glb', x: havuz.sagYataklar[2].x - 0.95, z: havuz.sagYataklar[2].z, tarz: 'uzan' },
     { ad: 'No. 8888', dosya: 'friendsie:fr_8888.glb', x: havuz.bar.x - 1.6, z: havuz.bar.z + 1.4, tarz: 'ayakta' },
+    { ad: 'No. 1000', dosya: 'friendsie:fr_1000.glb', x: 302 + (0.16 - 0.5) * 26, z: (0.72 - 0.5) * 26, tarz: 'otur' },
   ];
   for (const tanim of MISAFIR_TANIM) {
     createFriendsieRival(tanim.dosya, { height: 1.8 }).then((instance) => {
@@ -202,6 +209,22 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     return true;
   }
 
+  function kahveYap() {
+    const fincan = new THREE.Group();
+    fincan.name = 'mekan:kahve';
+    const govde = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.085, 0.07, 0.2, 10),
+      new THREE.MeshStandardMaterial({ color: 0xf6f2ec, roughness: 0.4 }),
+    );
+    const kapak = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.09, 0.09, 0.035, 10),
+      new THREE.MeshStandardMaterial({ color: 0xb98a5a, roughness: 0.6 }),
+    );
+    kapak.position.y = 0.115;
+    fincan.add(govde, kapak);
+    return fincan;
+  }
+
   function icecekYap() {
     const bardak = new THREE.Group();
     bardak.name = 'mekan:icecek';
@@ -265,7 +288,7 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
 
   // A round for someone in the room: pick who from the people actually here,
   // and the drink lands in their hand.
-  function birineIsmarla() {
+  function birineIsmarla(yapici = icecekYap, tur = 'drink') {
     const buradakiler = misafirler.filter((g) => {
       const d = Math.hypot(g.instance.root.position.x - getSim().pos.x,
         g.instance.root.position.z - getSim().pos.z);
@@ -275,7 +298,7 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
       ctx.ui.toast('Nobody else is here right now.');
       return;
     }
-    const panel = ctx.ui.panel({ title: 'Buy a drink for...' });
+    const panel = ctx.ui.panel({ title: tur === 'coffee' ? 'Buy a coffee for...' : 'Buy a drink for...' });
     const not = document.createElement('p');
     not.textContent = 'Pick someone in the room — it goes straight to them.';
     not.style.cssText = 'margin:0 0 12px;color:#6b7280;font-size:13.5px;';
@@ -283,12 +306,14 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     for (const g of buradakiler) {
       panel.body.appendChild(ctx.ui.button(g.ad, () => {
         panel.close();
-        const bardak = icecekYap();
+        const bardak = yapici();
         bardak.position.set(0.42, 0.95, 0.28);
         g.instance.root.add(bardak);
         setTimeout(() => bardak.removeFromParent(), 40000);
         ctx.bus.emit('sfx', 'reward');
-        ctx.ui.toast(`Delivered — ${g.ad} raises the glass to you.`);
+        ctx.ui.toast(tur === 'coffee'
+          ? `Delivered — ${g.ad} warms both hands on it.`
+          : `Delivered — ${g.ad} raises the glass to you.`);
       }, { primary: true }));
       panel.body.lastChild.style.margin = '0 8px 8px 0';
     }
@@ -355,6 +380,31 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
       target: 'cosmetics',
     },
     {
+      id: 'mekan-arcade-kapi', label: 'Arcade 67', kind: 'travel', radius: 2.6,
+      x: 51, z: 16,
+      target: { x: arcade.x + (0.49 - 0.5) * PLOT, z: arcade.z + PLOT * 0.485 - 1.2, mekan: 'arcade', label: 'Arcade 67' },
+    },
+    {
+      id: 'mekan-arcade-cikis', label: 'Back to 67 Park', kind: 'travel', radius: 2.2,
+      x: arcade.x + (0.49 - 0.5) * PLOT, z: arcade.z + PLOT * 0.485,
+      target: { ...donusNoktasi, mekan: null, label: '67 Park' },
+    },
+    {
+      id: 'mekan-arcade-hop', label: 'Play SKY HOP', kind: 'venue', radius: 2.2,
+      x: arcadeHop.x, z: arcadeHop.z + 1.4,
+      target: 'arcade-hop',
+    },
+    {
+      id: 'mekan-arcade-dodge', label: 'Play DODGE 67', kind: 'venue', radius: 2.2,
+      x: arcadeDodge.x, z: arcadeDodge.z + 1.4,
+      target: 'arcade-dodge',
+    },
+    {
+      id: 'mekan-arcade-kahve', label: 'Buy a coffee for someone', kind: 'venue', radius: 2.6,
+      x: arcadeKafe.x, z: arcadeKafe.z,
+      target: 'gift-kahve',
+    },
+    {
       id: 'mekan-kulup-dans', label: 'Dance', kind: 'venue', radius: 3.2,
       x: kulupPist.x, z: kulupPist.z + 2.4,
       target: 'dance',
@@ -413,6 +463,11 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
   isaret({ scene, x: havuz.kapi.x, z: havuz.kapi.z, metin: 'EXIT', renk: 0x17223a });
   isaret({ scene, x: magaza.x + PLOT * 0.21, z: magaza.z + PLOT * 0.485, metin: 'EXIT', renk: 0x17223a });
   isaret({ scene, x: magaza.x - PLOT * 0.055, z: magaza.z + PLOT * 0.05, metin: 'BUY', renk: 0xc9829a });
+  isaret({ scene, x: 51, z: 16, metin: 'ARCADE 67', renk: 0x8fc4cf });
+  isaret({ scene, x: arcade.x + (0.49 - 0.5) * PLOT, z: arcade.z + PLOT * 0.485, metin: 'EXIT', renk: 0x17223a });
+  isaret({ scene, x: arcadeHop.x, z: arcadeHop.z + 1.4, metin: 'SKY HOP', renk: 0x5a9cd8 });
+  isaret({ scene, x: arcadeDodge.x, z: arcadeDodge.z + 1.4, metin: 'DODGE 67', renk: 0x7fbf8e });
+  isaret({ scene, x: arcadeKafe.x, z: arcadeKafe.z, metin: 'COFFEE', renk: 0xb98a5a });
   isaret({ scene, x: kulupPist.x, z: kulupPist.z + 2.4, metin: 'DANCE', renk: 0xb45cd6 });
   isaret({ scene, x: kulupBar.x, z: kulupBar.z + 2.6, metin: 'BUY A ROUND', renk: 0xe8b64a });
   isaret({ scene, x: havuz.bar.x + 3.2, z: havuz.bar.z + 1.4, metin: 'BUY A ROUND', renk: 0xe8b64a });
@@ -439,6 +494,11 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
       if (target === 'drink') { icecekVer(); return; }
       if (target === 'shop-buy') { kiyafetSat(); return; }
       if (target === 'gift') { birineIsmarla(); return; }
+      if (target === 'gift-kahve') { birineIsmarla(kahveYap, 'coffee'); return; }
+      if (target === 'arcade-hop' || target === 'arcade-dodge') {
+        acMikroOyun(target, ctx);
+        return;
+      }
       if (target === 'dance') {
         if (durum.dans) dansiBirak(); else dansaBasla();
         return;

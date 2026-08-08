@@ -23,6 +23,7 @@ export const MEKANLAR = Object.freeze([
   Object.freeze({ id: 'havuz', ad: 'Pool Club', x: MEKAN_BASLANGIC, z: 0 }),
   Object.freeze({ id: 'kulup', ad: 'Night Club', x: MEKAN_BASLANGIC + 34, z: 0 }),
   Object.freeze({ id: 'magaza', ad: 'Boutique 67', x: MEKAN_BASLANGIC + 68, z: 0 }),
+  Object.freeze({ id: 'arcade', ad: 'Arcade 67', x: MEKAN_BASLANGIC + 102, z: 0 }),
 ]);
 
 export function mekanMerkezi(id) {
@@ -75,6 +76,7 @@ export function buildMekanlar({ THREE, group, add, material, mats }) {
     if (mekan.id === 'havuz') havuzKulubu({ THREE, kok, add, material, mats, mekan });
     if (mekan.id === 'kulup') geceKulubu({ THREE, kok, add, material, mekan });
     if (mekan.id === 'magaza') butik({ THREE, kok, add, material, mekan });
+    if (mekan.id === 'arcade') arcadeSalonu({ THREE, kok, add, material, mekan });
   }
   return kok;
 }
@@ -677,6 +679,184 @@ function butik({ THREE, kok, add, material, mekan }) {
       m.setPosition(x, y, z);
       mesh.setMatrixAt(i, m);
       mesh.setColorAt(i, new THREE.Color(renk));
+    });
+
+  add?.(zemin, { walkable: true, camera: false, cast: false });
+}
+
+// ------------------------------------------------------------------- arcade
+
+// Read off design/referans-mekanlar/arcade-basket.png, left hall: cabinet
+// rows on a warm wood floor, claw machines down the west wall, sit-in racing
+// cabinets mid-floor, a blue sofa lounge and the cafe corner with its striped
+// counter. The 67 half-court from that drawing lives on the town map, where
+// the hoop game runs.
+const ARCADE = Object.freeze({
+  duvar: 0.032,
+  kapi: Object.freeze([0.40, 0.58]),
+  kuzeySira: Object.freeze({ z: 0.085, x0: 0.10, x1: 0.62, adet: 7 }),
+  batiSutun: Object.freeze({ u: 0.075, z0: 0.16, z1: 0.62, adet: 5 }),
+  ortaSiralar: Object.freeze([
+    { z: 0.30, x0: 0.22, x1: 0.52, adet: 3, koltuk: true },
+    { z: 0.47, x0: 0.22, x1: 0.52, adet: 3, koltuk: true },
+    { z: 0.30, x0: 0.60, x1: 0.66, adet: 1, koltuk: false },
+  ]),
+  sagSutun: Object.freeze({ u: 0.645, z0: 0.42, z1: 0.66, adet: 3 }),
+  kanepe: Object.freeze([[0.16, 0.72, 0], [0.10, 0.83, Math.PI / 2], [0.22, 0.88, 0]]),
+  sehpa: Object.freeze([0.165, 0.80]),
+  kafeMasa: Object.freeze([[0.52, 0.80], [0.64, 0.88], [0.76, 0.80]]),
+  kafeTezgah: Object.freeze([0.86, 0.62, 0.955, 0.88]),
+  makineRenk: Object.freeze(['#e8a8b8', '#a8c3e0', '#f0b46a', '#9fd0a8', '#c9a8dd', '#8fc4cf', '#e0908a']),
+});
+
+function arcadeSalonu({ THREE, kok, add, material, mekan }) {
+  const S = MEKAN_PLOT;
+  const P = (u, v) => [mekan.x + (u - 0.5) * S, mekan.z + (v - 0.5) * S];
+  const M4 = new THREE.Matrix4();
+  const seri = (geo, mat, n, yerlestir) => {
+    const mesh = new THREE.InstancedMesh(geo, mat, n);
+    for (let i = 0; i < n; i += 1) yerlestir(i, M4, mesh);
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    kok.add(mesh);
+    return mesh;
+  };
+
+  const zemin = new THREE.Mesh(
+    new THREE.BoxGeometry(S, 0.4, S),
+    material(0xd9b98c, { roughness: 0.85 }),
+  );
+  {
+    const [x, z] = P(0.5, 0.5);
+    zemin.position.set(x, -0.2, z);
+  }
+  zemin.name = 'mekan:arcade-zemin';
+  kok.add(zemin);
+
+  // Shell.
+  const d = ARCADE.duvar;
+  const yuk = 1.6;
+  const kal = 0.4;
+  const [ka, kb] = ARCADE.kapi;
+  const duvarMat = material(0xd8cbc0, { roughness: 0.9 });
+  const duvarlar = [
+    { g: S * (1 - d * 2), dd: kal, u: 0.5, v: d },
+    { g: kal, dd: S * (1 - d * 2), u: d, v: 0.5 },
+    { g: kal, dd: S * (1 - d * 2), u: 1 - d, v: 0.5 },
+    { g: S * (ka - d), dd: kal, u: d + (ka - d) / 2, v: 1 - d },
+    { g: S * (1 - d - kb), dd: kal, u: kb + (1 - d - kb) / 2, v: 1 - d },
+  ];
+  seri(new THREE.BoxGeometry(1, 1, 1), duvarMat, duvarlar.length, (i, m, mesh) => {
+    const k = duvarlar[i];
+    const [x, z] = P(k.u, k.v);
+    m.makeScale(k.g, yuk, k.dd);
+    m.setPosition(x, yuk / 2, z);
+    mesh.setMatrixAt(i, m);
+  });
+
+  // Cabinets: body + dark screen + marquee, all instanced with tints. A claw
+  // machine is the same body in glassier tint with a taller cap; a racing
+  // cabinet adds a seat block in front.
+  const gov = [];   // [u, v, renkIdx, rotY]
+  const koltuklar = [];
+  const kSira = ARCADE.kuzeySira;
+  for (let i = 0; i < kSira.adet; i += 1) {
+    gov.push([kSira.x0 + ((i + 0.5) / kSira.adet) * (kSira.x1 - kSira.x0), kSira.z, i, 0]);
+  }
+  const bSutun = ARCADE.batiSutun;
+  for (let i = 0; i < bSutun.adet; i += 1) {
+    gov.push([bSutun.u, bSutun.z0 + ((i + 0.5) / bSutun.adet) * (bSutun.z1 - bSutun.z0), (i + 2), Math.PI / 2]);
+  }
+  for (const sira of ARCADE.ortaSiralar) {
+    for (let i = 0; i < sira.adet; i += 1) {
+      const u = sira.x0 + ((i + 0.5) / sira.adet) * (sira.x1 - sira.x0);
+      gov.push([u, sira.z, (i + 4), 0]);
+      if (sira.koltuk) koltuklar.push([u, sira.z + 0.052, i]);
+    }
+  }
+  const sSutun = ARCADE.sagSutun;
+  for (let i = 0; i < sSutun.adet; i += 1) {
+    gov.push([sSutun.u, sSutun.z0 + ((i + 0.5) / sSutun.adet) * (sSutun.z1 - sSutun.z0), (i + 1), -Math.PI / 2]);
+  }
+  const beyaz = (geo) => beyazRenk(THREE, geo);
+  const tintMat = material(0xffffff, { roughness: 0.55, vertexColors: true });
+  seri(beyaz(new THREE.BoxGeometry(0.95, 1.75, 0.72)), tintMat, gov.length, (i, m, mesh) => {
+    const [u, v, renk, rot] = gov[i];
+    const [x, z] = P(u, v);
+    m.makeRotationY(rot);
+    m.setPosition(x, 0.875, z);
+    mesh.setMatrixAt(i, m);
+    mesh.setColorAt(i, new THREE.Color(ARCADE.makineRenk[renk % ARCADE.makineRenk.length]));
+  });
+  seri(new THREE.BoxGeometry(0.7, 0.52, 0.05), material(0x241f2e, { roughness: 0.3 }),
+    gov.length, (i, m, mesh) => {
+      const [u, v, , rot] = gov[i];
+      const [x, z] = P(u, v);
+      m.makeRotationY(rot);
+      const one = new THREE.Vector3(0, 0, 0.37).applyAxisAngle(new THREE.Vector3(0, 1, 0), rot);
+      m.setPosition(x + one.x, 1.18, z + one.z);
+      mesh.setMatrixAt(i, m);
+    });
+  seri(beyaz(new THREE.BoxGeometry(0.62, 0.34, 0.5)), tintMat, koltuklar.length, (i, m, mesh) => {
+    const [u, v, renk] = koltuklar[i];
+    const [x, z] = P(u, v);
+    m.identity();
+    m.setPosition(x, 0.17, z);
+    mesh.setMatrixAt(i, m);
+    mesh.setColorAt(i, new THREE.Color(ARCADE.makineRenk[(renk + 3) % ARCADE.makineRenk.length]));
+  });
+
+  // Lounge sofas + low table.
+  seri(beyaz(new THREE.BoxGeometry(2.4, 0.62, 1.0)), tintMat, ARCADE.kanepe.length, (i, m, mesh) => {
+    const [u, v, rot] = ARCADE.kanepe[i];
+    const [x, z] = P(u, v);
+    m.makeRotationY(rot);
+    m.setPosition(x, 0.31, z);
+    mesh.setMatrixAt(i, m);
+    mesh.setColorAt(i, new THREE.Color('#8fb6d8'));
+  });
+  {
+    const [x, z] = P(ARCADE.sehpa[0], ARCADE.sehpa[1]);
+    const sehpa = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.34, 0.8),
+      material(0x9fc4cf, { roughness: 0.6 }));
+    sehpa.position.set(x, 0.17, z);
+    kok.add(sehpa);
+  }
+
+  // Cafe corner: striped counter, round tables with a pair of chairs each.
+  {
+    const [cx0, cz0, cx1, cz1] = ARCADE.kafeTezgah;
+    const [x, z] = P((cx0 + cx1) / 2, (cz0 + cz1) / 2);
+    const tezgah = new THREE.Mesh(
+      new THREE.BoxGeometry((cx1 - cx0) * S, 1.0, (cz1 - cz0) * S),
+      material(0xf3e2cf, { roughness: 0.7 }),
+    );
+    tezgah.position.set(x, 0.5, z);
+    tezgah.name = 'mekan:kafe-tezgah';
+    kok.add(tezgah);
+    const serit = new THREE.Mesh(
+      new THREE.BoxGeometry((cx1 - cx0) * S + 0.04, 0.22, (cz1 - cz0) * S + 0.04),
+      material(0xe8a8b8, { roughness: 0.6 }),
+    );
+    serit.position.set(x, 0.86, z);
+    kok.add(serit);
+  }
+  seri(new THREE.CylinderGeometry(0.55, 0.5, 0.08, 14), material(0xf3e2cf, { roughness: 0.7 }),
+    ARCADE.kafeMasa.length, (i, m, mesh) => {
+      const [u, v] = ARCADE.kafeMasa[i];
+      const [x, z] = P(u, v);
+      m.identity();
+      m.setPosition(x, 0.62, z);
+      mesh.setMatrixAt(i, m);
+    });
+  seri(beyaz(new THREE.CylinderGeometry(0.26, 0.24, 0.5, 10)), tintMat,
+    ARCADE.kafeMasa.length * 2, (i, m, mesh) => {
+      const [u, v] = ARCADE.kafeMasa[Math.floor(i / 2)];
+      const [x, z] = P(u + (i % 2 === 0 ? -0.032 : 0.032), v + (i % 2 === 0 ? 0.02 : -0.02));
+      m.identity();
+      m.setPosition(x, 0.25, z);
+      mesh.setMatrixAt(i, m);
+      mesh.setColorAt(i, new THREE.Color(i % 2 === 0 ? '#8fb6d8' : '#e8a8b8'));
     });
 
   add?.(zemin, { walkable: true, camera: false, cast: false });
