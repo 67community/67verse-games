@@ -190,9 +190,12 @@ const SLOT_ICON = {
 // Most cosmetics are a purchase; the two starters stay free. Prices in coins.
 const PRICES = { beanie_sunny: 0, specs_round: 0, cap_terra: 120, crown_plum: 260, shades_star: 200, pack_sage: 180, pack_wings: 320 };
 const priceOf = (id) => (PRICES[id] ?? 150);
-// Free starters so every kid has something fun on day one (no pay-to-win,
-// no paid randomness; more items arrive via the Shop/quests modules).
-const STARTERS = ['beanie_sunny', 'specs_round'];
+// You start with nothing — every item is picked up in the Closet itself.
+const STARTERS = [];
+// Trial phase: everything is free so the whole wardrobe can be tested end to
+// end. PRICES above stays as the future price list — flip this back to turn
+// the paid flow on again.
+const FREE_TRIAL = true;
 
 // ---------- ctx / save helpers ----------
 let ctxRef = null;
@@ -446,14 +449,16 @@ function cardEl(def, { equipped, owned, thumb }) {
 
   const price = document.createElement('div');
   price.className = 'cp-price';
-  price.textContent = owned ? (equipped ? 'Equipped' : 'Owned') : `${priceOf(def.id)} coins`;
+  price.textContent = owned
+    ? (equipped ? 'Equipped' : 'Owned')
+    : (FREE_TRIAL ? 'Free — trial' : `${priceOf(def.id)} coins`);
   card.appendChild(price);
 
   const btn = document.createElement('button');
   btn.type = 'button';
   if (!owned) {
     btn.className = 'cp-btn buy';
-    btn.textContent = 'BUY';
+    btn.textContent = FREE_TRIAL ? 'GET' : 'BUY';
     btn.onclick = () => {
       if (!buy(def.id)) { ctxRef.ui.toast('Purchase could not be saved on this device.'); return; }
       equip(def.id);
@@ -489,7 +494,7 @@ function renderBody() {
 
   const intro = document.createElement('p');
   intro.className = 'cp-intro';
-  intro.textContent = 'One item per slot — it shows on your character live. The two starters are free; the rest you can pick up right here.';
+  intro.textContent = 'You start with nothing — grab any item and it goes on your character live. Everything is free during the trial.';
   wrap.appendChild(intro);
 
   const owned = new Set(getOwned());

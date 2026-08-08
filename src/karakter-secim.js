@@ -16,20 +16,27 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const FR_BASE = `${import.meta.env?.BASE_URL ?? '/'}friendsies/`;
 
+// Trial phase: everything is free so the whole roster can be tested end to
+// end. The fiyat numbers below stay as the future price list — flipping this
+// flag back turns the paid flow on again.
+const HERSEY_UCRETSIZ = true;
+
 // The roster shown in the picker. The hero (gorilla) and the first fRiENDSiES
 // are free; the rest carry a coin price so most of the collection is a purchase,
 // the way Oscar wants it. price 0 = owned from the start.
 export const KARAKTERLER = Object.freeze([
+  // Display names never carry the source collection's brand — Oscar's rule:
+  // "Friends ismi hicbir yerde gecmeyecek". They are numbered 67 pieces.
   { id: 'gorilla', ad: 'Gorilla', dosya: null, fiyat: 0 },
-  { id: 'friendsie:fr_67.glb', ad: 'Friendsie 67', dosya: 'fr_67.glb', fiyat: 0 },
-  { id: 'friendsie:fr_1.glb', ad: 'Friendsie 1', dosya: 'fr_1.glb', fiyat: 120 },
-  { id: 'friendsie:fr_100.glb', ad: 'Friendsie 100', dosya: 'fr_100.glb', fiyat: 120 },
-  { id: 'friendsie:fr_500.glb', ad: 'Friendsie 500', dosya: 'fr_500.glb', fiyat: 200 },
-  { id: 'friendsie:fr_777.glb', ad: 'Friendsie 777', dosya: 'fr_777.glb', fiyat: 250 },
-  { id: 'friendsie:fr_1000.glb', ad: 'Friendsie 1000', dosya: 'fr_1000.glb', fiyat: 300 },
-  { id: 'friendsie:fr_2222.glb', ad: 'Friendsie 2222', dosya: 'fr_2222.glb', fiyat: 400 },
-  { id: 'friendsie:fr_4242.glb', ad: 'Friendsie 4242', dosya: 'fr_4242.glb', fiyat: 500 },
-  { id: 'friendsie:fr_8888.glb', ad: 'Friendsie 8888', dosya: 'fr_8888.glb', fiyat: 888 },
+  { id: 'friendsie:fr_67.glb', ad: 'No. 67', dosya: 'fr_67.glb', fiyat: 0 },
+  { id: 'friendsie:fr_1.glb', ad: 'No. 1', dosya: 'fr_1.glb', fiyat: 120 },
+  { id: 'friendsie:fr_100.glb', ad: 'No. 100', dosya: 'fr_100.glb', fiyat: 120 },
+  { id: 'friendsie:fr_500.glb', ad: 'No. 500', dosya: 'fr_500.glb', fiyat: 200 },
+  { id: 'friendsie:fr_777.glb', ad: 'No. 777', dosya: 'fr_777.glb', fiyat: 250 },
+  { id: 'friendsie:fr_1000.glb', ad: 'No. 1000', dosya: 'fr_1000.glb', fiyat: 300 },
+  { id: 'friendsie:fr_2222.glb', ad: 'No. 2222', dosya: 'fr_2222.glb', fiyat: 400 },
+  { id: 'friendsie:fr_4242.glb', ad: 'No. 4242', dosya: 'fr_4242.glb', fiyat: 500 },
+  { id: 'friendsie:fr_8888.glb', ad: 'No. 8888', dosya: 'fr_8888.glb', fiyat: 888 },
 ]);
 
 const STIL = `
@@ -117,7 +124,7 @@ export function buildKarakterSecim({ ctx, onConfirm }) {
             </svg>
           </div>
           <b>NFT Edition</b>
-          <span>Pick your character from the fRiENDSiES collection. NFTs in your wallet unlock.</span>
+          <span>Pick your character from the 67 collection. NFTs in your wallet unlock.</span>
         </button>
       </div>
     </div>
@@ -279,14 +286,16 @@ export function buildKarakterSecim({ ctx, onConfirm }) {
 
   // --- durum ---
   let indeks = 0;
-  const sahipMi = (kar) => kar.fiyat === 0 || (ctx?.save?.get?.('sahipKarakterler', []) || []).includes(kar.id);
+  const kayitliSahip = (kar) => kar.fiyat === 0 || (ctx?.save?.get?.('sahipKarakterler', []) || []).includes(kar.id);
+  const sahipMi = (kar) => HERSEY_UCRETSIZ || kayitliSahip(kar);
 
   function tazele() {
     const kar = KARAKTERLER[indeks];
     adEl.textContent = kar.ad;
     [...noktaEl.children].forEach((n, i) => n.classList.toggle('on', i === indeks));
     if (sahipMi(kar)) {
-      durumEl.textContent = kar.fiyat === 0 ? 'Unlocked' : 'Owned';
+      durumEl.textContent = kar.fiyat === 0 ? 'Unlocked'
+        : (kayitliSahip(kar) ? 'Owned' : 'Free — trial');
       secBtn.textContent = 'SELECT';
       secBtn.classList.remove('kilitli');
       secBtn.disabled = false;

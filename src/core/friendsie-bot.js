@@ -13,6 +13,7 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 
 const BASE = `${import.meta.env?.BASE_URL ?? '/'}friendsies/`;
 
@@ -60,7 +61,11 @@ export async function createFriendsieRival(id, { height = 1.8 } = {}) {
   const template = await loadModel(url);
   if (!template) return null;
 
-  const model = template.clone(true);
+  // SkeletonUtils.clone, not Object3D.clone: a plain clone(true) leaves the
+  // skinned mesh bound to the ORIGINAL template's skeleton, so the copy's own
+  // bones do nothing and the body renders collapsed at the world origin —
+  // the character is effectively invisible. SkeletonUtils rebinds properly.
+  const model = cloneSkinned(template);
   let box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
   if (size.y > 0) model.scale.multiplyScalar(height / size.y);
@@ -96,6 +101,69 @@ export async function createFriendsieRival(id, { height = 1.8 } = {}) {
   visual.name = `character:${id}:visual`;
   visual.add(model);
   root.add(visual);
+
+  // ---------- Cosmetic anchors ----------
+  // The Closet dresses characters through named anchors (head / face / back).
+  // Without them it falls back to offsets sized for the standard body — on a
+  // big-headed fRiENDSiES the hat lands by the feet. The head-region bounding
+  // box (top of the body, sampled from real vertices) gives both where the
+  // head is and how much to scale each item to hug it.
+  root.updateMatrixWorld(true);
+  const govdeKutu = new THREE.Box3().setFromObject(model);
+  const govde = govdeKutu.getSize(new THREE.Vector3());
+  const kafaKutu = new THREE.Box3();   // top ~45%: face height + front of face
+  const tepeKutu = new THREE.Box3();   // top ~18%: true head width — the
+  const bedenKutu = new THREE.Box3();  //   bind-pose arms reach into the head
+  kafaKutu.makeEmpty();                //   band but never up to the crown.
+  tepeKutu.makeEmpty();                // beden: torso band, for the backpack —
+  bedenKutu.makeEmpty();               //   the head is wider than the body, so
+  {                                    //   the back surface is the TORSO's.
+    const v = new THREE.Vector3();
+    const kafaEsik = govdeKutu.min.y + govde.y * 0.55;
+    const tepeEsik = govdeKutu.max.y - govde.y * 0.18;
+    const bedenAlt = govdeKutu.min.y + govde.y * 0.14;
+    model.traverse((object) => {
+      if (!object.isMesh || !object.geometry?.attributes?.position) return;
+      const pos = object.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i += 5) { // sparse sample is plenty
+        v.fromBufferAttribute(pos, i);
+        object.localToWorld(v);
+        if (v.y >= kafaEsik) kafaKutu.expandByPoint(v);
+        if (v.y >= tepeEsik) tepeKutu.expandByPoint(v);
+        if (v.y >= bedenAlt && v.y < kafaEsik) bedenKutu.expandByPoint(v);
+      }
+    });
+    if (kafaKutu.isEmpty()) kafaKutu.copy(govdeKutu);
+    if (tepeKutu.isEmpty()) tepeKutu.copy(kafaKutu);
+    if (bedenKutu.isEmpty()) bedenKutu.copy(govdeKutu);
+  }
+  const kafaG = kafaKutu.getSize(new THREE.Vector3());
+  const tepeG = tepeKutu.getSize(new THREE.Vector3());
+  const kafaMX = (tepeKutu.min.x + tepeKutu.max.x) / 2;
+  const kafaMZ = (tepeKutu.min.z + tepeKutu.max.z) / 2;
+  // Cosmetic defs are built for the standard ~0.84-wide head; scale with the
+  // real head so a hat hugs a big toy head instead of floating above it.
+  const olcek = THREE.MathUtils.clamp(Math.max(tepeG.x, tepeG.z) / 0.84, 0.85, 1.6);
+  const anchors = {};
+  const baglanti = (ad, x, y, z, s) => {
+    const a = new THREE.Group();
+    a.name = `anchor:${ad}`;
+    a.position.set(x, y, z);
+    a.scale.setScalar(s);
+    visual.add(a);
+    anchors[ad] = a;
+  };
+  // A hat's rim sits ~0.30*s above its anchor, so anchor just under the crown.
+  baglanti('head', kafaMX, kafaKutu.max.y - 0.40 * olcek, kafaMZ, olcek);
+  // Eyes sit just above the middle of the fRiENDSiES face.
+  baglanti('face', kafaMX, kafaKutu.min.y + kafaG.y * 0.56, kafaKutu.max.z - 0.02, olcek);
+  // Backpack flat against the TORSO's back surface, centred on the torso —
+  // the head is wider and deeper than the body, so the full-body box would
+  // float the pack behind and below the real back.
+  const bedenMY = (bedenKutu.min.y + bedenKutu.max.y) / 2;
+  baglanti('back', (bedenKutu.min.x + bedenKutu.max.x) / 2,
+    Math.max(bedenMY, govde.y * 0.33), bedenKutu.min.z + 0.02,
+    THREE.MathUtils.clamp(olcek * 0.75, 0.75, 1.25));
 
   let phase = Math.random() * Math.PI * 2;
   let airborne = 0;
@@ -144,6 +212,7 @@ export async function createFriendsieRival(id, { height = 1.8 } = {}) {
     root,
     visual,
     mesh: model,
+    anchors,
     animator,
     dispose() {
       model.traverse((object) => {
