@@ -785,6 +785,18 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     }
   });
 
+  // The board opens anywhere, not only at the skatepark ring: B on a
+  // keyboard, the BOARD touch button on a phone.
+  window.addEventListener('keydown', (e) => {
+    const hedefSerbest = e.target === document.body || e.target === window || e.target === document;
+    if (e.code === 'KeyB' && !e.repeat && hedefSerbest) {
+      if (durum.kaykay) kaykaydanIn(); else kaykayaBin();
+    }
+  });
+  document.getElementById('btn-board')?.addEventListener('click', () => {
+    if (durum.kaykay) kaykaydanIn(); else kaykayaBin();
+  });
+
   // E is also the exit for swim/sunbed when standing at their markers — the
   // venue verb handler above toggles; movement handles the sunbed too.
 }, { replay: true });

@@ -398,7 +398,8 @@ registerHook('boot', (ctx) => {
   });
   telefon.querySelector('#tf-kapat').addEventListener('click', kapat);
   window.addEventListener('keydown', (e) => {
-    if (e.code === 'KeyP' && !e.repeat && e.target === document.body) {
+    const hedefSerbest = e.target === document.body || e.target === window || e.target === document;
+    if (e.code === 'KeyP' && !e.repeat && hedefSerbest) {
       if (telefon.classList.contains('acik')) kapat(); else ac();
     }
   });

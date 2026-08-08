@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { COSMETICS } from './systems/cosmetics.js';
 
 const FR_BASE = `${import.meta.env?.BASE_URL ?? '/'}friendsies/`;
 
@@ -90,6 +91,10 @@ const STIL = `
 #ks-sec:hover { transform: scale(1.03); }
 #ks-sec:disabled { opacity: 0.5; cursor: not-allowed; }
 #ks-sec.kilitli { background: #c8892f; box-shadow: 0 8px 22px #c8892f55; }
+#ks-bitti { display: none; margin-left: 10px; background: #ffffffd9; color: #17223a;
+  border: none; border-radius: 14px; padding: 15px 34px; font-size: 16px; font-weight: 600;
+  cursor: pointer; box-shadow: 0 6px 18px #0002; }
+#karakter-secim.item-asamasi #ks-bitti { display: inline-block; }
 /* Phones: tighter type, thumb-sized arrows kept clear of the edges, and the
    bottom block inside the safe area. */
 @media (max-width: 600px) {
@@ -155,7 +160,7 @@ export function buildKarakterSecim({ ctx, onConfirm }) {
       <div id="ks-ad">—</div>
       <div id="ks-durum"></div>
       <div id="ks-nokta"></div>
-      <button id="ks-sec">SELECT</button>
+      <button id="ks-sec">SELECT</button><button id="ks-bitti" type="button">DONE</button>
     </div>`;
   document.body.appendChild(kok);
 
@@ -305,10 +310,52 @@ export function buildKarakterSecim({ ctx, onConfirm }) {
 
   // --- durum ---
   let indeks = 0;
+  let asama = 'karakter';   // 'karakter' -> 'item'
+  let itemIndeks = 0;
+  const bittiBtn = kok.querySelector('#ks-bitti');
+
+  const itemSahipleri = () => ctx?.save?.get?.('ownedCosmetics', []) || [];
+  const itemGiyilenler = () => ({
+    hat: null, glasses: null, backpack: null,
+    ...(ctx?.save?.get?.('equippedCosmetics', {}) || {}),
+  });
+  const SLOT_AD = { hat: 'Hat', glasses: 'Glasses', backpack: 'Backpack' };
+
+  function itemGoster(def) {
+    if (aktifModel) { donenGrup.remove(aktifModel); aktifModel = null; }
+    const grup = def.build(THREE);
+    const kutu = new THREE.Box3().setFromObject(grup);
+    const merkez = kutu.getCenter(new THREE.Vector3());
+    const boy = kutu.getSize(new THREE.Vector3());
+    const olcek = 1.15 / Math.max(boy.x, boy.y, boy.z, 0.2);
+    grup.scale.setScalar(olcek);
+    grup.position.set(-merkez.x * olcek, -kutu.min.y * olcek + 0.72, -merkez.z * olcek);
+    donenGrup.add(grup);
+    aktifModel = grup;
+  }
+
+  function noktalariKur(adet) {
+    noktaEl.innerHTML = '';
+    for (let i = 0; i < adet; i += 1) noktaEl.appendChild(document.createElement('i'));
+  }
   const kayitliSahip = (kar) => kar.fiyat === 0 || (ctx?.save?.get?.('sahipKarakterler', []) || []).includes(kar.id);
   const sahipMi = (kar) => HERSEY_UCRETSIZ || kayitliSahip(kar);
 
   function tazele() {
+    if (asama === 'item') {
+      const def = COSMETICS[itemIndeks];
+      const giyili = itemGiyilenler()[def.slot] === def.id;
+      adEl.textContent = def.name;
+      [...noktaEl.children].forEach((n, i) => n.classList.toggle('on', i === itemIndeks));
+      durumEl.textContent = giyili
+        ? `${SLOT_AD[def.slot]} — equipped`
+        : `${SLOT_AD[def.slot]} — free during the trial`;
+      secBtn.textContent = giyili ? 'REMOVE' : 'WEAR';
+      secBtn.classList.toggle('kilitli', !giyili);
+      secBtn.disabled = false;
+      itemGoster(def);
+      return;
+    }
     const kar = KARAKTERLER[indeks];
     adEl.textContent = kar.ad;
     [...noktaEl.children].forEach((n, i) => n.classList.toggle('on', i === indeks));
@@ -328,7 +375,11 @@ export function buildKarakterSecim({ ctx, onConfirm }) {
   }
 
   function git(yon) {
-    indeks = (indeks + yon + KARAKTERLER.length) % KARAKTERLER.length;
+    if (asama === 'item') {
+      itemIndeks = (itemIndeks + yon + COSMETICS.length) % COSMETICS.length;
+    } else {
+      indeks = (indeks + yon + KARAKTERLER.length) % KARAKTERLER.length;
+    }
     tazele();
   }
 
@@ -348,16 +399,39 @@ export function buildKarakterSecim({ ctx, onConfirm }) {
   canvas.addEventListener('pointerup', (e) => birak(e.clientX));
 
   secBtn.addEventListener('click', () => {
+    if (asama === 'item') {
+      const def = COSMETICS[itemIndeks];
+      const giyilen = itemGiyilenler();
+      if (giyilen[def.slot] === def.id) {
+        giyilen[def.slot] = null;
+      } else {
+        giyilen[def.slot] = def.id;
+        const sahip = itemSahipleri();
+        if (!sahip.includes(def.id)) ctx?.save?.set?.('ownedCosmetics', [...sahip, def.id]);
+      }
+      ctx?.save?.set?.('equippedCosmetics', giyilen);
+      tazele();
+      return;
+    }
     const kar = KARAKTERLER[indeks];
     if (!sahipMi(kar)) {
-      // satin alma yeri: jeton dususu ileride ekonomiye baglanir; simdilik
-      // sahiplige ekleyip kilidi aciyoruz (denemelik).
       const sahip = ctx?.save?.get?.('sahipKarakterler', []) || [];
       if (!sahip.includes(kar.id)) ctx?.save?.set?.('sahipKarakterler', [...sahip, kar.id]);
       tazele();
       return;
     }
+    // Character locked in; the same stage now browses the wardrobe.
     ctx?.save?.set?.('equipped', kar.id);
+    asama = 'item';
+    itemIndeks = 0;
+    kok.classList.add('item-asamasi');
+    kok.querySelector('#ks-baslik').firstChild.textContent = 'PICK YOUR ITEMS';
+    noktalariKur(COSMETICS.length);
+    tazele();
+  });
+
+  bittiBtn.addEventListener('click', () => {
+    const kar = KARAKTERLER[indeks];
     ctx?.save?.set?.('karakterSecildi', true);
     hide();
     onConfirm?.(kar.id);
@@ -391,15 +465,9 @@ export function buildKarakterSecim({ ctx, onConfirm }) {
     btn.addEventListener('click', () => {
       const surum = btn.dataset.surum;
       ctx?.save?.set?.('oyunSurumu', surum);
-      if (surum === 'normal') {
-        // Normal surum: hazir ucretsiz karakterle (goril) hemen basla.
-        ctx?.save?.set?.('equipped', 'gorilla');
-        ctx?.save?.set?.('karakterSecildi', true);
-        hide();
-        onConfirm?.('gorilla');
-      } else {
-        nftPickeriBaslat();
-      }
+      // Both editions choose on the same premium stage now — Oscar's call:
+      // the Standard path picks a character and items too.
+      nftPickeriBaslat();
     });
   });
   // geri: NFT secimden surum secimine don
@@ -415,8 +483,11 @@ export function buildKarakterSecim({ ctx, onConfirm }) {
 
   function show() {
     kok.classList.add('on', 'surum');
-    kok.classList.remove('nft-secim');
-    calisiyor = false;   // surum ekraninda 3B donmez; NFT secilince baslar
+    kok.classList.remove('nft-secim', 'item-asamasi');
+    asama = 'karakter';
+    kok.querySelector('#ks-baslik').firstChild.textContent = 'CHOOSE YOUR CHARACTER';
+    noktalariKur(KARAKTERLER.length);
+    calisiyor = false;   // surum ekraninda 3B donmez; secim yapilinca baslar
   }
   function hide() {
     kok.classList.remove('on', 'surum', 'nft-secim');

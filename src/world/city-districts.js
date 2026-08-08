@@ -278,6 +278,10 @@ function treeBlobs(positions, THREE_, blobMaterial) {
 }
 
 export function buildCityDistricts({ group, add, material, animated, buildStadium, stadiumPitch }) {
+  // Live boxes for the moving traffic — the car animator repositions them
+  // every frame; the collider list spreads them in so the sim sees a moving
+  // car as a moving wall.
+  const trafikKatilari = [];
   // Calibrated, not guessed: the first pass was measured against the
   // reference by sampling matching zones in both renders. The hub lighting
   // lifts everything ~1.22x, so each base color is the reference color
@@ -659,6 +663,14 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     // whatever that road measures, where a fixed offset could not.
     return { axis, dir, from: seg.from, to: seg.to, lane: seg.road + dir * seg.width * 0.26 };
   }).filter(Boolean);
+  // Moving traffic is solid too: one live AABB per driver, repositioned every
+  // frame with the car — Oscar walked through a moving car after the parked
+  // ones went solid.
+  const surucuKatilari = ROUTES.map(() => {
+    const k = { minX: 0, maxX: 0, minZ: 0, maxZ: 0, topY: 1.05 };
+    trafikKatilari.push(k);
+    return k;
+  });
   animated?.push((time) => {
     ROUTES.forEach((route, d) => {
       const index = PARKED.length + d;
@@ -668,6 +680,14 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
       // Direction decides which end of the measured carriageway the car
       // enters from; either way it never leaves the asphalt.
       const travel = route.dir > 0 ? route.from + phase : route.to - phase;
+      const kat = surucuKatilari[d];
+      const cx = route.axis === 'z' ? lane : travel;
+      const cz = route.axis === 'z' ? travel : lane;
+      const uzunZ = route.axis === 'z';
+      kat.minX = cx - (uzunZ ? 0.7 : 1.5);
+      kat.maxX = cx + (uzunZ ? 0.7 : 1.5);
+      kat.minZ = cz - (uzunZ ? 1.5 : 0.7);
+      kat.maxZ = cz + (uzunZ ? 1.5 : 0.7);
       if (route.axis === 'z') {
         placeCar(index, lane, travel, route.dir > 0 ? Math.PI : 0);
       } else {
@@ -2631,6 +2651,7 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   for (const [x, z, w, d] of PLAN_PLAZA_KULELERI) {
     colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, topY: 5.65 });
   }
+  colliders.push(...trafikKatilari);
   // Parked cars: Oscar walked straight through one. Footprint follows the
   // car's parking rotation (0 = nose along z).
   for (const [x, z, rot] of PARKED) {

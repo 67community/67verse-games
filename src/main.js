@@ -1007,7 +1007,11 @@ const HUD = devMode
         ? [['device-playtest', 'DEVICE', 'Physical-device playtest']]
         : []),
     ]
-  : [['settings', 'SETTINGS', 'Settings']];
+  : [
+      ['cosmetics', 'CLOSET', 'Closet'],
+      ['collection', 'CHARACTERS', 'Characters'],
+      ['settings', 'SETTINGS', 'Settings'],
+    ];
 for (const [id, badge, label] of HUD) {
   const button = ctx.ui.hudIcon(id, badge, label);
   if (hasSystemRoute(id)) {
