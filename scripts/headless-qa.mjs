@@ -63,8 +63,10 @@ page.on('console', (msg) => {
   if (text.includes('-qa]') || text.includes('[67VERSE]')) telemetry.push(text);
 });
 page.on('pageerror', (err) => errors.push(`[pageerror] ${err.message}`));
+page.on('response', (r) => { if (r.status() >= 400) errors.push(`[${r.status()}] ${r.url()}`); });
 
-await page.goto(`http://localhost:5173${path}`, { waitUntil: 'networkidle2', timeout: 45000 });
+const hedefUrl = path.startsWith('http') ? path : `http://localhost:5173${path}`;
+await page.goto(hedefUrl, { waitUntil: 'networkidle2', timeout: 45000 });
 // Through the entry gate if it is showing.
 try {
   await page.waitForSelector('#enter-game', { timeout: 6000 });

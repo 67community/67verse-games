@@ -2532,7 +2532,7 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   if (typeof document !== 'undefined') {
     const loader = new GLTFLoader();
     for (const [name, spec] of Object.entries(LANDMARK_MODELS)) {
-      loader.load(`/assets/city67/${name}.glb`, (gltf) => {
+      loader.load(`${import.meta.env?.BASE_URL ?? '/'}assets/city67/${name}.glb`, (gltf) => {
         const proto = normalizeLandmark(gltf, spec.height);
         for (const site of spec.sites) {
           const instance = proto.clone();
