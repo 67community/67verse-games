@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { registerHook } from '../core/registry.js';
 import { MEKAN_PLOT, mekanMerkezi } from './mekanlar.js';
 import { COSMETICS } from '../systems/cosmetics.js';
+import { createFriendsieRival } from '../core/friendsie-bot.js';
 
 const PLOT = MEKAN_PLOT;
 
@@ -88,6 +89,37 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
   const kulupVipAlt = kf(0.16, 0.73);        // VIP AREA sofa
   let karakter = null;
   ctx.bus.on('player-ready', (data) => { karakter = data?.instance || karakter; });
+
+  // ---------- venue guests ----------
+  // The rooms are not dioramas: a few of Oscar's collection hang out in them,
+  // and they are who a bought round goes to. Club guests dance on the lit
+  // floor; pool guests take the water and a sunbed.
+  const misafirler = [];
+  const MISAFIR_TANIM = [
+    { ad: 'No. 100', dosya: 'friendsie:fr_100.glb', x: kulup.x - 1.6, z: kulup.z + 0.4, tarz: 'dans' },
+    { ad: 'No. 500', dosya: 'friendsie:fr_500.glb', x: kulup.x + 1.4, z: kulup.z - 0.9, tarz: 'dans' },
+    { ad: 'No. 777', dosya: 'friendsie:fr_777.glb', x: kulupVipUst.x - 1.1, z: kulupVipUst.z, tarz: 'otur' },
+    { ad: 'No. 2222', dosya: 'friendsie:fr_2222.glb', x: havuz.sagYataklar[2].x - 0.95, z: havuz.sagYataklar[2].z, tarz: 'uzan' },
+    { ad: 'No. 8888', dosya: 'friendsie:fr_8888.glb', x: havuz.bar.x - 1.6, z: havuz.bar.z + 1.4, tarz: 'ayakta' },
+  ];
+  for (const tanim of MISAFIR_TANIM) {
+    createFriendsieRival(tanim.dosya, { height: 1.8 }).then((instance) => {
+      if (!instance) return;
+      instance.root.position.set(tanim.x, tanim.tarz === 'uzan' ? -0.2 : -0.2, tanim.z);
+      if (tanim.tarz === 'uzan') {
+        instance.visual.rotation.order = 'YXZ';
+        instance.visual.rotation.set(-Math.PI / 2, Math.PI / 2, 0);
+        instance.visual.position.y = 0.97;
+        instance.root.position.x = havuz.sagYataklar[2].x - 1 * 0.95;
+      }
+      if (tanim.tarz === 'otur') {
+        instance.visual.position.y = 0.34;
+        instance.visual.rotation.x = -0.28;
+      }
+      scene.add(instance.root);
+      misafirler.push({ ad: tanim.ad, instance, tarz: tanim.tarz, faz: Math.random() * 6 });
+    });
+  }
 
   // ---------- state ----------
   const durum = {
@@ -170,11 +202,7 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     return true;
   }
 
-  function icecekVer() {
-    if (!karakter?.root || durum.icecek) {
-      ctx.ui.toast(durum.icecek ? 'You already have a drink.' : 'Fresh juice.');
-      return;
-    }
+  function icecekYap() {
     const bardak = new THREE.Group();
     bardak.name = 'mekan:icecek';
     const cam = new THREE.Mesh(
@@ -188,6 +216,15 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     pipet.position.set(0.04, 0.2, 0);
     pipet.rotation.z = -0.3;
     bardak.add(cam, pipet);
+    return bardak;
+  }
+
+  function icecekVer() {
+    if (!karakter?.root || durum.icecek) {
+      ctx.ui.toast(durum.icecek ? 'You already have a drink.' : 'Fresh juice.');
+      return;
+    }
+    const bardak = icecekYap();
     bardak.position.set(0.42, 0.95, 0.28);
     karakter.root.add(bardak);
     durum.icecek = { prop: bardak, kalan: 40 };
@@ -224,6 +261,37 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
   function otur(nokta) {
     durum.oturan = { ...nokta };
     ctx.ui.toast('Taking a seat — press E or move to stand.');
+  }
+
+  // A round for someone in the room: pick who from the people actually here,
+  // and the drink lands in their hand.
+  function birineIsmarla() {
+    const buradakiler = misafirler.filter((g) => {
+      const d = Math.hypot(g.instance.root.position.x - getSim().pos.x,
+        g.instance.root.position.z - getSim().pos.z);
+      return d < PLOT;   // the same room
+    });
+    if (!buradakiler.length) {
+      ctx.ui.toast('Nobody else is here right now.');
+      return;
+    }
+    const panel = ctx.ui.panel({ title: 'Buy a drink for...' });
+    const not = document.createElement('p');
+    not.textContent = 'Pick someone in the room — it goes straight to them.';
+    not.style.cssText = 'margin:0 0 12px;color:#6b7280;font-size:13.5px;';
+    panel.body.appendChild(not);
+    for (const g of buradakiler) {
+      panel.body.appendChild(ctx.ui.button(g.ad, () => {
+        panel.close();
+        const bardak = icecekYap();
+        bardak.position.set(0.42, 0.95, 0.28);
+        g.instance.root.add(bardak);
+        setTimeout(() => bardak.removeFromParent(), 40000);
+        ctx.bus.emit('sfx', 'reward');
+        ctx.ui.toast(`Delivered — ${g.ad} raises the glass to you.`);
+      }, { primary: true }));
+      panel.body.lastChild.style.margin = '0 8px 8px 0';
+    }
   }
 
   // Boutique purchase: E at the racks hands over the next piece the player
@@ -297,6 +365,16 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
       target: 'drink',
     },
     {
+      id: 'mekan-kulup-ismarla', label: 'Buy a round', kind: 'venue', radius: 2.6,
+      x: kulupBar.x, z: kulupBar.z + 2.6,
+      target: 'gift',
+    },
+    {
+      id: 'mekan-havuz-ismarla', label: 'Buy a round', kind: 'venue', radius: 2.4,
+      x: havuz.bar.x + 3.2, z: havuz.bar.z + 1.4,
+      target: 'gift',
+    },
+    {
       id: 'mekan-kulup-vip-ust', label: 'Sit down', kind: 'venue', radius: 2.4,
       x: kulupVipUst.x, z: kulupVipUst.z + 1.2,
       target: 'sit-vip-ust',
@@ -336,6 +414,8 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
   isaret({ scene, x: magaza.x + PLOT * 0.21, z: magaza.z + PLOT * 0.485, metin: 'EXIT', renk: 0x17223a });
   isaret({ scene, x: magaza.x - PLOT * 0.055, z: magaza.z + PLOT * 0.05, metin: 'BUY', renk: 0xc9829a });
   isaret({ scene, x: kulupPist.x, z: kulupPist.z + 2.4, metin: 'DANCE', renk: 0xb45cd6 });
+  isaret({ scene, x: kulupBar.x, z: kulupBar.z + 2.6, metin: 'BUY A ROUND', renk: 0xe8b64a });
+  isaret({ scene, x: havuz.bar.x + 3.2, z: havuz.bar.z + 1.4, metin: 'BUY A ROUND', renk: 0xe8b64a });
   isaret({ scene, x: kulupBar.x, z: kulupBar.z, metin: 'BAR', renk: 0xe8b64a });
   isaret({ scene, x: kulupVipUst.x, z: kulupVipUst.z + 1.2, metin: 'VIP', renk: 0x7b4f96 });
   isaret({ scene, x: kulupVipAlt.x + 1.2, z: kulupVipAlt.z, metin: 'VIP', renk: 0x7b4f96 });
@@ -358,6 +438,7 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
       }
       if (target === 'drink') { icecekVer(); return; }
       if (target === 'shop-buy') { kiyafetSat(); return; }
+      if (target === 'gift') { birineIsmarla(); return; }
       if (target === 'dance') {
         if (durum.dans) dansiBirak(); else dansaBasla();
         return;
@@ -390,6 +471,19 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
       if (v) {
         v.rotation.x = -1.25;                      // prone, face down the water
         v.position.y = -0.55;                      // body sits in the water
+      }
+    }
+    for (const g of misafirler) {
+      if (g.tarz === 'dans') {
+        g.faz += dt * 13.4;
+        const v = g.instance.visual;
+        v.position.y = Math.abs(Math.sin(g.faz)) * 0.22;
+        v.rotation.z = Math.sin(g.faz / 2) * 0.14;
+        v.rotation.y = Math.sin(g.faz / 4) * 0.7;
+        g.instance.animator?.update?.(dt, { speed: 3.4, grounded: true });
+      } else if (g.tarz === 'ayakta') {
+        g.faz += dt;
+        g.instance.animator?.update?.(dt, { speed: 0, grounded: true });
       }
     }
     if (durum.dans) {
