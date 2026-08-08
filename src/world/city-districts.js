@@ -507,11 +507,23 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // Park walks and neighbourhood lanes: narrower, and they never carry traffic.
   // Park walks and the kerb lips share the pale material and a unit box, so
   // both live in one instanced mesh: the walks first, then two lips per road.
+  //
+  // A walk drawn ACROSS a carriageway is a pale slab lying on the asphalt —
+  // six of the ten did exactly that, which is the tangle of footpaths Oscar
+  // sees everywhere. Each one is pushed off the road first, the same way a
+  // building is, and one that still cannot clear the tarmac is dropped
+  // rather than laid over it.
+  const YURUYUS = PLAN_PATIKALAR
+    .map(([x, z, g, d, renk]) => {
+      const [nx, nz] = yoldanKaydir(x, z, g, d);
+      return [nx, nz, g, d, renk];
+    })
+    .filter(([x, z, g, d]) => !yolUstunde(x, z, g * 0.8, d * 0.8));
   const patikalar = new THREE.InstancedMesh(
     new THREE.BoxGeometry(1, 1, 1), mats.kerbLight,
-    PLAN_PATIKALAR.length + PLAN_ANA_YOLLAR.length * 2,
+    YURUYUS.length + PLAN_ANA_YOLLAR.length * 2,
   );
-  PLAN_PATIKALAR.forEach(([x, z, g, d], i) => {
+  YURUYUS.forEach(([x, z, g, d], i) => {
     ym.makeScale(Math.max(g, 1.2), 0.07, Math.max(d, 1.2));
     ym.setPosition(x, 0.05, z);
     patikalar.setMatrixAt(i, ym);
@@ -541,7 +553,7 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
 
   // Kerb lips down both sides of every arterial, and the dashed centre line
   // along its length — both derived from the plan's own road records.
-  const kerbTaban = PLAN_PATIKALAR.length;
+  const kerbTaban = YURUYUS.length;
   const dashList = [];
   PLAN_ANA_YOLLAR.forEach(([x, z, g, d], i) => {
     const yatay = yatayMi(g, d);
@@ -580,8 +592,19 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // Crosswalks exactly where the plan paints them: each record becomes a set
   // of five stripes laid across the road it belongs to. The stripes span the
   // WIDENED carriageway, so each looks up the road it crosses.
+  // Only crossings that actually cross something, and only one per crossing.
+  // Thirteen pairs of the plan's zebras stood within five units of each other
+  // and one lay on no carriageway at all — stacked paint reads as the tangle
+  // of footpaths Oscar sees. Keep the first of each cluster, drop the orphan.
+  const ZEBRALAR = [];
+  for (const zebra of PLAN_ZEBRALAR) {
+    const [x, z] = zebra;
+    if (!yolUstunde(x, z, 1.2, 1.2)) continue;
+    if (ZEBRALAR.some(([ox, oz]) => Math.hypot(ox - x, oz - z) < 5)) continue;
+    ZEBRALAR.push(zebra);
+  }
   const stripes = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(0.7, 0.02, 1), mats.paint, Math.max(1, PLAN_ZEBRALAR.length * 5),
+    new THREE.BoxGeometry(0.7, 0.02, 1), mats.paint, Math.max(1, ZEBRALAR.length * 5),
   );
   const zebraBoyu = (x, z, yatay) => {
     // A wide zebra patch marches its bars along x, each bar long in z — it
@@ -591,7 +614,7 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     const yakin = adaylar.filter((a) => a.icinde && a.mesafe < 6).sort((a, b) => a.mesafe - b.mesafe)[0];
     return yakin ? (yakin.pay - 0.35) * 2 + 0.6 : 4.2;
   };
-  PLAN_ZEBRALAR.forEach(([x, z, g, d], c) => {
+  ZEBRALAR.forEach(([x, z, g, d], c) => {
     const yatay = g >= d;
     const boy = zebraBoyu(x, z, yatay);
     for (let sIdx = 0; sIdx < 5; sIdx += 1) {
@@ -1816,39 +1839,54 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // of the map: a soft squircle body on a wider plinth, a raised lip framing
   // the roof, an L-shaped recess inside that lip, and a striped awning at the
   // street face. Five instanced meshes cover every block in the city.
-  const blockGeo = roundedBoxGeometry(1, 1, 1, 0.16, 0.075);
-  // Kimi's grey buildings read better than flat boxes because their walls carry
-  // a window grid — rows of panes, some lit warm, some cool. Ported here as a
-  // shader on the instanced body so every block gets a facade for no extra
-  // draw: windows are drawn on the vertical faces only, over each block's own
-  // measured colour, and the top face (roof) is left clean.
-  const binaCephe = mats.white.clone();
-  binaCephe.onBeforeCompile = (shader) => {
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vYerelPos;\nvarying vec3 vYerelNorm;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvYerelPos = position;\nvYerelNorm = normal;');
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vYerelPos;\nvarying vec3 vYerelNorm;')
-      .replace('#include <color_fragment>', `#include <color_fragment>
-      {
-        vec3 n = normalize(vYerelNorm);
-        if (abs(n.y) < 0.5) {                       // sadece dik cepheler
-          float yatay = abs(n.x) > abs(n.z) ? vYerelPos.z : vYerelPos.x;  // -0.5..0.5
-          float dikey = vYerelPos.y;                // 0..1
-          vec2 hucre = vec2((yatay + 0.5) * 5.0, dikey * 7.0);
-          vec2 f = fract(hucre);
-          vec2 kimlik = floor(hucre);
-          float pencere = step(0.20, f.x) * step(f.x, 0.80) * step(0.24, f.y) * step(f.y, 0.82);
-          float h = fract(sin(dot(kimlik, vec2(41.3, 7.7))) * 4531.7);
-          vec3 yanik = vec3(0.98, 0.86, 0.50);
-          vec3 sonuk = vec3(0.62, 0.72, 0.80);
-          vec3 camRenk = mix(sonuk, yanik, step(0.82, h));
-          float govde = step(0.06, dikey) * step(dikey, 0.93);   // saçak ve taban hariç
-          diffuseColor.rgb = mix(diffuseColor.rgb, camRenk, pencere * govde * 0.9);
+  // The corner radius is a FRACTION of a unit box that the instance matrix
+  // then stretches, so 0.16 meant every block was rounded by 16% of its own
+  // width — nearly eight tenths of a unit on an average block. That is why
+  // the city read as a shelf of soft pills rather than buildings. A real
+  // building has a small, near-constant chamfer whatever its size, so the
+  // radius drops to something that lands near a tenth of a unit across the
+  // measured size range, and the vertical bevel shrinks with it.
+  const blockGeo = roundedBoxGeometry(1, 1, 1, 0.055, 0.022);
+  // ---- Facade windows -------------------------------------------------
+  // The window grid used to be painted on by a shader: no depth, no sill, no
+  // shadow, which is most of why the blocks read as cardboard next to the
+  // reference. Every window is real geometry now — a pane recessed into the
+  // wall and a sill standing proud under it. Both ride instanced meshes that
+  // already exist (the shopfront glass and its cream surround), so a city of
+  // real windows costs no extra draw call.
+  const PENCERE_G = 0.62;
+  const PENCERE_Y = 0.78;
+  const PENCERE_TABAN = 2.3;
+  const PENCERE_ARALIK = 1.5;
+  const PENCERELER = [];
+  BLOCKS.forEach(([x, z, w, h, d], i) => {
+    // Anything under three units is a shed; a shed with four storeys of
+    // glazing looks worse than a plain one.
+    if (h <= 3.0) return;
+    const sira = Math.max(1, Math.min(4, Math.floor((h - PENCERE_TABAN - 0.9) / PENCERE_ARALIK) + 1));
+    const sutunSay = (uzunluk) => Math.max(1, Math.min(5, Math.floor(uzunluk / 1.9)));
+    for (let r = 0; r < sira; r += 1) {
+      const y = PENCERE_TABAN + r * PENCERE_ARALIK;
+      for (const yon of [-1, 1]) {
+        // Faces looking along z: columns spread across the block's width.
+        const nz = sutunSay(w);
+        for (let c = 0; c < nz; c += 1) {
+          const ox = (c - (nz - 1) / 2) * (w / (nz + 0.35));
+          PENCERELER.push({ x: x + ox, y, z: z + yon * d / 2, eksen: 'z', yon, blok: i });
         }
-      }`);
-  };
-  const blockBodies = new THREE.InstancedMesh(blockGeo, binaCephe, BLOCKS.length);
+        // Faces looking along x: columns spread across the block's depth.
+        const nx = sutunSay(d);
+        for (let c = 0; c < nx; c += 1) {
+          const oz = (c - (nx - 1) / 2) * (d / (nx + 0.35));
+          PENCERELER.push({ x: x + yon * w / 2, y, z: z + oz, eksen: 'x', yon, blok: i });
+        }
+      }
+    }
+  });
+  // The walls carry their own colour and nothing else. A shader used to paint
+  // a window grid across every facade; real recessed panes and sills replace
+  // it above, and a painted grid underneath them read as a double exposure.
+  const blockBodies = new THREE.InstancedMesh(blockGeo, mats.white, BLOCKS.length);
   const blockPlinths = new THREE.InstancedMesh(roundedBoxGeometry(1, 1, 1, 0.30, 0.03), material(0xd7cdc6, { roughness: 0.9 }), BLOCKS.length);
   // The roof lip is a frame, not a lid: the tray it encloses is what the
   // reference shows inside every parapet.
@@ -1864,10 +1902,17 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // upper window band in the same glass the gym roof uses.
   // Surround and mullions are the same cream box geometry, so they share one
   // instanced mesh: three slots per block — the surround then two mullions.
-  const doorFrames = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.white, BLOCKS.length * 3);
+  // Three slots per block for the shopfront, then one sill per facade window.
+  const doorFrames = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 1, 1), mats.white, BLOCKS.length * 3 + PENCERELER.length,
+  );
   // Shopfront glazing and the upper window band are the same glass box, so
   // they share one instanced mesh: slot 2i is the door, 2i+1 the band.
-  const doorGlass = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mats.glass, BLOCKS.length * 2);
+  // Two slots per block for the shopfront and its band, then one pane per
+  // facade window.
+  const doorGlass = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 1, 1), mats.glass, BLOCKS.length * 2 + PENCERELER.length,
+  );
   const AWNING_TONE = [COPING.red, COPING.blue, 0xd7cfc2];
   const bm = new THREE.Matrix4();
   BLOCKS.forEach(([x, z, w, h, d], i) => {
@@ -1921,6 +1966,31 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     bm.makeScale(w * 0.66, 0.55, 0.09);
     bm.setPosition(x, h * 0.66, z + d / 2 + 0.06);
     doorGlass.setMatrixAt(i * 2 + 1, bm);
+  });
+  // Facade windows: a cream frame standing just off the wall with the pane set
+  // into it. Sinking the glass INTO the wall hides it completely — the wall is
+  // opaque and there is no hole — so the depth comes from the frame instead:
+  // the pane sits proud of its own surround, and the surround casts the line
+  // of shadow that reads as a reveal.
+  PENCERELER.forEach((p, i) => {
+    const camSlot = BLOCKS.length * 2 + i;
+    const cerceveSlot = BLOCKS.length * 3 + i;
+    const orta = p.y + PENCERE_Y / 2;
+    if (p.eksen === 'z') {
+      bm.makeScale(PENCERE_G + 0.15, PENCERE_Y + 0.15, 0.06);
+      bm.setPosition(p.x, orta, p.z + p.yon * 0.03);
+      doorFrames.setMatrixAt(cerceveSlot, bm);
+      bm.makeScale(PENCERE_G, PENCERE_Y, 0.06);
+      bm.setPosition(p.x, orta, p.z + p.yon * 0.06);
+      doorGlass.setMatrixAt(camSlot, bm);
+    } else {
+      bm.makeScale(0.06, PENCERE_Y + 0.15, PENCERE_G + 0.15);
+      bm.setPosition(p.x + p.yon * 0.03, orta, p.z);
+      doorFrames.setMatrixAt(cerceveSlot, bm);
+      bm.makeScale(0.06, PENCERE_Y, PENCERE_G);
+      bm.setPosition(p.x + p.yon * 0.06, orta, p.z);
+      doorGlass.setMatrixAt(camSlot, bm);
+    }
   });
   for (const mesh of [
     blockBodies, blockPlinths, blockLips, blockNotches,
@@ -2633,17 +2703,32 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     }
     return tutulan.map((ev) => [ev.x, ev.z]);
   })();
-  const houseBodies = new THREE.InstancedMesh(new THREE.BoxGeometry(3, 2.2, 3.4), mats.block, KARADAKI_EVLER.length);
-  const houseRoofs = new THREE.InstancedMesh(new THREE.ConeGeometry(2.5, 1.5, 4), mats.copingRed, KARADAKI_EVLER.length);
+  // Two slots per house: the body, then a chimney riding the same box mesh so
+  // it costs no extra draw. A bare pyramid on a bare box is the one silhouette
+  // that never reads as a home — the reference houses all carry an overhanging
+  // eave and a stack, and those two details are most of the toy-house look.
+  const houseBodies = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(1, 1, 1), mats.block, KARADAKI_EVLER.length * 2,
+  );
+  // Radius 2.9 against a 3 x 3.4 body: the roof now oversails the walls
+  // instead of dying flush into them.
+  const houseRoofs = new THREE.InstancedMesh(new THREE.ConeGeometry(2.9, 1.6, 4), mats.copingRed, KARADAKI_EVLER.length);
   KARADAKI_EVLER.forEach(([x, z], i) => {
     // Alternate the plan rotation so a row of houses reads as a street of
     // separate homes rather than one repeated stamp.
     const turn = (i % 2) * (Math.PI / 2);
     const bodyM = new THREE.Matrix4().makeRotationY(turn);
+    bodyM.scale(new THREE.Vector3(3, 2.2, 3.4));
     bodyM.setPosition(x, 1.1, z);
-    houseBodies.setMatrixAt(i, bodyM);
+    houseBodies.setMatrixAt(i * 2, bodyM);
+    // Chimney: off-centre on the ridge, standing clear of the roof slope.
+    const bacaM = new THREE.Matrix4().makeRotationY(turn);
+    bacaM.scale(new THREE.Vector3(0.42, 1.5, 0.42));
+    const bacaKay = turn === 0 ? [0.85, -0.55] : [-0.55, 0.85];
+    bacaM.setPosition(x + bacaKay[0], 3.15, z + bacaKay[1]);
+    houseBodies.setMatrixAt(i * 2 + 1, bacaM);
     const rm = new THREE.Matrix4().makeRotationY(Math.PI / 4 + turn);
-    rm.setPosition(x, 2.95, z);
+    rm.setPosition(x, 3.0, z);
     houseRoofs.setMatrixAt(i, rm);
     houseRoofs.setColorAt(i, new THREE.Color(CAR_PAINT[i % 3]));
   });
