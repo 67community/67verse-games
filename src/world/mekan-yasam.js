@@ -361,12 +361,12 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
   world.destinations.push(
     {
       id: 'mekan-havuz-kapi', label: 'Pool Club', kind: 'travel', radius: 2.6,
-      x: 51, z: -5,
+      x: 50.6, z: -5,
       target: { x: havuz.kapi.x, z: havuz.kapi.z - 1.2, mekan: 'havuz', label: 'Pool Club' },
     },
     {
       id: 'mekan-kulup-kapi', label: 'Night Club', kind: 'travel', radius: 2.6,
-      x: 51, z: 2,
+      x: 50.6, z: 2,
       target: { x: kulup.x, z: kulup.z + PLOT * 0.485 - 1.2, mekan: 'kulup', label: 'Night Club' },
     },
     {
@@ -381,7 +381,7 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     },
     {
       id: 'mekan-magaza-kapi', label: 'Boutique 67', kind: 'travel', radius: 2.6,
-      x: 51, z: 9,
+      x: 50.6, z: 9,
       target: { x: magaza.x, z: magaza.z + PLOT * 0.485 - 1.2, mekan: 'magaza', label: 'Boutique 67' },
     },
     {
@@ -411,7 +411,7 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     },
     {
       id: 'mekan-arcade-kapi', label: 'Arcade 67', kind: 'travel', radius: 2.6,
-      x: 51, z: 16,
+      x: 50.6, z: 16,
       target: { x: arcade.x + (0.49 - 0.5) * PLOT, z: arcade.z + PLOT * 0.485 - 1.2, mekan: 'arcade', label: 'Arcade 67' },
     },
     {
@@ -486,14 +486,95 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     },
   );
 
+  // ---------- venue facades on the promenade ----------
+  // The doors are not floating rings in the sand: each venue has a small
+  // storefront on the beach strip, its ring on the doormat, its name over
+  // the door. E at the mat still carries you to the room.
+  {
+    const CEPHELER = [
+      { z: -5, govde: '#f1e9dc', serit: '#6fc9d8', ad: 'POOL CLUB' },
+      { z: 2, govde: '#2a2431', serit: '#b45cd6', ad: 'NIGHT CLUB' },
+      { z: 9, govde: '#e6d9c8', serit: '#c9829a', ad: 'BOUTIQUE 67' },
+      { z: 16, govde: '#8fc4cf', serit: '#17223a', ad: 'ARCADE 67' },
+    ];
+    const CX = 53.3;
+    const G = 4.6, D = 3.6, H = 3.4;
+    const govdeler = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 }),
+      CEPHELER.length,
+    );
+    const seritler = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 }),
+      CEPHELER.length,
+    );
+    const kapilar = new THREE.InstancedMesh(
+      new THREE.BoxGeometry(1.15, 2.0, 0.14),
+      new THREE.MeshStandardMaterial({ color: 0x2c2f38, roughness: 0.7 }),
+      CEPHELER.length,
+    );
+    const ym = new THREE.Matrix4();
+    // One atlas holds all four signs; each plane picks its strip with UVs.
+    const atlas = document.createElement('canvas');
+    atlas.width = 512; atlas.height = 256;
+    const ac = atlas.getContext('2d');
+    CEPHELER.forEach((c, i) => {
+      ac.fillStyle = '#17223a';
+      ac.fillRect(0, i * 64 + 8, 512, 48);
+      ac.fillStyle = '#ffffff';
+      ac.font = '700 34px Figtree, Arial';
+      ac.textAlign = 'center';
+      ac.textBaseline = 'middle';
+      ac.fillText(c.ad, 256, i * 64 + 32);
+    });
+    const atlasTex = new THREE.CanvasTexture(atlas);
+    atlasTex.colorSpace = THREE.SRGBColorSpace;
+    const tabelaMat = new THREE.MeshBasicMaterial({ map: atlasTex, transparent: true });
+    CEPHELER.forEach((c, i) => {
+      ym.makeScale(G, H, D);
+      ym.setPosition(CX, H / 2, c.z);
+      govdeler.setMatrixAt(i, ym);
+      govdeler.setColorAt(i, new THREE.Color(c.govde));
+      ym.makeScale(G + 0.2, 0.5, D + 0.2);
+      ym.setPosition(CX, H - 0.2, c.z);
+      seritler.setMatrixAt(i, ym);
+      seritler.setColorAt(i, new THREE.Color(c.serit));
+      ym.identity();
+      ym.setPosition(CX - G / 2 - 0.02, 1.0, c.z);
+      kapilar.setMatrixAt(i, ym);
+      const tabela = new THREE.PlaneGeometry(3.4, 0.62);
+      const uv = tabela.attributes.uv;
+      for (let k = 0; k < uv.count; k += 1) {
+        uv.setY(k, (uv.getY(k) * 48 + (3 - i) * 64 + 8) / 256);
+      }
+      const tabelaMesh = new THREE.Mesh(tabela, tabelaMat);
+      tabelaMesh.position.set(CX - G / 2 - 0.05, 2.55, c.z);
+      tabelaMesh.rotation.y = -Math.PI / 2;
+      scene.add(tabelaMesh);
+      if (Array.isArray(world.solids)) {
+        world.solids.push({
+          minX: CX - G / 2, maxX: CX + G / 2,
+          minZ: c.z - D / 2, maxZ: c.z + D / 2, topY: H,
+        });
+      }
+    });
+    govdeler.instanceMatrix.needsUpdate = true;
+    seritler.instanceMatrix.needsUpdate = true;
+    kapilar.instanceMatrix.needsUpdate = true;
+    if (govdeler.instanceColor) govdeler.instanceColor.needsUpdate = true;
+    if (seritler.instanceColor) seritler.instanceColor.needsUpdate = true;
+    scene.add(govdeler, seritler, kapilar);
+  }
+
   // Door + verb markers so each point reads on the ground.
-  isaret({ scene, x: 51, z: -5, metin: 'POOL CLUB', renk: 0x3fa9b6 });
-  isaret({ scene, x: 51, z: 2, metin: 'NIGHT CLUB', renk: 0x7b4f96 });
-  isaret({ scene, x: 51, z: 9, metin: 'BOUTIQUE 67', renk: 0xc9829a });
+  isaret({ scene, x: 50.6, z: -5, metin: 'POOL CLUB', renk: 0x3fa9b6 });
+  isaret({ scene, x: 50.6, z: 2, metin: 'NIGHT CLUB', renk: 0x7b4f96 });
+  isaret({ scene, x: 50.6, z: 9, metin: 'BOUTIQUE 67', renk: 0xc9829a });
   isaret({ scene, x: havuz.kapi.x, z: havuz.kapi.z, metin: 'EXIT', renk: 0x17223a });
   isaret({ scene, x: magaza.x + PLOT * 0.21, z: magaza.z + PLOT * 0.485, metin: 'EXIT', renk: 0x17223a });
   isaret({ scene, x: magaza.x - PLOT * 0.055, z: magaza.z + PLOT * 0.05, metin: 'BUY', renk: 0xc9829a });
-  isaret({ scene, x: 51, z: 16, metin: 'ARCADE 67', renk: 0x8fc4cf });
+  isaret({ scene, x: 50.6, z: 16, metin: 'ARCADE 67', renk: 0x8fc4cf });
   isaret({ scene, x: -36, z: -1.7, metin: 'HOOP SHOT', renk: 0xe08a3c });
   isaret({ scene, x: 29.95, z: 5.2, metin: 'GOAL SHOT', renk: 0x5a9c7a });
   isaret({ scene, x: arcade.x + (0.49 - 0.5) * PLOT, z: arcade.z + PLOT * 0.485, metin: 'EXIT', renk: 0x17223a });
