@@ -37,6 +37,11 @@ const takeFlag = (name) => {
 };
 const prefix = takeFlag('--out') || 'shot';
 const scriptPath = takeFlag('--script');
+// A Mac running headless Chrome is nothing like an iPhone, so a stall that only
+// shows on a phone never reproduces at full speed. --cpu <n> throttles the main
+// thread by that factor through CDP, which is how a phone-only freeze gets
+// caught here instead of in Oscar's hand.
+const cpuYavaslat = Number(takeFlag('--cpu')) || 0;
 const mobil = args.includes('--mobile');
 if (mobil) args.splice(args.indexOf('--mobile'), 1);
 const path = args[0] || '/?game=karting&qa=1';
@@ -55,6 +60,11 @@ const browser = await puppeteer.launch({
     : { width: 1440, height: 900, deviceScaleFactor: 1 },
 });
 const page = await browser.newPage();
+if (cpuYavaslat > 1) {
+  const cdp = await page.createCDPSession();
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpuYavaslat });
+  console.log('cpu throttle', `${cpuYavaslat}x`);
+}
 const errors = [];
 const telemetry = [];
 page.on('console', (msg) => {

@@ -106,28 +106,53 @@ export async function ensureSystemLoaded(id) {
   return loadSystemRoute(id);
 }
 
+// Hand the frame back to the browser: one paint, then a fresh task. Without
+// it the whole idle pass lands inside a single frame.
+function nefesAl() {
+  return new Promise((resolve) => {
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => setTimeout(resolve, 0));
+    } else {
+      setTimeout(resolve, 0);
+    }
+  });
+}
+
 export function loadIdleModules() {
   if (!idleLoadPromise) {
     // Sound is synthesized, not fetched, and nothing is audible before the
     // player is through the entry gate, so it rides the idle pass rather than
     // the first bundle. It self-registers on import exactly as before.
-    idleLoadPromise = Promise.allSettled([
-      import('./systems/audio.js'),
+    //
+    // These import one at a time with a frame between, NOT all at once. Each
+    // of them registers hub hooks that replay immediately and build real
+    // geometry — five venue interiors, a rain field, the phone — so firing
+    // them together put every build in one task. Measured on a 6x-throttled
+    // main thread, that was a single 746 ms frame a moment after the hub
+    // appeared: the freeze Oscar hit on his phone. Spread over frames the
+    // same work never blocks a paint.
+    const gorevler = [
+      () => import('./systems/audio.js'),
       // Venue life, weather and the phone register hub hooks late and rely on
       // hook replay; riding the idle pass keeps them out of the first paint's
       // budget.
-      import('./world/mekan-yasam.js'),
-      import('./world/hava-durumu.js'),
-      import('./systems/telefon.js'),
-      ...IDLE_MODULE_IDS.map((id) => ensureSystemLoaded(id)),
-    ])
-      .then((results) => {
-        results.forEach((result, index) => {
-          if (result.status === 'rejected') {
-          }
-        });
-        return results;
-      });
+      () => import('./world/mekan-yasam.js'),
+      () => import('./world/hava-durumu.js'),
+      () => import('./systems/telefon.js'),
+      ...IDLE_MODULE_IDS.map((id) => () => ensureSystemLoaded(id)),
+    ];
+    idleLoadPromise = (async () => {
+      const results = [];
+      for (const gorev of gorevler) {
+        try {
+          results.push({ status: 'fulfilled', value: await gorev() });
+        } catch (reason) {
+          results.push({ status: 'rejected', reason });
+        }
+        await nefesAl();
+      }
+      return results;
+    })();
   }
   return idleLoadPromise;
 }
