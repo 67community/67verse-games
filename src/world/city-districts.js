@@ -338,7 +338,22 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     stadiumTrack: material(0x645c6a, { roughness: 0.92 }),
     grass: material(0x868b6e, { roughness: 0.95 }),
     sand: material(0xd8bcae, { roughness: 0.95 }),
-    water: material(0x8caddf, { roughness: 0.25, transparent: true, opacity: 0.97 }),
+    water: (() => {
+      // Natural water, not a painted slab: a slow two-axis swell displaces
+      // the surface a few centimetres and the shader time drifts it. Shared
+      // by the sea, the river and the pond.
+      const su = material(0x8caddf, { roughness: 0.22, transparent: true, opacity: 0.96 });
+      su.onBeforeCompile = (shader) => {
+        shader.uniforms.suZaman = { value: 0 };
+        su.userData.suZaman = shader.uniforms.suZaman;
+        shader.vertexShader = shader.vertexShader
+          .replace('#include <common>', '#include <common>\nuniform float suZaman;')
+          .replace('#include <begin_vertex>', `#include <begin_vertex>
+            transformed.y += 0.05 * sin(position.x * 0.55 + suZaman * 1.1)
+                           + 0.04 * sin(position.z * 0.42 + suZaman * 0.8);`);
+      };
+      return su;
+    })(),
     // The reference's roads are a warm NEUTRAL grey — its green and blue
     // channels are equal (#d8cccc). Mine had blue well under green, which is
     // exactly what read as brown. Measured and corrected: green and blue now
@@ -395,6 +410,13 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // and 52. Several earlier guesses were two to six units out, which is what
   // pushed plan-placed buildings onto the carriageway.
   const ROAD_W = 4.6;
+  // Oscar, from the phone screenshots: the map reads cramped — "daracik
+  // yollar". The drawing's carriageways measure 2.3-4.3 units, alley-width
+  // next to the blocks. Every arterial is widened here at build time, and
+  // kerbs, lane dashes, crosswalks, traffic lanes and the building clash
+  // margin all read the same widened figure so the network stays coherent.
+  const YOL_CARPAN = 1.75;
+  const yolKalinlik = (g, d) => Math.max(Math.min(g, d) * YOL_CARPAN, 5.6);
   // Roads come from the plan: PLAN_ANA_YOLLAR holds every arterial the drawing
   // shows with its measured centre, length and width — twenty-six of them, not
   // the four-by-four grid I had drawn by hand. Each is laid along its longer
@@ -411,9 +433,9 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // plaza, and gave up on one of them entirely. Each road now carries the
   // span it actually covers along its own long axis.
   const V_ROADS = PLAN_ANA_YOLLAR.filter(([, , g, d]) => !yatayMi(g, d))
-    .map(([x, z, , d]) => [x, z - d / 2, z + d / 2]);
+    .map(([x, z, g, d]) => [x, z - d / 2, z + d / 2, yolKalinlik(g, d) / 2 + 0.35]);
   const H_ROADS = PLAN_ANA_YOLLAR.filter(([, , g, d]) => yatayMi(g, d))
-    .map(([x, z, g]) => [z, x - g / 2, x + g / 2]);
+    .map(([x, z, g, d]) => [z, x - g / 2, x + g / 2, yolKalinlik(g, d) / 2 + 0.35]);
 
   // Nothing from the plan may stand on a road. A footprint that lands on a
   // carriageway is not deleted — the plan drew a building there and it should
@@ -421,7 +443,8 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // the way a site plan resolves a clash.
   // The plan builds right up to the kerb, so the setback is a kerb's width,
   // not a garden. A larger margin was rejecting terraces that genuinely fit.
-  const YOL_PAYI = ROAD_W / 2 + 0.35;
+  // Each road carries its own widened clearance (4th tuple slot) so the
+  // clash test matches the asphalt that is actually rendered.
   // A footprint only clashes with a road if it overlaps the road's own length
   // as well as crossing its centre line.
   const boyunca = (c, half, min, max) => c + half > min && c - half < max;
@@ -430,14 +453,14 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     let nz = z;
     for (let tur = 0; tur < 3; tur += 1) {
       let carpisma = false;
-      for (const [rx, z0, z1] of V_ROADS) {
+      for (const [rx, z0, z1, pay] of V_ROADS) {
         if (!boyunca(nz, d / 2, z0, z1)) continue;
-        const bindirme = YOL_PAYI + w / 2 - Math.abs(nx - rx);
+        const bindirme = pay + w / 2 - Math.abs(nx - rx);
         if (bindirme > 0) { nx += nx >= rx ? bindirme : -bindirme; carpisma = true; }
       }
-      for (const [rz, x0, x1] of H_ROADS) {
+      for (const [rz, x0, x1, pay] of H_ROADS) {
         if (!boyunca(nx, w / 2, x0, x1)) continue;
-        const bindirme = YOL_PAYI + d / 2 - Math.abs(nz - rz);
+        const bindirme = pay + d / 2 - Math.abs(nz - rz);
         if (bindirme > 0) { nz += nz >= rz ? bindirme : -bindirme; carpisma = true; }
       }
       if (!carpisma) break;
@@ -445,11 +468,11 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     return [nx, nz];
   }
   function yolUstunde(x, z, w = 0, d = 0) {
-    for (const [rx, z0, z1] of V_ROADS) {
-      if (boyunca(z, d / 2, z0, z1) && Math.abs(x - rx) < YOL_PAYI + w / 2) return true;
+    for (const [rx, z0, z1, pay] of V_ROADS) {
+      if (boyunca(z, d / 2, z0, z1) && Math.abs(x - rx) < pay + w / 2) return true;
     }
-    for (const [rz, x0, x1] of H_ROADS) {
-      if (boyunca(x, w / 2, x0, x1) && Math.abs(z - rz) < YOL_PAYI + d / 2) return true;
+    for (const [rz, x0, x1, pay] of H_ROADS) {
+      if (boyunca(x, w / 2, x0, x1) && Math.abs(z - rz) < pay + d / 2) return true;
     }
     return false;
   }
@@ -461,7 +484,10 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   );
   const ym = new THREE.Matrix4();
   PLAN_ANA_YOLLAR.forEach(([x, z, g, d], i) => {
-    ym.makeScale(Math.max(g, ROAD_W * 0.7), 1, Math.max(d, ROAD_W * 0.7));
+    // The long axis keeps its measured extent; the narrow axis is widened.
+    const kalin = yolKalinlik(g, d);
+    if (yatayMi(g, d)) ym.makeScale(Math.max(g, kalin), 1, kalin);
+    else ym.makeScale(kalin, 1, Math.max(d, kalin));
     ym.setPosition(x, 0.04, z);
     anaYollar.setMatrixAt(i, ym);
   });
@@ -511,7 +537,7 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   PLAN_ANA_YOLLAR.forEach(([x, z, g, d], i) => {
     const yatay = yatayMi(g, d);
     const uzun = Math.max(g, d);
-    const genis = Math.max(Math.min(g, d), ROAD_W * 0.7);
+    const genis = yolKalinlik(g, d);
     for (const yon of [-1, 1]) {
       if (yatay) {
         ym.makeScale(uzun, 0.1, 0.5);
@@ -543,16 +569,27 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   add(patikalar, { camera: false, cast: false });
 
   // Crosswalks exactly where the plan paints them: each record becomes a set
-  // of five stripes laid across the road it belongs to.
+  // of five stripes laid across the road it belongs to. The stripes span the
+  // WIDENED carriageway, so each looks up the road it crosses.
   const stripes = new THREE.InstancedMesh(
-    new THREE.BoxGeometry(0.7, 0.02, 3.4), mats.paint, Math.max(1, PLAN_ZEBRALAR.length * 5),
+    new THREE.BoxGeometry(0.7, 0.02, 1), mats.paint, Math.max(1, PLAN_ZEBRALAR.length * 5),
   );
+  const zebraBoyu = (x, z, yatay) => {
+    // A wide zebra patch marches its bars along x, each bar long in z — it
+    // crosses a road running along x (H_ROADS); the tall patch the reverse.
+    const adaylar = yatay ? H_ROADS.map(([c, a0, a1, pay]) => ({ mesafe: Math.abs(z - c), icinde: x > a0 && x < a1, pay }))
+      : V_ROADS.map(([c, a0, a1, pay]) => ({ mesafe: Math.abs(x - c), icinde: z > a0 && z < a1, pay }));
+    const yakin = adaylar.filter((a) => a.icinde && a.mesafe < 6).sort((a, b) => a.mesafe - b.mesafe)[0];
+    return yakin ? (yakin.pay - 0.35) * 2 + 0.6 : 4.2;
+  };
   PLAN_ZEBRALAR.forEach(([x, z, g, d], c) => {
     const yatay = g >= d;
+    const boy = zebraBoyu(x, z, yatay);
     for (let sIdx = 0; sIdx < 5; sIdx += 1) {
       const offset = (sIdx - 2) * 0.95;
       const m = new THREE.Matrix4().makeRotationY(yatay ? 0 : Math.PI / 2);
-      m.setPosition(yatay ? x + offset : x, 0.1, yatay ? z : z + offset);
+      m.scale(new THREE.Vector3(1, 1, boy));
+      m.setPosition(yatay ? x + offset : x, 0.13, yatay ? z : z + offset);
       stripes.setMatrixAt(c * 5 + sIdx, m);
     }
   });
@@ -574,7 +611,13 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // house, and read as a car driving out of the wall. Drop cars on that strip.
   const evSeridiAraba = (x, z) => z < -53 && x > -6 && x < 27;
   const KARADA = PLAN_ARABALAR.filter(([x, z]) => !denizdeMi(x, z) && !evSeridiAraba(x, z));
-  const PARKED = KARADA.map(([x, z, dikey]) => [x, z, dikey ? 0 : V]);
+  // The plan parks its cars on the ORIGINAL kerb line; the widened asphalt
+  // would swallow them, so each parked car takes the same clash shift the
+  // buildings do and slides out to the new kerb.
+  const PARKED = KARADA.map(([x, z, dikey]) => {
+    const [nx, nz] = yoldanKaydir(x, z, dikey ? 1.05 : 2.5, dikey ? 2.5 : 1.05);
+    return [nx, nz, dikey ? 0 : V];
+  });
   const PARKED_RENK = KARADA.map(([, , , renk]) => renk);
   const DRIVERS = 10;
   const CAR_N = PARKED.length + DRIVERS;
@@ -643,8 +686,8 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // therefore the lane off the plan. A car cannot leave the asphalt because its
   // route IS a measured piece of asphalt.
   const SEGMENTS = PLAN_ANA_YOLLAR.map(([x, z, g, d]) => (g >= d
-    ? { axis: 'x', road: z, width: d, from: x - g / 2, to: x + g / 2 }
-    : { axis: 'z', road: x, width: g, from: z - d / 2, to: z + d / 2 }));
+    ? { axis: 'x', road: z, width: yolKalinlik(g, d), from: x - g / 2, to: x + g / 2 }
+    : { axis: 'z', road: x, width: yolKalinlik(g, d), from: z - d / 2, to: z + d / 2 }));
   // The longest carriageway within a lane's reach of the named centre line;
   // the short stubs that share a centre would strand the car at their end.
   const segmentFor = (axis, road) => SEGMENTS
@@ -663,6 +706,10 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     // whatever that road measures, where a fixed offset could not.
     return { axis, dir, from: seg.from, to: seg.to, lane: seg.road + dir * seg.width * 0.26 };
   }).filter(Boolean);
+  animated?.push((time) => {
+    if (mats.water.userData.suZaman) mats.water.userData.suZaman.value = time;
+  });
+
   // Moving traffic is solid too: one live AABB per driver, repositioned every
   // frame with the car — Oscar walked through a moving car after the parked
   // ones went solid.
@@ -2263,7 +2310,7 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     mats.road,
   );
   ringPath.scale.y = 0.09;
-  ringPath.position.y = 0.1;
+  ringPath.position.y = 0.17;
   ringPath.name = 'district:park-path';
   add(ringPath, { camera: false, cast: false });
   const branchCurve = new THREE.CatmullRomCurve3([
@@ -2274,7 +2321,7 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   ]);
   const branchPath = new THREE.Mesh(new THREE.TubeGeometry(branchCurve, 40, 0.72, 4), mats.road);
   branchPath.scale.y = 0.09;
-  branchPath.position.y = 0.1;
+  branchPath.position.y = 0.17;
   add(branchPath, { camera: false, cast: false });
 
   // Benches: the little colored bars dotted along the paths.
@@ -2389,7 +2436,10 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     // west of the river, two staggered rows
     [-59, -36], [-60, -26], [-60, -16], [-59, -6],
     [-59, 4], [-60, 14], [-60, 24], [-59, 34], [-58, 44],
-    [-53, -21], [-53, -1], [-53, 19], [-52, 39],
+    // The second west row's north pair stood east of the corrected river —
+    // on the sports quarter's paving. They are gone; the south pair sits on
+    // grass and stays.
+    [-53, 19], [-52, 39],
     // south edge
     [-46, 52], [-36, 53], [-26, 52], [-16, 53], [-6, 52],
     [4, 53], [14, 52], [24, 53], [34, 52], [44, 53],

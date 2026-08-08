@@ -438,7 +438,7 @@ async function mountHubCharacter(id = ctx.characters.equippedId()) {
     // chosen avatar walks on its own skeleton like the gorilla does.
     const friendsieOyuncu = rigged.isRiggedCharacter(id) || rigged.isFriendsieRival(id);
     const instance = (friendsieOyuncu
-      ? await rigged.createFriendsieRival(id, { height: 1.5 })
+      ? await rigged.createFriendsieRival(id, { height: 1.38 })
       : null)
       || await ctx.characters.createInstance(friendsieOyuncu ? 'qa-runner' : id, {
         skinTone: ctx.save.settings.skinTone,

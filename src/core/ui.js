@@ -20,8 +20,7 @@ const CSS = `
 .uv-btn:disabled{opacity:.45;cursor:default}
 .uv-toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 18px);transform:translateX(-50%);max-width:calc(100vw - env(safe-area-inset-left) - env(safe-area-inset-right) - 20px);background:#060c21;color:#fff;padding:10px 20px;border-radius:999px;font:500 13px -apple-system,system-ui,sans-serif;z-index:80;box-shadow:0 8px 24px rgba(6,12,33,.22);pointer-events:none}
 .uv-hudbar{position:fixed;top:calc(env(safe-area-inset-top) + 12px);right:calc(env(safe-area-inset-right) + 12px);z-index:50;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;max-width:60vw}
-.uv-hudbar button{width:44px;height:44px;border-radius:10px;border:1px solid #e5e5ea;background:rgba(255,255,255,.92);font-size:19px;cursor:pointer;box-shadow:none;color:#060c21;backdrop-filter:blur(12px) saturate(180%);transition:transform 150ms ease-out,background 150ms ease-out,border-color 150ms ease-out}
-.uv-hudbar button[aria-label="Settings"]{width:auto;min-width:44px;padding:0 14px;font:500 13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:0}
+.uv-hudbar button{width:auto;min-width:44px;height:44px;padding:0 14px;border-radius:10px;border:1px solid #e5e5ea;background:rgba(255,255,255,.92);font:500 13px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:0;white-space:nowrap;cursor:pointer;box-shadow:none;color:#060c21;backdrop-filter:blur(12px) saturate(180%);transition:transform 150ms ease-out,background 150ms ease-out,border-color 150ms ease-out}
 .uv-hudbar button:hover{background:#fff;border-color:#a9a9b1}
 .uv-hudbar button:active{transform:scale(.98)}
 .uv-hudbar button[aria-busy="true"]{opacity:.55;cursor:wait}

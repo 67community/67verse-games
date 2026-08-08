@@ -105,6 +105,13 @@ export function buildWorld(scene, { buildCity, buildStadium, stadiumPitch } = {}
   // nothing from the previous town ships on the main map.
   // ---------------------------------------------------------------------
   const districts = buildCity({ group, add, material, animated, buildStadium, stadiumPitch });
+  // Ray plumbing for the skatepark's shaped ground.
+  const parkRay = new THREE.Raycaster();
+  const ASAGI = new THREE.Vector3(0, -1, 0);
+  const parkIsini = new THREE.Vector3();
+  const parkYuzeyleri = ['district:skatepark-basins', 'district:skatepark-props']
+    .map((ad) => group.getObjectByName(ad))
+    .filter(Boolean);
   const solids = districts.colliders ?? [];
   const isWater = districts.isWater ?? (() => false);
 
@@ -166,6 +173,16 @@ export function buildWorld(scene, { buildCity, buildStadium, stadiumPitch } = {}
     }
     const park = districts.skatepark;
     if (x > park.minX && x < park.maxX && z > park.minZ && z < park.maxZ) {
+      // The bowls are real ground now: inside the park the surface comes off
+      // the basin meshes by ray, so walking or boarding in actually descends
+      // into the 67 bowl instead of hovering on a flat slab.
+      if (parkYuzeyleri.length) {
+        parkIsini.set(x, park.topY + 6, z);
+        parkRay.set(parkIsini, ASAGI);
+        parkRay.far = 14;
+        const vurus = parkRay.intersectObjects(parkYuzeyleri, false);
+        if (vurus.length) return { y: vurus[0].point.y, box2: null };
+      }
       return { y: park.topY, box2: null };                 // skatepark slab
     }
     const pitch = districts.stadiumPitch;
@@ -202,6 +219,9 @@ export function buildWorld(scene, { buildCity, buildStadium, stadiumPitch } = {}
     // and deterministic replays are untouched.
     jumpScale: 1.24,
     airJumps: 1,
+    // Softer acceleration ramp in the hub: movement glides the way the skate
+    // lobby feels instead of snapping to top speed.
+    accelScale: 0.72,
     // The street runs along -z, so the far end of the avenue is where players
     // head for. Audio and the optional hub-plus layer read this.
     // North gate of the boulevard — the reference city's top exit.

@@ -88,8 +88,32 @@ export async function createFriendsieRival(id, { height = 1.45 } = {}) {
     object.userData.restX = object.rotation.x;
     bones.set(object.name, object);
   });
+  // Not every model in the collection names its rig ThighL/ArmR; walk cycles
+  // were dead on those and the character glided like a statue. Fuzzy-match
+  // each role against whatever names the rig carries; a rig with no usable
+  // legs at all falls back to a whole-body hop in the animator below.
+  const rolBul = (govdeler, taraf) => {
+    const t = taraf.toLowerCase();
+    for (const [ad, bone] of bones) {
+      const kucuk = ad.toLowerCase();
+      if (!govdeler.some((g) => kucuk.includes(g))) continue;
+      const solda = /(^|[^a-z])l([^a-z]|$)|left|sol/.test(kucuk);
+      const sagda = /(^|[^a-z])r([^a-z]|$)|right|sag/.test(kucuk);
+      if (t === 'l' && (solda || (!solda && !sagda))) return bone;
+      if (t === 'r' && sagda) return bone;
+    }
+    return null;
+  };
+  const rolMap = {
+    ThighL: bones.get('ThighL') || rolBul(['thigh', 'upleg', 'leg', 'hip'], 'l'),
+    ThighR: bones.get('ThighR') || rolBul(['thigh', 'upleg', 'leg', 'hip'], 'r'),
+    ArmL: bones.get('ArmL') || rolBul(['arm', 'shoulder'], 'l'),
+    ArmR: bones.get('ArmR') || rolBul(['arm', 'shoulder'], 'r'),
+    Spine1: bones.get('Spine1') || rolBul(['spine', 'chest', 'body'], 'l'),
+  };
+  const bacakVar = Boolean(rolMap.ThighL || rolMap.ThighR);
   const swing = (name, amount) => {
-    const bone = bones.get(name);
+    const bone = rolMap[name] ?? bones.get(name);
     if (bone) bone.rotation.x = bone.userData.restX + amount;
   };
 
@@ -172,6 +196,17 @@ export async function createFriendsieRival(id, { height = 1.45 } = {}) {
   // reports a real contact — one per half stride, alternating feet.
   const contact = { serial: 0, foot: 'left' };
   let lastStrideSign = 0;
+  // Body bob is applied as a delta on top of whatever y/z the venue verbs
+  // pinned (sunbed lift, swim level), never as an absolute write — an
+  // absolute would flatten a lying character back onto the deck.
+  let sonBob = 0;
+  let sonSway = 0;
+  const bobUygula = (bob, sway) => {
+    visual.position.y += bob - sonBob;
+    visual.rotation.z += sway - sonSway;
+    sonBob = bob;
+    sonSway = sway;
+  };
 
   const animator = {
     contact,
@@ -185,13 +220,26 @@ export async function createFriendsieRival(id, { height = 1.45 } = {}) {
       phase += dt * (2.4 + running * 6.2);
       if (!grounded || airborne > 0) {
         // Tucked: both legs forward, arms up.
+        bobUygula(0, 0);
         swing('ThighL', 0.62);
         swing('ThighR', 0.48);
         swing('ArmL', -0.9);
         swing('ArmR', -0.9);
         return;
       }
+      // A rig with no legs at all still walks: the whole body hops and sways
+      // with the stride so nothing in the collection glides like a statue.
+      if (!bacakVar) {
+        const adim = Math.min(running, 1);
+        bobUygula(Math.abs(Math.sin(phase)) * 0.12 * adim, Math.sin(phase) * 0.06 * adim);
+        return;
+      }
       // Standing still still breathes a little, so a waiting rival is not a statue.
+      // Stubby collection bodies hide most of the thigh swing, so every walk
+      // also bobs and sways the whole body — the stride must read at a glance
+      // on any silhouette, not just the long-legged ones.
+      const canli = Math.min(running, 1);
+      bobUygula(Math.abs(Math.sin(phase)) * 0.055 * canli, Math.sin(phase) * 0.035 * canli);
       const stride = Math.sin(phase) * (0.1 + running * 0.42);
       const strideSign = Math.sign(Math.sin(phase));
       if (running > 0.12 && strideSign !== 0 && strideSign !== lastStrideSign) {
