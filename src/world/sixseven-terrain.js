@@ -134,8 +134,12 @@ export function buildTerrainMesh(size = 150, segments = 120) {
     // never be tinted to taupe however large the multiplier. The base is
     // neutral now and both tints sit under 1: paved #c0b6b5 inside the plan,
     // meadow #8b876d beyond it.
+    // "Zemine kadar" — the paving joins the clay palette. The taupe was a
+    // close cousin of the old mauve walls, so ground and building washed into
+    // each other; a warm cream lets both the buildings and the darker asphalt
+    // read against it.
     const sehirIcinde = Math.abs(x) < 58 && Math.abs(z) < 58;
-    const tint = sehirIcinde ? [0.753, 0.714, 0.710] : [0.545, 0.529, 0.427];
+    const tint = sehirIcinde ? [0.878, 0.845, 0.800] : [0.545, 0.529, 0.427];
     colors[i * 3] = tint[0];
     colors[i * 3 + 1] = tint[1];
     colors[i * 3 + 2] = tint[2];

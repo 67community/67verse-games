@@ -306,8 +306,11 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     // Stall canopies, sampled off the reference's olive awnings at
     // (189,173,150) and trimmed the same way — captured (191,176,151).
     stallCanopy: material(0xa1917c, { roughness: 0.8 }),
-    block: material(0xb5a9a6, { roughness: 0.7 }),
-    blockDark: material(0xa39590, { roughness: 0.75 }),
+    // Soft-clay palette, from Oscar's miniature reference: an off-white body
+    // with one pastel accent, matte, and no specular hit — a highlight is what
+    // makes a toy read as cheap plastic instead of pressed porcelain.
+    block: material(0xe7ded4, { roughness: 0.86, metalness: 0 }),
+    blockDark: material(0xd6cabd, { roughness: 0.88, metalness: 0 }),
     // The reference's court is a deep muted olive, 102,107,93 lit.
     court: material(0x5c6b48, { roughness: 0.9 }),
     // Sports turf: the athletics infield, the baseball outfield and the
@@ -376,7 +379,10 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     // through the lighting gain.
     wood: material(0xb09492, { flatShading: true, roughness: 1 }),
     rail: material(0x70757e, { roughness: 0.35, metalness: 0.4 }),
-    white: material(0xbeb3b7, { roughness: 0.6 }),
+    // The block walls and every window surround ride this one. Cream and
+    // matte, per the reference — it was a mauve grey, which is why the whole
+    // city read as one dusty tone.
+    white: material(0xeee7dd, { roughness: 0.84, metalness: 0 }),
     cream: material(0xbeb0a9, { roughness: 0.5 }),
     // Skatepark surfaces are one-sided sheets — bowl walls, ramp faces — so
     // they are drawn from both sides rather than gambling on winding, and the
@@ -1984,7 +1990,12 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // building has a small, near-constant chamfer whatever its size, so the
   // radius drops to something that lands near a tenth of a unit across the
   // measured size range, and the vertical bevel shrinks with it.
-  const blockGeo = roundedBoxGeometry(1, 1, 1, 0.055, 0.022);
+  // The reference's softness is a CONSTANT small chamfer, not a proportion.
+  // 0.055 of a unit box stretches with the instance, so a wide block got a
+  // wide round and a narrow one a tight one; halfway between the pill this
+  // used to be and the hard edge it became reads as pressed clay at every
+  // size the plan draws.
+  const blockGeo = roundedBoxGeometry(1, 1, 1, 0.085, 0.035);
   // ---- Facade windows -------------------------------------------------
   // The window grid used to be painted on by a shader: no depth, no sill, no
   // shadow, which is most of why the blocks read as cardboard next to the
