@@ -113,7 +113,13 @@ export function stepPlayer(s, input, dt, env) {
   // area is a disc — a square clamp would let players walk past the rounded
   // rim at the corners and stand on open sky. Square-bound worlds (UGC
   // editor plots) keep the legacy box clamp.
-  if (env.boundsCircle) {
+  if (env.boundsBox) {
+    // An off-map venue plot pens the player in its own box; the town square
+    // clamp would snap them straight back across the world.
+    const b = env.boundsBox;
+    s.pos.x = Math.max(b.minX, Math.min(b.maxX, s.pos.x));
+    s.pos.z = Math.max(b.minZ, Math.min(b.maxZ, s.pos.z));
+  } else if (env.boundsCircle) {
     const rim = Math.hypot(s.pos.x, s.pos.z);
     if (rim > env.bounds) {
       const scale = env.bounds / rim;

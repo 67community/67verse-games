@@ -3,6 +3,7 @@
 // stable split points without changing the modules' self-registration contract.
 import { GAMES, SYSTEMS } from './core/registry.js';
 import './world/hub-plus.js';
+import './world/mekan-yasam.js';
 
 const GAME_LOADERS = Object.freeze({
   tag: () => import('./games/tag.js'),

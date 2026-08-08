@@ -77,8 +77,9 @@ scene.environment = envRT.texture;
 scene.environmentIntensity = 0.3;
 pmrem.dispose();
 
-// Plain daylight dome over the park.
-const skyDome = createSkyDome(THREE, 180);
+// Plain daylight dome over the park — wide enough to also roof the off-map
+// venue plots (x≈200+), which otherwise sit against black void.
+const skyDome = createSkyDome(THREE, 330);
 skyDome.userData.perfGroup = 'hub-sky';
 scene.add(skyDome);
 
@@ -1076,7 +1077,7 @@ window.addEventListener('keydown', (e) => {
     e.stopImmediatePropagation();
     if (devMode) {
       openSystem('emotes', 'Emotes');
-    } else if (hubCharacter?.animator.play('wave')) {
+    } else if (hubCharacter?.animator.play?.('wave')) {
       ctx.bus.emit('emote', { id: 'wave' });
     }
   }
@@ -1273,14 +1274,18 @@ function frame(now) {
           world.onboarding?.start();
         } else if (nearbyDestination.kind === 'activity') {
           hubActivities.start(nearbyDestination.target);
+        } else if (nearbyDestination.kind === 'travel') {
+          world.mekanYasam?.seyahat(nearbyDestination.target);
+        } else if (nearbyDestination.kind === 'venue') {
+          world.mekanYasam?.eylem(nearbyDestination.target);
         } else if (nearbyDestination.kind === 'emote') {
-          if (hubCharacter?.animator.play('wave')) {
+          if (hubCharacter?.animator.play?.('wave')) {
             ctx.bus.emit('emote', { id: 'wave' });
           }
         }
       } else if (sim.grabEvent && destinationCooldown <= 0) {
         destinationCooldown = 0.8;
-        if (hubCharacter?.animator.play('wave')) {
+        if (hubCharacter?.animator.play?.('wave')) {
           ctx.bus.emit('emote', { id: 'wave' });
         }
       }

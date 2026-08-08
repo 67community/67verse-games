@@ -240,6 +240,43 @@ function havuzKulubu({ THREE, kok, add, material, mats, mekan }) {
       m.makeRotationY(Math.PI / 2); m.setPosition(x, 0.62, z); mesh.setMatrixAt(i, m);
     });
 
+  // Steps into the shallow end — three shrinking treads inside the south lobe,
+  // like the reference's corner stairs.
+  seri(kutu(1, 1, 1), material(0xf6f2ec, { roughness: 0.7 }), 3, (i, m, mesh) => {
+    const [x, z] = P(pu, pz1 - 0.012 - i * 0.017);
+    m.makeScale(2.2 - i * 0.5, 0.14, 0.5);
+    m.setPosition(x, 0.46 - i * 0.13, z);
+    mesh.setMatrixAt(i, m);
+  });
+
+  // Two low deck chairs by the pool's waist — the small pair the reference
+  // parks between the lounger rows and the water.
+  const sandalyeU = [px0 - 0.055, px1 + 0.055];
+  seri(kutu(0.72, 0.16, 0.95), ahsapMat, 2, (i, m, mesh) => {
+    const [x, z] = P(sandalyeU[i], (pz0 + pz1) / 2 - 0.06);
+    m.identity(); m.setPosition(x, 0.3, z); mesh.setMatrixAt(i, m);
+  });
+  seri(kutu(0.72, 0.5, 0.14), ahsapMat, 2, (i, m, mesh) => {
+    const [x, z] = P(sandalyeU[i], (pz0 + pz1) / 2 - 0.083);
+    m.identity(); m.setPosition(x, 0.62, z); mesh.setMatrixAt(i, m);
+  });
+
+  // A cocktail on every side table, and a bottle rank along the back bar.
+  const icecekMat = material(0xf2a45c, { roughness: 0.3 });
+  seri(new THREE.CylinderGeometry(0.075, 0.062, 0.2, 8), icecekMat, BAY.length, (i, m, mesh) => {
+    const b = BAY[i];
+    const [x, z] = P(b.u + b.yon * 0.075, b.v + 0.045);
+    m.identity(); m.setPosition(x, 0.6, z); mesh.setMatrixAt(i, m);
+  });
+  const siseRenk = ['#5a9c7a', '#d0775e', '#8a6fb0', '#e8b64a', '#7fb6d8'];
+  seri(beyazRenk(THREE, new THREE.CylinderGeometry(0.06, 0.06, 0.34, 8)),
+    material(0xffffff, { roughness: 0.25, vertexColors: true }), siseRenk.length,
+    (i, m, mesh) => {
+      const [x, z] = P(0.44 + i * 0.03, 0.075);
+      m.identity(); m.setPosition(x, 1.25, z); mesh.setMatrixAt(i, m);
+      mesh.setColorAt(i, new THREE.Color(siseRenk[i]));
+    });
+
   add?.(deck, { walkable: true, camera: false, cast: false });
 }
 
