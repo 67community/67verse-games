@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import { registerHook } from '../core/registry.js';
 import { MEKAN_PLOT, mekanMerkezi } from './mekanlar.js';
+import { COSMETICS } from '../systems/cosmetics.js';
 
 const PLOT = MEKAN_PLOT;
 
@@ -78,6 +79,7 @@ function isaret({ scene, x, z, metin, renk = 0x2d6cdf }) {
 registerHook('hub', (ctx, { scene, world, getSim }) => {
   const havuz = havuzDunya();
   const kulup = mekanMerkezi('kulup');
+  const magaza = mekanMerkezi('magaza');
   let karakter = null;
   ctx.bus.on('player-ready', (data) => { karakter = data?.instance || karakter; });
 
@@ -188,6 +190,24 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     ctx.ui.toast('Lying back — press E or move to get up.');
   }
 
+  // Boutique purchase: E at the racks hands over the next piece the player
+  // does not own yet, straight into the real Closet inventory. Free while the
+  // trial phase is on, exactly like the Closet itself.
+  function kiyafetSat() {
+    const sahip = ctx.save.get('ownedCosmetics', []);
+    const sirada = COSMETICS.find((c) => !sahip.includes(c.id));
+    if (!sirada) {
+      ctx.ui.toast('You own every piece in the boutique.');
+      return;
+    }
+    if (ctx.save.set('ownedCosmetics', [...sahip, sirada.id]) !== true) {
+      ctx.ui.toast('Purchase could not be saved on this device.');
+      return;
+    }
+    ctx.bus.emit('sfx', 'reward');
+    ctx.ui.toast(`${sirada.name} is yours — it is hanging in your Closet.`);
+  }
+
   // ---------- doors + verbs, through the existing destination system ----------
   world.destinations.push(
     {
@@ -209,6 +229,26 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
       id: 'mekan-kulup-cikis', label: 'Back to 67 Park', kind: 'travel', radius: 2.2,
       x: kulup.x, z: kulup.z + PLOT * 0.485,
       target: { ...donusNoktasi, x: donusNoktasi.x, mekan: null, label: '67 Park' },
+    },
+    {
+      id: 'mekan-magaza-kapi', label: 'Boutique 67', kind: 'travel', radius: 2.6,
+      x: 51, z: 9,
+      target: { x: magaza.x, z: magaza.z + PLOT * 0.485 - 1.2, mekan: 'magaza', label: 'Boutique 67' },
+    },
+    {
+      id: 'mekan-magaza-cikis', label: 'Back to 67 Park', kind: 'travel', radius: 2.2,
+      x: magaza.x + PLOT * 0.21, z: magaza.z + PLOT * 0.485,
+      target: { ...donusNoktasi, mekan: null, label: '67 Park' },
+    },
+    {
+      id: 'mekan-magaza-alisveris', label: 'Buy clothes', kind: 'venue', radius: 2.8,
+      x: magaza.x - PLOT * 0.055, z: magaza.z + PLOT * 0.05,
+      target: 'shop-buy',
+    },
+    {
+      id: 'mekan-magaza-kabin', label: 'Fitting room — open Closet', kind: 'system', radius: 2.4,
+      x: magaza.x + PLOT * 0.137, z: magaza.z - PLOT * 0.425 + 2.2,
+      target: 'cosmetics',
     },
     {
       id: 'mekan-havuz-yuzme', label: 'Swim', kind: 'venue', radius: 2.6,
@@ -235,7 +275,11 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
   // Door + verb markers so each point reads on the ground.
   isaret({ scene, x: 51, z: -5, metin: 'POOL CLUB', renk: 0x3fa9b6 });
   isaret({ scene, x: 51, z: 2, metin: 'NIGHT CLUB', renk: 0x7b4f96 });
+  isaret({ scene, x: 51, z: 9, metin: 'BOUTIQUE 67', renk: 0xc9829a });
   isaret({ scene, x: havuz.kapi.x, z: havuz.kapi.z, metin: 'EXIT', renk: 0x17223a });
+  isaret({ scene, x: magaza.x + PLOT * 0.21, z: magaza.z + PLOT * 0.485, metin: 'EXIT', renk: 0x17223a });
+  isaret({ scene, x: magaza.x - PLOT * 0.055, z: magaza.z + PLOT * 0.05, metin: 'BUY', renk: 0xc9829a });
+  isaret({ scene, x: magaza.x + PLOT * 0.137, z: magaza.z - PLOT * 0.425 + 2.2, metin: 'FITTING ROOM', renk: 0xe8a8a5 });
   isaret({ scene, x: kulup.x, z: kulup.z + PLOT * 0.485, metin: 'EXIT', renk: 0x17223a });
   isaret({
     scene, x: (havuz.su.minX + havuz.su.maxX) / 2, z: havuz.su.maxZ + 1.0,
@@ -253,6 +297,7 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
         return;
       }
       if (target === 'drink') { icecekVer(); return; }
+      if (target === 'shop-buy') { kiyafetSat(); return; }
       if (target === 'sunbed-sol') { sezlongaUzan(havuz.solYataklar); return; }
       if (target === 'sunbed-sag') { sezlongaUzan(havuz.sagYataklar); }
     },
