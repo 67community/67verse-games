@@ -56,9 +56,14 @@ const COPING = Object.freeze({ red: 0xe0745e, blue: 0x5a80d6, yellow: 0xf6c445 }
 // decoder and meshopt fails silently.
 const LANDMARK_MODELS = Object.freeze({
   // [file, target height, sites]
-  gozlemevi: { height: 5.2, sites: [{ x: -46, z: -10, yaw: 0 }] },
-  'bina-krmz': { height: 4.4, sites: [{ x: -32, z: 10, yaw: Math.PI }, { x: 9, z: 24, yaw: 0 }] },
-  'bina-mavi': { height: 4, sites: [{ x: -42, z: 8, yaw: Math.PI / 2 }, { x: -12, z: 40, yaw: 0 }] },
+  // The court ring (COURT_BLOCKS) authors x -48..-24 by z -12..12 itself, so
+  // no landmark may sit inside it: the old gozlemevi/-mavi/-krmz sites there
+  // stood in the ring blocks and piled into the court corner. The observatory
+  // now has the east lawn by the bay to itself; the other two keep their
+  // second sites.
+  gozlemevi: { height: 5.2, sites: [{ x: 47, z: 26, yaw: Math.PI / 2 }] },
+  'bina-krmz': { height: 4.4, sites: [{ x: 9, z: 24, yaw: 0 }] },
+  'bina-mavi': { height: 4, sites: [{ x: -12, z: 40, yaw: 0 }] },
 });
 
 function normalizeLandmark(gltf, targetHeight) {
@@ -2253,8 +2258,11 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     group.add(teddy);
     return teddy;
   }
-  teddyAt(23, 21, material(0xe8a45e, { roughness: 0.7 })).name = 'district:teddy';
-  teddyAt(26.5, 22.5, mats.pink).scale.setScalar(0.7);
+  // On the lawn's north-west corner, OUTSIDE the ring path — at (23,21) the
+  // big bear stood in the path's rounded corner. They flank the relocated
+  // playground corner (PLAN_OYUN) without touching its floor.
+  teddyAt(20.6, 19.6, material(0xe8a45e, { roughness: 0.7 })).name = 'district:teddy';
+  teddyAt(22.7, 19.8, mats.pink).scale.setScalar(0.7);
 
   // -------------------------------------------------------------------
   // TREES — playground cluster, suburb and coast greens, one instanced set
@@ -2331,9 +2339,11 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     [-46, 52], [-36, 53], [-26, 52], [-16, 53], [-6, 52],
     [4, 53], [14, 52], [24, 53], [34, 52], [44, 53],
     [-40, 59], [-20, 59], [0, 59], [20, 59], [40, 59],
-    // north edge, past the pool complex
+    // north edge, past the pool complex. 36 sat half inside the block tower
+    // beside it — its pyramid roof pierced the facade — so that house stands
+    // one parcel further east.
     [-24, -58], [-12, -57], [0, -58],
-    [12, -57], [24, -58], [36, -57], [46, -56],
+    [12, -57], [24, -58], [39.5, -57], [46, -56],
     // east, behind the coast road
     [52, 40], [54, 50], [50, 30],
   ];
@@ -2510,8 +2520,12 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // the houses read as a grey stone sitting in the front yard, so props are
   // held off it the way the blocks and suburb houses are.
   const evSeridindeOge = (x, z) => z < -53 && x > -12 && x < 26;
+  // The kidney pond and its rim author their own furniture; two catch-all
+  // records used to stand in the water as pale crates.
+  const goletteOge = (x, z) => x > 23.5 && x < 36.2 && z > 25 && z < 40.5;
   const ufakMi = ([x, z, g, d]) => g <= 3.2 && d <= 3.2
-    && !skateIcinde(x, z) && !denizdeMi(x, z) && !evSeridindeOge(x, z);
+    && !skateIcinde(x, z) && !denizdeMi(x, z) && !evSeridindeOge(x, z)
+    && !goletteOge(x, z);
   // PLAN_SEMSIYELER is deliberately not in here: the parasols are drawn as
   // cones by the beach and promenade run above, and dropping a coloured slab
   // on each of them as well stacked a box under every umbrella.

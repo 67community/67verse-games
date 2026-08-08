@@ -2,10 +2,13 @@
 // pane is hidden (hidden panes park RAF, freezing the app). Headless Chrome
 // treats its page as visible, so the game really runs and screenshots are
 // truthful. Usage:
-//   node scripts/headless-qa.mjs '<path-with-query>' <shot1s> ... [--out prefix]
+//   node scripts/headless-qa.mjs '<path-with-query>' <shot1s> ... [--out prefix] [--script file.js]
+// --script runs the given file in the page after entry (async IIFE result is
+// JSON-printed) — QA hooks like __67VERSE_QA__ are reachable from it.
 // Example:
 //   node scripts/headless-qa.mjs '/?game=karting&qa=1' 3 10 20 34
-import { access, mkdir } from 'node:fs/promises';
+//   node scripts/headless-qa.mjs '/?qa=1' 8 --script scripts/qa/map-audit.js --out audit
+import { access, mkdir, readFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import puppeteer from 'puppeteer-core';
 
@@ -25,11 +28,17 @@ async function chromeExecutable() {
 }
 
 const args = process.argv.slice(2);
-const outIdx = args.indexOf('--out');
-const prefix = outIdx >= 0 ? args[outIdx + 1] : 'shot';
-const positional = outIdx >= 0 ? [...args.slice(0, outIdx), ...args.slice(outIdx + 2)] : args;
-const path = positional[0] || '/?game=karting&qa=1';
-const times = positional.slice(1).map(Number);
+const takeFlag = (name) => {
+  const i = args.indexOf(name);
+  if (i < 0) return null;
+  const value = args[i + 1];
+  args.splice(i, 2);
+  return value;
+};
+const prefix = takeFlag('--out') || 'shot';
+const scriptPath = takeFlag('--script');
+const path = args[0] || '/?game=karting&qa=1';
+const times = args.slice(1).map(Number);
 const shots = times.length ? times : [3, 10, 20, 34];
 
 const outDir = new URL('../artifacts/headless-qa/', import.meta.url).pathname;
@@ -57,6 +66,18 @@ try {
   await page.waitForSelector('#enter-game', { timeout: 6000 });
   await page.click('#enter-game');
 } catch {}
+
+if (scriptPath) {
+  const body = await readFile(scriptPath, 'utf8');
+  try {
+    const result = await page.evaluate(body);
+    console.log('--- script result ---');
+    console.log(typeof result === 'string' ? result : JSON.stringify(result, null, 1));
+  } catch (error) {
+    console.log('--- script error ---');
+    console.log(error.message);
+  }
+}
 
 const t0 = Date.now();
 for (const s of shots) {

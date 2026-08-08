@@ -300,11 +300,15 @@ export const PLAN_KART = Object.freeze({
 export const PLAN_OYUN = Object.freeze([
   [30.13, -35.65, 19.76, 29.16, '#dec9c8'], // lunapark platformu
   [30.03, -22.77, 18.89, 3.88, '#d98f93'], // lunapark hiz treni
-  [28.58, 27.71, 8.04, 8.04, '#ddbdb8'], // yuvarlak oyun alani zemini
-  [28.29, 25.67, 3.88, 1.65, '#f7a860'], // turuncu oyun unitesi (uzun)
-  [26.64, 27.71, 2.81, 2.32, '#f9b268'], // turuncu oyun unitesi (yuvarlak)
-  [30.23, 28.77, 3.1, 3.39, '#f07ab4'], // pembe oyun unitesi
-  [27.22, 30.23, 0.97, 0.97, '#e070a8'], // kucuk pembe koni
+  // Oyun kosesi: planin olctugu (28.6, 27.7) parseli sonradan gelen bohrek
+  // goletin bati lobuyla ayni hucreye dusuyordu — zemin golet bordurune
+  // gomulup uniteler yari suya batiyordu. Ayni kume, ayni oranlar; ring
+  // patikasinin disindaki cimen kosesine, ayi heykellerinin yanina tasindi.
+  [26.5, 19.3, 5.5, 3.7, '#ddbdb8'],  // oyun alani zemini
+  [25.4, 18.4, 2.8, 1.5, '#f7a860'],  // turuncu oyun unitesi (uzun)
+  [27.9, 18.6, 2.4, 2.1, '#f9b268'],  // turuncu oyun unitesi (yuvarlak)
+  [26.6, 20.2, 2.6, 1.7, '#f07ab4'],  // pembe oyun unitesi
+  [28.6, 20.3, 0.97, 0.97, '#e070a8'], // kucuk pembe koni
   [-7.56, -43.01, 13.17, 9.4, '#d9605e'], // kirmizi kenarli buyuk kase (67 havuzu)
   [2.62, -44.47, 5.81, 7.07, '#8cb2d6'], // mavi kenarli ust kanal/kase
   [-9.11, -35.17, 9.78, 5.42, '#8cb2d6'], // mavi kenarli sol-alt kase (C bicimli)

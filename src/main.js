@@ -1118,6 +1118,9 @@ console.log('[67VERSE] hub ready — WASD/arrows move, drag to look, Space jump,
         hubActivities,
         world,
         bus: ctx.bus,
+        scene,
+        THREE,
+        view: ctx.view,
       }))
       .catch((error) => console.error('[67VERSE] deferred QA hooks failed', error));
   }
