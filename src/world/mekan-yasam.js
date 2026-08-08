@@ -18,6 +18,7 @@ import { COSMETICS } from '../systems/cosmetics.js';
 import { createFriendsieRival } from '../core/friendsie-bot.js';
 import { acMikroOyun } from './arcade-oyunlar.js';
 import { kurBasketAtisi } from './basket-atisi.js';
+import { kurFutbolAtisi } from './futbol-atisi.js';
 
 const PLOT = MEKAN_PLOT;
 
@@ -100,6 +101,7 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
   ctx.bus.on('player-ready', (data) => { karakter = data?.instance || karakter; });
 
   const basket = kurBasketAtisi({ ctx, scene, getSim });
+  const futbol = kurFutbolAtisi({ ctx, scene, getSim });
 
   // ---------- venue guests ----------
   // The rooms are not dioramas: a few of Oscar's collection hang out in them,
@@ -403,6 +405,11 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
       target: 'hoop-shot',
     },
     {
+      id: 'futbol-atisi', label: 'Goal Shot', kind: 'venue', radius: 2.4,
+      x: 29.95, z: 5.2,
+      target: 'goal-shot',
+    },
+    {
       id: 'mekan-arcade-kapi', label: 'Arcade 67', kind: 'travel', radius: 2.6,
       x: 51, z: 16,
       target: { x: arcade.x + (0.49 - 0.5) * PLOT, z: arcade.z + PLOT * 0.485 - 1.2, mekan: 'arcade', label: 'Arcade 67' },
@@ -488,6 +495,7 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
   isaret({ scene, x: magaza.x - PLOT * 0.055, z: magaza.z + PLOT * 0.05, metin: 'BUY', renk: 0xc9829a });
   isaret({ scene, x: 51, z: 16, metin: 'ARCADE 67', renk: 0x8fc4cf });
   isaret({ scene, x: -36, z: -1.7, metin: 'HOOP SHOT', renk: 0xe08a3c });
+  isaret({ scene, x: 29.95, z: 5.2, metin: 'GOAL SHOT', renk: 0x5a9c7a });
   isaret({ scene, x: arcade.x + (0.49 - 0.5) * PLOT, z: arcade.z + PLOT * 0.485, metin: 'EXIT', renk: 0x17223a });
   isaret({ scene, x: arcadeHop.x, z: arcadeHop.z + 1.4, metin: 'SKY HOP', renk: 0x5a9cd8 });
   isaret({ scene, x: arcadeDodge.x, z: arcadeDodge.z + 1.4, metin: 'DODGE 67', renk: 0x7fbf8e });
@@ -520,6 +528,7 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
       if (target === 'gift') { birineIsmarla(); return; }
       if (target === 'gift-kahve') { birineIsmarla(kahveYap, 'coffee'); return; }
       if (target === 'hoop-shot') { basket.baslat(); return; }
+      if (target === 'goal-shot') { futbol.baslat(); return; }
       if (target === 'arcade-hop' || target === 'arcade-dodge') {
         acMikroOyun(target, ctx);
         return;

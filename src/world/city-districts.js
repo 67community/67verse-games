@@ -1536,6 +1536,35 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // -------------------------------------------------------------------
   group.add(buildStadium(mats));
 
+  // ---------- Stadium: goals on the pitch, and a solid bowl you enter
+  // through the south gate (Oscar: walkable opening + goals + shot). ----------
+  const SAHA = { x: stadiumPitch.x, z: stadiumPitch.z };
+  {
+    const direkMat = material(0xf6f2ec, { roughness: 0.5 });
+    const agMat = material(0xffffff, { roughness: 0.9, transparent: true, opacity: 0.35 });
+    const kaleler = new THREE.Group();
+    kaleler.name = 'district:kaleler';
+    for (const yon of [-1, 1]) {
+      const gz = SAHA.z + yon * 9.6;
+      for (const dx of [-1.35, 1.35]) {
+        const direk = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.15, 8), direkMat);
+        direk.position.set(SAHA.x + dx, 0.735, gz);
+        kaleler.add(direk);
+      }
+      const ust = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.7, 8), direkMat);
+      ust.rotation.z = Math.PI / 2;
+      ust.position.set(SAHA.x, 1.31, gz);
+      kaleler.add(ust);
+      const ag = new THREE.Mesh(new THREE.PlaneGeometry(2.7, 1.1), agMat);
+      ag.position.set(SAHA.x, 0.72, gz + yon * 0.42);
+      ag.rotation.x = yon * 0.28;
+      kaleler.add(ag);
+    }
+    kaleler.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    group.add(kaleler);
+  }
+
+
   // -------------------------------------------------------------------
   // WEST + SOUTH CELLS — dense blocks, the basketball court, the market
   // -------------------------------------------------------------------
@@ -2622,6 +2651,27 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // Market stalls and the centre pavilion.
   for (const [x, z, w, d] of TEZGAHLAR) {
     colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, topY: 1.9 });
+  }
+  // Stadium bowl: sixteen wall segments around the oval, minus the two that
+  // fall on the south gate — the one way in on foot.
+  {
+    const rxW = stadiumPitch.rx + 2.9;
+    const rzW = stadiumPitch.rz + 2.9;
+    for (let i = 0; i < 16; i += 1) {
+      const a = (i / 16) * Math.PI * 2;
+      const cx = stadiumPitch.x + Math.cos(a) * rxW;
+      const cz = stadiumPitch.z + Math.sin(a) * rzW;
+      const kapida = cz > stadiumPitch.z + rzW - 1.6 && Math.abs(cx - stadiumPitch.x) < 3.4;
+      if (kapida) continue;
+      colliders.push({ minX: cx - 1.6, maxX: cx + 1.6, minZ: cz - 1.6, maxZ: cz + 1.6, topY: 2.4 });
+    }
+    // Gate cheeks funnel the walk-in.
+    for (const dx of [-3.1, 3.1]) {
+      colliders.push({
+        minX: stadiumPitch.x + dx - 0.9, maxX: stadiumPitch.x + dx + 0.9,
+        minZ: stadiumPitch.z + rzW - 2.2, maxZ: stadiumPitch.z + rzW + 1.4, topY: 2.4,
+      });
+    }
   }
 
   return {
