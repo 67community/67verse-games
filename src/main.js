@@ -44,7 +44,9 @@ function wrappedAngleDelta(from, to) {
 }
 
 // ---------- Renderer ----------
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+// preserveDrawingBuffer: the in-game phone's camera reads the canvas after
+// the frame; without it the capture comes back black.
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 // Safe pre-settings state. The persisted deterministic tier is applied before
 // the first animation frame once the shared context exists.

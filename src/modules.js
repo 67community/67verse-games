@@ -4,6 +4,8 @@
 import { GAMES, SYSTEMS } from './core/registry.js';
 import './world/hub-plus.js';
 import './world/mekan-yasam.js';
+import './world/hava-durumu.js';
+import './systems/telefon.js';
 
 const GAME_LOADERS = Object.freeze({
   tag: () => import('./games/tag.js'),
