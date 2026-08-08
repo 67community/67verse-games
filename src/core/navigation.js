@@ -36,6 +36,13 @@ export const FEATURED_MODES = Object.freeze([
     status: 'On this device · Training race',
   }),
   Object.freeze({
+    id: 'karting',
+    name: 'Kart 67',
+    icon: 'KART',
+    description: 'First-person kart race — three laps from inside the cockpit.',
+    status: 'On this device · Training race',
+  }),
+  Object.freeze({
     id: 'show67',
     name: '67 Show',
     icon: 'SHOW',

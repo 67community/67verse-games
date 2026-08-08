@@ -624,6 +624,10 @@ async function karakterSeas() {
   karakterSecim.show();
 }
 function enterVeyaSec() {
+  // QA and capture runs must stay deterministic and unattended, so the
+  // one-time character choice never gates them — they enter as the default
+  // hero exactly like a returning player.
+  if (query.has('qa') || query.has('visualQa')) { enterWorld(); return; }
   if (ctx.save.get('karakterSecildi', false)) { enterWorld(); return; }
   karakterSeas();
 }

@@ -9,6 +9,7 @@ const GAME_LOADERS = Object.freeze({
   balloon: () => import('./games/balloon.js'),
   obstacle: () => import('./games/obstacle.js'),
   skate: () => import('./games/skate-race.js'),
+  karting: () => import('./games/karting.js'),
   creator: () => import('./ugc/editor.js'),
   // 67Show chains Tag -> Balloon Battle -> Skyway Sprint, so its three rounds
   // load up front: a mid-gauntlet import stall would land between rounds, where
