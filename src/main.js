@@ -430,10 +430,14 @@ async function mountHubCharacter(id = ctx.characters.equippedId()) {
     // is fetched only when the equipped character actually is one, so a player
     // wearing a roster character never downloads it.
     const rigged = await import('./core/friendsie-bot.js');
-    const instance = (rigged.isRiggedCharacter(id)
+    // The player can now BE a fRiENDSiES, not just race them: a `friendsie:` id
+    // loads through the same rival factory (it carries the gait bones), so the
+    // chosen avatar walks on its own skeleton like the gorilla does.
+    const friendsieOyuncu = rigged.isRiggedCharacter(id) || rigged.isFriendsieRival(id);
+    const instance = (friendsieOyuncu
       ? await rigged.createFriendsieRival(id, { height: 1.9 })
       : null)
-      || await ctx.characters.createInstance(rigged.isRiggedCharacter(id) ? 'qa-runner' : id, {
+      || await ctx.characters.createInstance(friendsieOyuncu ? 'qa-runner' : id, {
         skinTone: ctx.save.settings.skinTone,
         lod: 'hero',
         shadow: 'hero',
@@ -606,7 +610,24 @@ function enterWorld() {
   }
 }
 
-enterButton?.addEventListener('click', enterWorld);
+// Character picker (Normal vs NFT, then the fRiENDSiES roster). Shown once, the
+// first time a player enters, before the world; a saved choice skips it.
+let karakterSecim = null;
+async function karakterSeas() {
+  if (!karakterSecim) {
+    const mod = await import('./karakter-secim.js');
+    karakterSecim = mod.buildKarakterSecim({
+      ctx,
+      onConfirm: (id) => { mountHubCharacter(id); enterWorld(); },
+    });
+  }
+  karakterSecim.show();
+}
+function enterVeyaSec() {
+  if (ctx.save.get('karakterSecildi', false)) { enterWorld(); return; }
+  karakterSeas();
+}
+enterButton?.addEventListener('click', enterVeyaSec);
 primaryPlayButton?.addEventListener('click', () => {
   enterWorld();
   openGameSelect();

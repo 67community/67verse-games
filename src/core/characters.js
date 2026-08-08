@@ -507,6 +507,10 @@ export function createCharacters(ctx, {
       // has never chosen anything wears it. An explicit shop selection still
       // wins, and a saved choice is never overwritten.
       if (requested == null) return 'gorilla';
+      // A chosen fRiENDSiES avatar is a `friendsie:` id the hub mounts through
+      // the rival factory. It is not a roster id, so it passes straight through
+      // rather than being normalized to qa-runner.
+      if (typeof requested === 'string' && requested.startsWith('friendsie:')) return requested;
       if (
         requested == null
         && candidateManifests.some((entry) => entry.id === DEFAULT_CHARACTER_ID)
