@@ -80,15 +80,23 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
   const havuz = havuzDunya();
   const kulup = mekanMerkezi('kulup');
   const magaza = mekanMerkezi('magaza');
+  // Club spots, from the night-club reference fractions in mekanlar.js.
+  const kf = (u, v) => ({ x: kulup.x + (u - 0.5) * PLOT, z: kulup.z + (v - 0.5) * PLOT });
+  const kulupPist = kf(0.474, 0.507);        // lit dance floor centre
+  const kulupBar = kf(0.245, 0.39);          // in front of the west bar
+  const kulupVipUst = kf(0.77, 0.18);        // VIP LOUNGE sofa
+  const kulupVipAlt = kf(0.16, 0.73);        // VIP AREA sofa
   let karakter = null;
   ctx.bus.on('player-ready', (data) => { karakter = data?.instance || karakter; });
 
   // ---------- state ----------
   const durum = {
-    mekanda: null,       // 'havuz' | 'kulup' | null
+    mekanda: null,       // 'havuz' | 'kulup' | 'magaza' | null
     yuzuyor: false,
     uzanan: null,        // { x, z } of the sunbed while lying
     icecek: null,        // drink prop + timer
+    dans: null,          // { x, z, sure } while dancing
+    oturan: null,        // { x, z } while sitting
   };
 
   const donusNoktasi = { x: 51, z: -2 };   // the promenade, in front of the doors
@@ -113,6 +121,21 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     ctx.ui.toast('Out of the pool.');
   }
 
+  function dansiBirak() {
+    if (!durum.dans) return;
+    durum.dans = null;
+    gorselDuzelt();
+  }
+
+  function oturmayiBirak() {
+    if (!durum.oturan) return;
+    durum.oturan = null;
+    gorselDuzelt();
+    const sim = getSim();
+    sim.pos.x += 0.9;
+    ctx.ui.toast('Up you get.');
+  }
+
   function uzanmayiBirak() {
     if (!durum.uzanan) return;
     durum.uzanan = null;
@@ -126,6 +149,8 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     const sim = getSim();
     yuzmeyiBirak();
     uzanmayiBirak();
+    dansiBirak();
+    oturmayiBirak();
     sim.pos.x = target.x;
     sim.pos.z = target.z;
     sim.pos.y = 0.4;
@@ -190,6 +215,17 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     ctx.ui.toast('Lying back — press E or move to get up.');
   }
 
+  function dansaBasla() {
+    const sim = getSim();
+    durum.dans = { x: sim.pos.x, z: sim.pos.z, sure: 0 };
+    ctx.ui.toast('Dancing — move or press E to stop.');
+  }
+
+  function otur(nokta) {
+    durum.oturan = { ...nokta };
+    ctx.ui.toast('Taking a seat — press E or move to stand.');
+  }
+
   // Boutique purchase: E at the racks hands over the next piece the player
   // does not own yet, straight into the real Closet inventory. Free while the
   // trial phase is on, exactly like the Closet itself.
@@ -251,6 +287,26 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
       target: 'cosmetics',
     },
     {
+      id: 'mekan-kulup-dans', label: 'Dance', kind: 'venue', radius: 3.2,
+      x: kulupPist.x, z: kulupPist.z + 2.4,
+      target: 'dance',
+    },
+    {
+      id: 'mekan-kulup-bar', label: 'Take a drink', kind: 'venue', radius: 2.6,
+      x: kulupBar.x, z: kulupBar.z,
+      target: 'drink',
+    },
+    {
+      id: 'mekan-kulup-vip-ust', label: 'Sit down', kind: 'venue', radius: 2.4,
+      x: kulupVipUst.x, z: kulupVipUst.z + 1.2,
+      target: 'sit-vip-ust',
+    },
+    {
+      id: 'mekan-kulup-vip-alt', label: 'Sit down', kind: 'venue', radius: 2.4,
+      x: kulupVipAlt.x + 1.2, z: kulupVipAlt.z,
+      target: 'sit-vip-alt',
+    },
+    {
       id: 'mekan-havuz-yuzme', label: 'Swim', kind: 'venue', radius: 2.6,
       x: (havuz.su.minX + havuz.su.maxX) / 2, z: havuz.su.maxZ + 1.0,
       target: 'swim',
@@ -279,6 +335,10 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
   isaret({ scene, x: havuz.kapi.x, z: havuz.kapi.z, metin: 'EXIT', renk: 0x17223a });
   isaret({ scene, x: magaza.x + PLOT * 0.21, z: magaza.z + PLOT * 0.485, metin: 'EXIT', renk: 0x17223a });
   isaret({ scene, x: magaza.x - PLOT * 0.055, z: magaza.z + PLOT * 0.05, metin: 'BUY', renk: 0xc9829a });
+  isaret({ scene, x: kulupPist.x, z: kulupPist.z + 2.4, metin: 'DANCE', renk: 0xb45cd6 });
+  isaret({ scene, x: kulupBar.x, z: kulupBar.z, metin: 'BAR', renk: 0xe8b64a });
+  isaret({ scene, x: kulupVipUst.x, z: kulupVipUst.z + 1.2, metin: 'VIP', renk: 0x7b4f96 });
+  isaret({ scene, x: kulupVipAlt.x + 1.2, z: kulupVipAlt.z, metin: 'VIP', renk: 0x7b4f96 });
   isaret({ scene, x: magaza.x + PLOT * 0.137, z: magaza.z - PLOT * 0.425 + 2.2, metin: 'FITTING ROOM', renk: 0xe8a8a5 });
   isaret({ scene, x: kulup.x, z: kulup.z + PLOT * 0.485, metin: 'EXIT', renk: 0x17223a });
   isaret({
@@ -298,6 +358,12 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
       }
       if (target === 'drink') { icecekVer(); return; }
       if (target === 'shop-buy') { kiyafetSat(); return; }
+      if (target === 'dance') {
+        if (durum.dans) dansiBirak(); else dansaBasla();
+        return;
+      }
+      if (target === 'sit-vip-ust') { otur(kulupVipUst); return; }
+      if (target === 'sit-vip-alt') { otur(kulupVipAlt); return; }
       if (target === 'sunbed-sol') { sezlongaUzan(havuz.solYataklar); return; }
       if (target === 'sunbed-sag') { sezlongaUzan(havuz.sagYataklar); }
     },
@@ -326,7 +392,58 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
         v.position.y = -0.55;                      // body sits in the water
       }
     }
+    if (durum.dans) {
+      const sim = getSim();
+      // An external jump (venue travel, QA teleport) releases the pin — only
+      // the pin itself keeps the player within a step of the dance spot.
+      if (Math.hypot(sim.pos.x - durum.dans.x, sim.pos.z - durum.dans.z) > 2.5) {
+        dansiBirak();
+      } else {
+      durum.dans.sure += dt;
+      const t = durum.dans.sure;
+      sim.pos.x = durum.dans.x;
+      sim.pos.z = durum.dans.z;
+      sim.vel.x = 0; sim.vel.z = 0;
+      const v = karakter?.visual;
+      if (v) {
+        // Beat at ~128bpm: bounce, sway, and quarter-turn hips; the walk
+        // animator drives arms and legs like a fast step in place.
+        const vurus = t * 13.4;
+        v.position.y = Math.abs(Math.sin(vurus)) * 0.22;
+        v.rotation.z = Math.sin(vurus / 2) * 0.14;
+        v.rotation.y = Math.sin(vurus / 4) * 0.7;
+      }
+      karakter?.animator?.update?.(dt, { speed: 3.4, grounded: true });
+      const pad = ctx.input.poll();
+      if (Math.abs(pad.mx) > 0.3 || Math.abs(pad.my) > 0.3) dansiBirak();
+      }
+    }
+    if (durum.oturan) {
+      const sim = getSim();
+      if (Math.hypot(sim.pos.x - durum.oturan.x, sim.pos.z - durum.oturan.z) > 2.5) {
+        oturmayiBirak();
+        return;
+      }
+      sim.pos.x = durum.oturan.x;
+      sim.pos.z = durum.oturan.z;
+      sim.pos.y = -0.2;
+      sim.vel.x = 0; sim.vel.y = 0; sim.vel.z = 0;
+      sim.grounded = true;
+      const v = karakter?.visual;
+      if (v) {
+        // A seated read without rig surgery: sunk to the cushion, a light
+        // recline against the sofa back.
+        v.position.y = 0.34;
+        v.rotation.x = -0.28;
+      }
+      const pad = ctx.input.poll();
+      if (Math.abs(pad.mx) > 0.3 || Math.abs(pad.my) > 0.3) oturmayiBirak();
+    }
     if (durum.uzanan) {
+      if (Math.hypot(sim.pos.x - durum.uzanan.x, sim.pos.z - durum.uzanan.z) > 3.4) {
+        uzanmayiBirak();
+        return;
+      }
       // Feet toward the pool so the body lies along the bed's long axis, the
       // head up by the parasol end.
       sim.pos.x = durum.uzanan.x - durum.uzanan.yon * 0.95;
