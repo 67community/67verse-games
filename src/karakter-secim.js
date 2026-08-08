@@ -20,7 +20,7 @@ const FR_BASE = `${import.meta.env?.BASE_URL ?? '/'}friendsies/`;
 // are free; the rest carry a coin price so most of the collection is a purchase,
 // the way Oscar wants it. price 0 = owned from the start.
 export const KARAKTERLER = Object.freeze([
-  { id: 'gorilla', ad: 'Goril', dosya: null, fiyat: 0 },
+  { id: 'gorilla', ad: 'Gorilla', dosya: null, fiyat: 0 },
   { id: 'friendsie:fr_67.glb', ad: 'Friendsie 67', dosya: 'fr_67.glb', fiyat: 0 },
   { id: 'friendsie:fr_1.glb', ad: 'Friendsie 1', dosya: 'fr_1.glb', fiyat: 120 },
   { id: 'friendsie:fr_100.glb', ad: 'Friendsie 100', dosya: 'fr_100.glb', fiyat: 120 },
@@ -96,7 +96,7 @@ export function buildKarakterSecim({ ctx, onConfirm }) {
   kok.id = 'karakter-secim';
   kok.innerHTML = `
     <div id="ks-surum">
-      <div id="ks-surum-baslik">NASIL OYNAMAK İSTERSİN?</div>
+      <div id="ks-surum-baslik">HOW DO YOU WANT TO PLAY?</div>
       <div id="ks-surum-kartlar">
         <button class="ks-kart" data-surum="normal">
           <div class="ks-kart-ust">
@@ -105,8 +105,8 @@ export function buildKarakterSecim({ ctx, onConfirm }) {
               <path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/>
             </svg>
           </div>
-          <b>Normal Sürüm</b>
-          <span>Hazır karakterle hemen başla. Ücretsiz.</span>
+          <b>Standard</b>
+          <span>Jump in with a ready character. Free.</span>
         </button>
         <button class="ks-kart nft" data-surum="nft">
           <div class="ks-kart-ust">
@@ -116,20 +116,20 @@ export function buildKarakterSecim({ ctx, onConfirm }) {
               <path d="M8.5 3 6 9l6 12 6-12-2.5-6"/>
             </svg>
           </div>
-          <b>NFT Sürümü</b>
-          <span>fRiENDSiES koleksiyonundan karakterini seç. Cüzdanındaki NFT’ler açılır.</span>
+          <b>NFT Edition</b>
+          <span>Pick your character from the fRiENDSiES collection. NFTs in your wallet unlock.</span>
         </button>
       </div>
     </div>
     <canvas id="ks-canvas"></canvas>
-    <div id="ks-baslik">KARAKTERİNİ SEÇ<span>Bir kez seçilir — hesabına kaydolur</span></div>
-    <button class="ks-ok" id="ks-sol" aria-label="önceki">‹</button>
-    <button class="ks-ok" id="ks-sag" aria-label="sonraki">›</button>
+    <div id="ks-baslik">CHOOSE YOUR CHARACTER<span>Chosen once — saved to your account</span></div>
+    <button class="ks-ok" id="ks-sol" aria-label="previous">‹</button>
+    <button class="ks-ok" id="ks-sag" aria-label="next">›</button>
     <div id="ks-alt">
       <div id="ks-ad">—</div>
       <div id="ks-durum"></div>
       <div id="ks-nokta"></div>
-      <button id="ks-sec">SEÇ</button>
+      <button id="ks-sec">SELECT</button>
     </div>`;
   document.body.appendChild(kok);
 
@@ -252,6 +252,14 @@ export function buildKarakterSecim({ ctx, onConfirm }) {
       // only ever shows one at a time, so the loaded scene is used directly and
       // simply re-parented when the choice changes.
       const m = gltf.scene;
+      // The fit must be idempotent: the same cached object can be shown again
+      // (e.g. after a purchase refresh), so clear any transform from a previous
+      // show before measuring — otherwise we'd measure an already-scaled model
+      // and the fit would compound, throwing the avatar out of frame.
+      m.scale.setScalar(1);
+      m.position.set(0, 0, 0);
+      m.rotation.set(0, 0, 0);
+      m.updateMatrixWorld(true);
       const box = new THREE.Box3().setFromObject(m);
       const h = box.max.y - box.min.y || 1;
       const s = 1.7 / h;
@@ -278,13 +286,13 @@ export function buildKarakterSecim({ ctx, onConfirm }) {
     adEl.textContent = kar.ad;
     [...noktaEl.children].forEach((n, i) => n.classList.toggle('on', i === indeks));
     if (sahipMi(kar)) {
-      durumEl.textContent = kar.fiyat === 0 ? 'Açık' : 'Sahipsin';
-      secBtn.textContent = 'SEÇ';
+      durumEl.textContent = kar.fiyat === 0 ? 'Unlocked' : 'Owned';
+      secBtn.textContent = 'SELECT';
       secBtn.classList.remove('kilitli');
       secBtn.disabled = false;
     } else {
-      durumEl.textContent = `Kilitli — ${kar.fiyat} jeton`;
-      secBtn.textContent = `SATIN AL (${kar.fiyat})`;
+      durumEl.textContent = `Locked — ${kar.fiyat} coins`;
+      secBtn.textContent = `BUY (${kar.fiyat})`;
       secBtn.classList.add('kilitli');
       secBtn.disabled = false;
     }
@@ -369,7 +377,7 @@ export function buildKarakterSecim({ ctx, onConfirm }) {
   // geri: NFT secimden surum secimine don
   const geriBtn = document.createElement('button');
   geriBtn.id = 'ks-geri';
-  geriBtn.textContent = '‹ Geri';
+  geriBtn.textContent = '‹ Back';
   kok.appendChild(geriBtn);
   geriBtn.addEventListener('click', () => {
     calisiyor = false;
