@@ -104,7 +104,14 @@ registerHook('boot', (ctx) => {
   // ---------- state ----------
   const sohbetler = new Map(KISILER.map((k) => [k.id, []]));
   let okunmamis = 0;
-  const fotolar = [];   // dataURL'ler, en yeni basta, en cok 10
+  const fotolar = [];   // { veri, paylasildi } — en yeni basta, en cok 10
+  const populerlikOku = () => {
+    const v = ctx.save.get('populerlik', 0);
+    return Number.isFinite(v) ? v : 0;
+  };
+  const populerlikEkle = (n) => {
+    ctx.save.set('populerlik', populerlikOku() + n);
+  };
 
   // ---------- floating button + notification ----------
   const dugme = document.createElement('button');
@@ -153,7 +160,8 @@ registerHook('boot', (ctx) => {
   function anaEkran() {
     okunmamis = 0;
     rozetGuncelle();
-    icerik.innerHTML = '<div class="tf-baslik">67 Phone</div>';
+    icerik.innerHTML = `<div class="tf-baslik">67 Phone</div>
+      <p class="tf-not" style="margin-top:-6px;">Popularity ${populerlikOku()}</p>`;
     const izgara = document.createElement('div');
     izgara.className = 'tf-izgara';
     const uygulamalar = [
@@ -290,7 +298,7 @@ registerHook('boot', (ctx) => {
     cek.addEventListener('click', () => {
       const foto = fotoCek();
       if (!foto) { ctx.ui.toast('The camera could not read the frame.'); return; }
-      fotolar.unshift(foto);
+      fotolar.unshift({ veri: foto, paylasildi: false });
       if (fotolar.length > 10) fotolar.pop();
       ctx.ui.toast('Saved to Photos.');
       galeriEkrani();
@@ -314,15 +322,48 @@ registerHook('boot', (ctx) => {
     }
     for (const f of fotolar) {
       const img = document.createElement('img');
-      img.src = f;
+      img.src = f.veri;
       img.className = 'tf-foto';
       img.alt = 'Park photo';
+      img.style.marginBottom = '4px';
       icerik.appendChild(img);
+      const paylas = document.createElement('button');
+      paylas.type = 'button';
+      paylas.className = 'tf-buyuk';
+      paylas.style.cssText = 'margin:0 0 12px;padding:9px;font-size:12.5px;';
+      if (f.paylasildi) {
+        paylas.textContent = 'Shared';
+        paylas.disabled = true;
+        paylas.style.opacity = '0.55';
+      } else {
+        paylas.textContent = 'Share';
+        paylas.addEventListener('click', () => {
+          f.paylasildi = true;
+          galeriEkrani();
+          ctx.ui.toast('Shared with the park.');
+          // Likes trickle in from whoever is around; each one is worth
+          // popularity and lands as a notification.
+          const begenecekler = [...KISILER]
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 1 + Math.floor(Math.random() * 3));
+          begenecekler.forEach((kisi, i) => {
+            setTimeout(() => {
+              populerlikEkle(1);
+              okunmamis += 1;
+              rozetGuncelle();
+              bildirimGoster(kisi.ad, 'liked your photo.');
+              ctx.bus.emit('sfx', 'notify');
+            }, 2200 + i * 2600 + Math.random() * 1200);
+          });
+        });
+      }
+      icerik.appendChild(paylas);
     }
   }
 
   // ---------- Weather ----------
   const DURUM_AD = { gunes: 'Sunny', bulut: 'Clouding over', yagmur: 'Raining' };
+  const MEVSIM_AD = { yaz: 'Summer', sonbahar: 'Autumn', kis: 'Winter', ilkbahar: 'Spring' };
   function havaEkrani() {
     icerik.innerHTML = '';
     icerik.append(geriDugme(anaEkran));
@@ -335,7 +376,7 @@ registerHook('boot', (ctx) => {
     const detay = document.createElement('p');
     detay.className = 'tf-not';
     const tazele = () => {
-      simdiki.textContent = `67 Park — ${DURUM_AD[havaDurumu.simdiki] || havaDurumu.simdiki}`;
+      simdiki.textContent = `67 Park — ${DURUM_AD[havaDurumu.simdiki] || havaDurumu.simdiki} · ${MEVSIM_AD[havaDurumu.mevsim] || ''}`;
       detay.textContent = `Next change in about ${Math.max(0, Math.round(havaDurumu.kalan))} seconds.`;
     };
     tazele();

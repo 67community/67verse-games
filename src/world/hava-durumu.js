@@ -17,8 +17,12 @@ export const havaDurumu = {
   simdiki: 'gunes',
   kalan: SURELER.gunes,
   uyariVerildi: false,
+  mevsim: 'yaz',
   dinleyiciler: new Set(),
 };
+
+export const MEVSIMLER = ['yaz', 'sonbahar', 'kis', 'ilkbahar'];
+const MEVSIM_SURESI = 480;   // eight minutes each, a full year every half hour
 
 function duyur(tur, veri) {
   for (const fn of havaDurumu.dinleyiciler) {
@@ -118,6 +122,93 @@ registerHook('hub', (ctx, { scene, getSim }) => {
     }
   });
 
+  // ---------- seasons ----------
+  // A season is a light-and-foliage read over the whole town: every greenish
+  // material in the scene is collected once and eased toward the season's
+  // leaf tone; winter swaps the rain field to slow white flakes.
+  const yesiller = [];        // shared materials with green colours
+  const yesilOrnekler = [];   // per-instance greens on instanced meshes
+  {
+    const gorulen = new Set();
+    const yesilMi = (r, g, b) => g > r * 1.08 && g > b * 1.08 && g > 0.22;
+    const c = new THREE.Color();
+    scene.traverse((o) => {
+      // The town tints its instanced foliage through instanceColor, not the
+      // material, so both layers are collected.
+      if (o.isInstancedMesh && o.instanceColor) {
+        const dizi = { mesh: o, renkler: [] };
+        for (let i = 0; i < o.count; i += 1) {
+          c.fromBufferAttribute(o.instanceColor, i);
+          if (yesilMi(c.r, c.g, c.b)) dizi.renkler.push({ i, asil: c.clone() });
+        }
+        if (dizi.renkler.length) yesilOrnekler.push(dizi);
+      }
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const mat of mats) {
+        if (!mat?.color || gorulen.has(mat)) continue;
+        gorulen.add(mat);
+        if (yesilMi(mat.color.r, mat.color.g, mat.color.b)) {
+          yesiller.push({ mat, asil: mat.color.clone() });
+        }
+      }
+    });
+  }
+  const MEVSIM_YAPRAK = {
+    yaz: null,
+    sonbahar: new THREE.Color(0xc9884f),
+    kis: new THREE.Color(0xc3cbcd),
+    ilkbahar: new THREE.Color(0x93cf7d),
+  };
+  let mevsimKalan = MEVSIM_SURESI;
+  let yaprakKarisim = 0;
+  let sonUygulanan = -1;
+  let sonHedefRenk = null;
+  const gecici = new THREE.Color();
+
+  function mevsimUygula(dt) {
+    const hedefRenk = MEVSIM_YAPRAK[havaDurumu.mevsim];
+    const hedef = hedefRenk ? 1 : 0;
+    yaprakKarisim += (hedef - yaprakKarisim) * Math.min(1, dt * 0.5);
+    const degisti = Math.abs(yaprakKarisim - sonUygulanan) > 0.01
+      || hedefRenk !== sonHedefRenk;
+    if (degisti) {
+      sonUygulanan = yaprakKarisim;
+      sonHedefRenk = hedefRenk;
+      const boya = hedefRenk || MEVSIM_YAPRAK.sonbahar;
+      for (const y of yesiller) {
+        y.mat.color.copy(y.asil);
+        if (yaprakKarisim > 0.001) y.mat.color.lerp(boya, yaprakKarisim);
+      }
+      for (const dizi of yesilOrnekler) {
+        for (const kayit of dizi.renkler) {
+          gecici.copy(kayit.asil);
+          if (yaprakKarisim > 0.001) gecici.lerp(boya, yaprakKarisim);
+          dizi.mesh.setColorAt(kayit.i, gecici);
+        }
+        dizi.mesh.instanceColor.needsUpdate = true;
+      }
+    }
+    // Winter turns the precipitation white and slow.
+    const kis = havaDurumu.mevsim === 'kis';
+    damlaMat.color.setHex(kis ? 0xffffff : 0x9fc4e8);
+    for (const n of noktalar) n.hiz = kis ? 2.4 + (n.hiz % 1.6) : 9 + (n.hiz % 5);
+  }
+
+  function mevsimIlerlet() {
+    const sirada = MEVSIMLER[(MEVSIMLER.indexOf(havaDurumu.mevsim) + 1) % MEVSIMLER.length];
+    havaDurumu.mevsim = sirada;
+    mevsimKalan = MEVSIM_SURESI;
+    duyur('mevsim', { mevsim: sirada });
+    const AD = { yaz: 'Summer', sonbahar: 'Autumn', kis: 'Winter', ilkbahar: 'Spring' };
+    ctx.ui.toast(`${AD[sirada]} settles over 67 Park.`);
+  }
+
+  ctx.loop.add((dt) => {
+    mevsimKalan -= dt;
+    if (mevsimKalan <= 0) mevsimIlerlet();
+    mevsimUygula(dt);
+  });
+
   // Deterministic QA control. Keyed off the query — the QA object itself
   // arrives on a deferred chunk after this hook has already run.
   const qaModu = typeof location !== 'undefined'
@@ -137,7 +228,13 @@ registerHook('hub', (ctx, { scene, getSim }) => {
         return true;
       },
       oku() {
-        return { durum: havaDurumu.simdiki, kalan: Math.round(havaDurumu.kalan) };
+        return { durum: havaDurumu.simdiki, kalan: Math.round(havaDurumu.kalan), mevsim: havaDurumu.mevsim, yesil: yesiller.length + yesilOrnekler.reduce((t, d) => t + d.renkler.length, 0) };
+      },
+      mevsimZorla(m) {
+        if (!MEVSIMLER.includes(m)) return false;
+        havaDurumu.mevsim = m;
+        duyur('mevsim', { mevsim: m });
+        return true;
       },
     };
   }
