@@ -23,7 +23,7 @@ import {
 } from './sekil.js';
 
 import { PLAN_BINALAR, PLAN_BINA_RENK, PLAN_AGACLAR, PLAN_ARABALAR } from './plan-verisi.js';
-import {
+import { PLAN_LUNAPARK,
   PLAN_ANA_YOLLAR, PLAN_PATIKALAR, PLAN_ZEBRALAR, PLAN_KAVSAKLAR, PLAN_PAZAR,
   PLAN_SPOR_OLCU, PLAN_KART,
   PLAN_MERKEZ_MEYDAN, PLAN_MERKEZ_CESME, PLAN_PLAZA_KULELERI,
@@ -1165,7 +1165,13 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // plan measured is taken. They are in the scene while the door that swaps
   // them in is still being written, which the 150 budget carries: the city is
   // 109 and the two rooms are about thirty between them.
-  buildMekanlar({ THREE, group, add, material, mats });
+  // Solid footprints collect from here on; the venue builders push their own
+  // walls and counters into the same list the city blocks use.
+  const colliders = [];
+  buildMekanlar({
+    THREE, group, add, material, mats,
+    solid: (k) => colliders.push(k),
+  });
 
   // -------------------------------------------------------------------
   // EAST MARGIN — the SEA fills the whole right edge; beach cape with
@@ -2575,9 +2581,9 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // -------------------------------------------------------------------
   // Solid footprints for the player sim.
   // -------------------------------------------------------------------
-  const colliders = BLOCKS.map(([x, z, w, h, d]) => (
+  colliders.push(...BLOCKS.map(([x, z, w, h, d]) => (
     { minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, topY: h }
-  ));
+  )));
   colliders.push({ minX: -36.5, maxX: -25.5, minZ: -45.5, maxZ: -38.5, topY: 4.2 });
   // The suburb belt was the one kind of building the player could walk
   // straight through: every other block is in this list and the houses were
@@ -2595,6 +2601,27 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // is, on their own measured footprints rather than the posts' old ones.
   for (const [x, z, w, d] of PLAN_PLAZA_KULELERI) {
     colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, topY: 5.65 });
+  }
+  // Parked cars: Oscar walked straight through one. Footprint follows the
+  // car's parking rotation (0 = nose along z).
+  for (const [x, z, rot] of PARKED) {
+    const uzunZ = rot === 0;
+    const w = uzunZ ? 1.3 : 2.7;
+    const d = uzunZ ? 2.7 : 1.3;
+    colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, topY: 1.05 });
+  }
+  // The fairground rides and their queues are solid: both carousels, the
+  // wheel's support envelope, and the coaster station strip.
+  {
+    const [kx, kz, kEn, kDer] = PLAN_LUNAPARK.atlikarinca;
+    colliders.push({ minX: kx - kEn / 2 - 0.2, maxX: kx + kEn / 2 + 0.2, minZ: kz - kDer / 2 - 0.2, maxZ: kz + kDer / 2 + 0.2, topY: 3.4 });
+    colliders.push({ minX: 34.1 - 2.4, maxX: 34.1 + 2.4, minZ: -36.1 - 2.4, maxZ: -36.1 + 2.4, topY: 3.2 });
+    const [dx, dz, dEn] = PLAN_LUNAPARK.dolapTaban;
+    colliders.push({ minX: dx - dEn / 2, maxX: dx + dEn / 2, minZ: dz - 1.4, maxZ: dz + 1.4, topY: 2.2 });
+  }
+  // Market stalls and the centre pavilion.
+  for (const [x, z, w, d] of TEZGAHLAR) {
+    colliders.push({ minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2, topY: 1.9 });
   }
 
   return {

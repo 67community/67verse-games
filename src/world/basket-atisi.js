@@ -128,7 +128,7 @@ export function kurBasketAtisi({ ctx, scene, getSim }) {
   async function baslat() {
     if (aktif) return;
     if (!rakip) {
-      rakip = await createFriendsieRival('friendsie:fr_500.glb', { height: 1.8 });
+      rakip = await createFriendsieRival('friendsie:fr_500.glb', { height: 1.45 });
       if (rakip) {
         rakip.root.position.set(RAKIP_NOKTASI.x, 0, RAKIP_NOKTASI.z);
         scene.add(rakip.root);

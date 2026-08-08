@@ -115,7 +115,7 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     { ad: 'No. 1000', dosya: 'friendsie:fr_1000.glb', x: 302 + (0.16 - 0.5) * 26, z: (0.72 - 0.5) * 26, tarz: 'otur' },
   ];
   for (const tanim of MISAFIR_TANIM) {
-    createFriendsieRival(tanim.dosya, { height: 1.8 }).then((instance) => {
+    createFriendsieRival(tanim.dosya, { height: 1.45 }).then((instance) => {
       if (!instance) return;
       instance.root.position.set(tanim.x, tanim.tarz === 'uzan' ? -0.2 : -0.2, tanim.z);
       if (tanim.tarz === 'uzan') {
@@ -156,6 +156,10 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
   function yuzmeyiBirak() {
     if (!durum.yuzuyor) return;
     durum.yuzuyor = false;
+    if (Array.isArray(world.solids) && havuzKatilari.length) {
+      world.solids.push(...havuzKatilari);
+      havuzKatilari = [];
+    }
     gorselDuzelt();
     const sim = getSim();
     sim.pos.z = havuz.su.maxZ + 1.6;
@@ -259,9 +263,18 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     ctx.ui.toast('Fresh juice — enjoy.');
   }
 
+  let havuzKatilari = [];
   function yuzmeyeGir() {
     const sim = getSim();
     durum.yuzuyor = true;
+    // Lift the pool's own collider while swimming; walkers stay blocked.
+    if (Array.isArray(world.solids)) {
+      havuzKatilari = world.solids.filter((k) => k.id === 'havuz-su');
+      for (const k of havuzKatilari) {
+        const i = world.solids.indexOf(k);
+        if (i >= 0) world.solids.splice(i, 1);
+      }
+    }
     sim.pos.x = Math.min(Math.max(sim.pos.x, havuz.su.minX + 0.8), havuz.su.maxX - 0.8);
     sim.pos.z = havuz.su.maxZ - 1.4;
     sim.pos.y = havuz.su.seviye;

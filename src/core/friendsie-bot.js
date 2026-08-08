@@ -56,7 +56,7 @@ function loadModel(url) {
  * Builds a rival that walks and runs on its own skeleton.
  * Returns the same surface spawnBot uses from a roster character.
  */
-export async function createFriendsieRival(id, { height = 1.8 } = {}) {
+export async function createFriendsieRival(id, { height = 1.45 } = {}) {
   const url = isRiggedCharacter(id) ? RIGGED_CHARACTERS[id] : `${BASE}${id.slice('friendsie:'.length)}`;
   const template = await loadModel(url);
   if (!template) return null;

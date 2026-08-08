@@ -41,6 +41,7 @@ export function createInput() {
   const btnGrab = document.getElementById('btn-grab');
   let touchJump = false;
   let touchGrab = false;
+  let touchSprint = false;
   const look = {
     active: false,
     id: null,
@@ -154,6 +155,7 @@ export function createInput() {
   }
   bindButton(btnJump, () => { touchJump = true; }, () => { touchJump = false; });
   bindButton(btnGrab, () => { touchGrab = true; }, () => { touchGrab = false; });
+  bindButton(document.getElementById('btn-sprint'), () => { touchSprint = true; }, () => { touchSprint = false; });
 
   // ----- Frame polling -----
   let prevGrab = false;
@@ -203,7 +205,7 @@ export function createInput() {
     let grabNow = keys.has('KeyE') || keys.has('ShiftLeft') || touchGrab;
     // Sprint: right Shift on keyboard, or the touch stick shoved to its rim
     // (left Shift stays grab — it predates sprint).
-    let sprintHeld = keys.has('ShiftRight') ||
+    let sprintHeld = keys.has('ShiftRight') || touchSprint ||
       (stick.active && Math.hypot(stick.dx, stick.dy) / STICK_RADIUS > 0.92);
 
     let lookYaw = look.yaw;

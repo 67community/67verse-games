@@ -438,7 +438,7 @@ async function mountHubCharacter(id = ctx.characters.equippedId()) {
     // chosen avatar walks on its own skeleton like the gorilla does.
     const friendsieOyuncu = rigged.isRiggedCharacter(id) || rigged.isFriendsieRival(id);
     const instance = (friendsieOyuncu
-      ? await rigged.createFriendsieRival(id, { height: 1.9 })
+      ? await rigged.createFriendsieRival(id, { height: 1.5 })
       : null)
       || await ctx.characters.createInstance(friendsieOyuncu ? 'qa-runner' : id, {
         skinTone: ctx.save.settings.skinTone,
@@ -486,15 +486,9 @@ mountHubCharacter();
 ctx.bus.on('character-equipped', ({ id } = {}) => mountHubCharacter(id));
 const entryGate = document.getElementById('entry-gate');
 const enterButton = document.getElementById('enter-game');
-const entrySummary = document.getElementById('entry-summary');
-// The tagline is derived from the same list that builds the play chooser, so
-// the public promise on the entry gate can never drift from what the menu
-// actually offers. The static index.html text is only a pre-boot fallback.
-if (entrySummary) {
-  entrySummary.textContent = `INSTANT LOCAL PLAY · ${
-    FEATURED_MODES.map((mode) => mode.name.toUpperCase()).join(' · ')
-  }`;
-}
+// Oscar's call: the entry gate is just the wordmark and the button — no
+// mode-list strip underneath.
+document.getElementById('entry-summary')?.remove();
 const primaryPlayButton = document.getElementById('primary-play');
 // The 67VERSE skate lobby's live address. Shared by the Play Games panel and
 // the map, so there is one place to change it.

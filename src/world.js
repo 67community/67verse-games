@@ -185,6 +185,9 @@ export function buildWorld(scene, { buildCity, buildStadium, stadiumPitch } = {}
 
   return {
     group,
+    // Live solid list — venue verbs (swimming) lift their own entries while
+    // active, so the pool blocks walkers but not swimmers.
+    solids,
     sampleGround,
     isWater,
     registerWalkable,
@@ -194,6 +197,11 @@ export function buildWorld(scene, { buildCity, buildStadium, stadiumPitch } = {}
     // area is the square that holds the grid, the coast and the suburbs.
     bounds: 62,
     boundsCircle: false,
+    // Hub-only movement feel: a stronger hop and one extra jump in the air.
+    // Game modes build their own env without these, so their tuned physics
+    // and deterministic replays are untouched.
+    jumpScale: 1.24,
+    airJumps: 1,
     // The street runs along -z, so the far end of the avenue is where players
     // head for. Audio and the optional hub-plus layer read this.
     // North gate of the boulevard — the reference city's top exit.

@@ -28,7 +28,7 @@ export const FRIENDSIE_GUESTS = Object.freeze([
   Object.freeze({ file: 'rig_56.glb', from: [40.5, -44], to: [40.5, -31], speed: 0.95 }),
 ]);
 
-const GUEST_HEIGHT = 1.8;
+const GUEST_HEIGHT = 1.45;
 
 function groundGuest(model) {
   let box = new THREE.Box3().setFromObject(model);

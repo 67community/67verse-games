@@ -31,6 +31,7 @@ export function createPlayerState(x = 0, z = 10) {
     grabCooldown: 0,
     grabEvent: false,    // true for exactly one tick when grab fires
     jumpEvent: false,    // true for exactly one tick when leaving ground
+    airJumps: 0,         // granted on ground contact when env.airJumps allows
     coyoteTime: TUNING.coyoteTime,
     jumpBufferTime: 0,
     jumpHeldLast: false,
@@ -94,10 +95,23 @@ export function stepPlayer(s, input, dt, env) {
   s.vel.z += (wantZ - s.vel.z) * blend;
 
   // --- Jump + gravity ---
+  // The hub opts into a bigger hop and one extra air jump through its env
+  // (jumpScale / airJumps); the game modes keep the original physics so their
+  // deterministic replays and tuned platform distances stay exact.
+  const jumpImpulse = TUNING.jumpImpulse * (env.jumpScale || 1);
+  const airJumpsAllowed = env.airJumps || 0;
+  s.airJumps = Number.isFinite(s.airJumps) ? s.airJumps : airJumpsAllowed;
+  if (s.grounded) s.airJumps = airJumpsAllowed;
   if (s.jumpBufferTime > 0 && (s.grounded || s.coyoteTime > 0)) {
-    s.vel.y = TUNING.jumpImpulse;
+    s.vel.y = jumpImpulse;
     s.grounded = false;
     s.coyoteTime = 0;
+    s.jumpBufferTime = 0;
+    s.jumpEvent = true;
+  } else if (jumpPressed && !s.grounded && s.coyoteTime <= 0 && s.airJumps > 0) {
+    // The double hop: a fresh press mid-air spends the air jump.
+    s.airJumps -= 1;
+    s.vel.y = jumpImpulse * 0.92;
     s.jumpBufferTime = 0;
     s.jumpEvent = true;
   }

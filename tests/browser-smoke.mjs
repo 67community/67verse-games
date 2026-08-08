@@ -466,7 +466,6 @@ test('entry and shared dialogs expose modal semantics and isolate the game shell
           role: entry.getAttribute('role'),
           modal: entry.getAttribute('aria-modal'),
           labelledBy: entry.getAttribute('aria-labelledby'),
-          describedBy: entry.getAttribute('aria-describedby'),
         },
         bodyModal: document.body.classList.contains('modal-open'),
         hud: { inert: hud.inert, hidden: hud.getAttribute('aria-hidden') },
@@ -477,7 +476,6 @@ test('entry and shared dialogs expose modal semantics and isolate the game shell
         role: 'dialog',
         modal: 'true',
         labelledBy: 'entry-title',
-        describedBy: 'entry-summary',
       },
       bodyModal: true,
       hud: { inert: true, hidden: 'true' },
@@ -3102,10 +3100,6 @@ test('fresh mobile visitor reaches Skyway results through the honest public path
       await page.evaluate(() => localStorage.getItem('67v.seenSkyparkArrival')),
       null,
     );
-    assert.match(
-      await page.$eval('#entry-summary', (element) => element.textContent),
-      /INSTANT LOCAL PLAY · SKYWAY SPRINT/,
-    );
     const entryStartedAt = await page.evaluate(() => performance.now());
     await clickButton(page, 'ENTER 67 PARK');
     await page.waitForFunction(() => (
@@ -3226,10 +3220,6 @@ test('fresh desktop visitor can finish, replay, and return through the public Sk
     assert.equal(
       await page.evaluate(() => localStorage.getItem('67v.seenSkyparkArrival')),
       null,
-    );
-    assert.match(
-      await page.$eval('#entry-summary', (element) => element.textContent),
-      /INSTANT LOCAL PLAY · SKYWAY SPRINT/,
     );
     const entryStartedAt = await page.evaluate(() => performance.now());
     await clickButton(page, 'ENTER 67 PARK');

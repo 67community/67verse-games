@@ -68,20 +68,20 @@ function beyazRenk(THREE, geo) {
   return geo;
 }
 
-export function buildMekanlar({ THREE, group, add, material, mats }) {
+export function buildMekanlar({ THREE, group, add, material, mats, solid = () => {} }) {
   const kok = new THREE.Group();
   kok.name = 'mekanlar';
   group.add(kok);
   for (const mekan of MEKANLAR) {
-    if (mekan.id === 'havuz') havuzKulubu({ THREE, kok, add, material, mats, mekan });
-    if (mekan.id === 'kulup') geceKulubu({ THREE, kok, add, material, mekan });
-    if (mekan.id === 'magaza') butik({ THREE, kok, add, material, mekan });
-    if (mekan.id === 'arcade') arcadeSalonu({ THREE, kok, add, material, mekan });
+    if (mekan.id === 'havuz') havuzKulubu({ THREE, kok, add, material, mats, mekan, solid });
+    if (mekan.id === 'kulup') geceKulubu({ THREE, kok, add, material, mekan, solid });
+    if (mekan.id === 'magaza') butik({ THREE, kok, add, material, mekan, solid });
+    if (mekan.id === 'arcade') arcadeSalonu({ THREE, kok, add, material, mekan, solid });
   }
   return kok;
 }
 
-function havuzKulubu({ THREE, kok, add, material, mats, mekan }) {
+function havuzKulubu({ THREE, kok, add, material, mats, mekan, solid = () => {} }) {
   const S = MEKAN_PLOT;
   // Fraction of the drawing to a world point on this plot.
   const P = (u, v) => [mekan.x + (u - 0.5) * S, mekan.z + (v - 0.5) * S];
@@ -149,6 +149,7 @@ function havuzKulubu({ THREE, kok, add, material, mats, mekan }) {
     m.makeScale(k.g, duvarYuk, k.d);
     m.setPosition(x, duvarYuk / 2, z);
     mesh.setMatrixAt(i, m);
+    solid({ minX: x - k.g / 2, maxX: x + k.g / 2, minZ: z - k.d / 2, maxZ: z + k.d / 2, topY: duvarYuk + 0.4 });
   });
 
   // The pool: a coping ring with the water set inside and below it.
@@ -162,11 +163,21 @@ function havuzKulubu({ THREE, kok, add, material, mats, mekan }) {
   // own top face won the whole pool and the water did not show at all.
   const su = koy(new THREE.Mesh(kutu(pw, 0.42, pd), suMat), pu, pv, 0.12);
   su.name = 'mekan:havuz-su';
+  {
+    // The pool itself blocks walking — you get in through the SWIM ring.
+    const [sx, sz] = P(pu, pv);
+    solid({ id: 'havuz-su', minX: sx - pw / 2 - 0.4, maxX: sx + pw / 2 + 0.4, minZ: sz - pd / 2 - 0.4, maxZ: sz + pd / 2 + 0.4, topY: 0.8 });
+  }
 
   // Bar: counter, awning on posts, and the stools along it.
   const [bx0, bz0, bx1, bz1] = HAVUZ.barTezgah;
   koy(new THREE.Mesh(kutu((bx1 - bx0) * S, 1.05, (bz1 - bz0) * S), ahsapMat),
     (bx0 + bx1) / 2, (bz0 + bz1) / 2, 0.52);
+  {
+    const [bxc, bzc] = P((bx0 + bx1) / 2, (bz0 + bz1) / 2);
+    solid({ minX: bxc - (bx1 - bx0) * S / 2, maxX: bxc + (bx1 - bx0) * S / 2,
+      minZ: bzc - (bz1 - bz0) * S / 2, maxZ: bzc + (bz1 - bz0) * S / 2, topY: 1.1 });
+  }
   const [tx0, tz0, tx1, tz1] = HAVUZ.barTente;
   koy(new THREE.Mesh(kutu((tx1 - tx0) * S, 0.16, (tz1 - tz0) * S), suMat),
     (tx0 + tx1) / 2, (tz0 + tz1) / 2, 2.3);
@@ -307,7 +318,7 @@ const KULUP = Object.freeze({
   ]),
 });
 
-function geceKulubu({ THREE, kok, add, material, mekan }) {
+function geceKulubu({ THREE, kok, add, material, mekan, solid = () => {} }) {
   const S = MEKAN_PLOT;
   const P = (u, v) => [mekan.x + (u - 0.5) * S, mekan.z + (v - 0.5) * S];
   const kutu = (g, y, d) => new THREE.BoxGeometry(g, y, d);
@@ -354,6 +365,7 @@ function geceKulubu({ THREE, kok, add, material, mekan }) {
     m.makeScale(k.g, yuk, k.d);
     m.setPosition(x, yuk / 2, z);
     mesh.setMatrixAt(i, m);
+    solid({ minX: x - k.g / 2, maxX: x + k.g / 2, minZ: z - k.d / 2, maxZ: z + k.d / 2, topY: yuk + 0.4 });
   });
 
   // The dance floor: sixty-four lit tiles, brightest at the centre, which is
@@ -390,6 +402,10 @@ function geceKulubu({ THREE, kok, add, material, mekan }) {
 
   // DJ booth on its riser, with a speaker stack each side.
   const dj = alan(KULUP.djKursu);
+  {
+    const [djx, djz] = P(dj.u, dj.v);
+    solid({ minX: djx - dj.g / 2, maxX: djx + dj.g / 2, minZ: djz - dj.d / 2, maxZ: djz + dj.d / 2, topY: 1.4 });
+  }
   tek(kutu(dj.g, 0.5, dj.d),
     new THREE.MeshStandardMaterial({ color: 0x3a2f4a, roughness: 0.7, emissive: 0x7b3fd4, emissiveIntensity: 0.55 }),
     dj.u, dj.v, 0.25);
@@ -406,6 +422,10 @@ function geceKulubu({ THREE, kok, add, material, mekan }) {
 
   // Bar: counter down the west wall with its stools.
   const bar = alan(KULUP.bar);
+  {
+    const [bx, bz] = P(bar.u, bar.v);
+    solid({ minX: bx - bar.g / 2, maxX: bx + bar.g / 2, minZ: bz - bar.d / 2, maxZ: bz + bar.d / 2, topY: 1.15 });
+  }
   tek(kutu(bar.g, 1.1, bar.d),
     new THREE.MeshStandardMaterial({ color: 0x4a3a2e, roughness: 0.6, emissive: 0xd08a3a, emissiveIntensity: 0.3 }),
     bar.u, bar.v, 0.55);
@@ -438,6 +458,7 @@ function geceKulubu({ THREE, kok, add, material, mekan }) {
     m.makeScale(b.g, 0.85, b.d);
     m.setPosition(x, 0.42, z);
     mesh.setMatrixAt(i, m);
+    solid({ minX: x - b.g / 2, maxX: x + b.g / 2, minZ: z - b.d / 2, maxZ: z + b.d / 2, topY: 0.9 });
   });
   seri(kutu(1, 1, 1), kanepeMat, oda.length, (i, m, mesh) => {
     const a = alan(oda[i].k);
@@ -477,7 +498,7 @@ const BUTIK = Object.freeze({
   kasa: Object.freeze([0.80, 0.55, 0.885, 0.76]),
 });
 
-function butik({ THREE, kok, add, material, mekan }) {
+function butik({ THREE, kok, add, material, mekan, solid = () => {} }) {
   const S = MEKAN_PLOT;
   const P = (u, v) => [mekan.x + (u - 0.5) * S, mekan.z + (v - 0.5) * S];
   const uz = (a, b) => (b - a) * S;
@@ -535,6 +556,7 @@ function butik({ THREE, kok, add, material, mekan }) {
     m.makeScale(k.g, h, k.dd);
     m.setPosition(x, h / 2, z);
     mesh.setMatrixAt(i, m);
+    solid({ minX: x - k.g / 2, maxX: x + k.g / 2, minZ: z - k.dd / 2, maxZ: z + k.dd / 2, topY: h + 0.3 });
   });
 
   // West wall cubbies with folded stacks.
@@ -600,6 +622,9 @@ function butik({ THREE, kok, add, material, mekan }) {
     m.makeScale(w, h, dd);
     m.setPosition(x, y, z);
     mesh.setMatrixAt(i, m);
+    // Furniture below head height is solid; the rail high on the north wall
+    // is not something you can walk into.
+    if (y < 1.1) solid({ minX: x - w / 2, maxX: x + w / 2, minZ: z - dd / 2, maxZ: z + dd / 2, topY: y + h / 2 });
   });
   seri(new THREE.CylinderGeometry(1, 1, 1, 8), metal, silindirler.length, (i, m, mesh) => {
     const [u, v, y, r, len, yatay] = silindirler[i];
@@ -709,7 +734,7 @@ const ARCADE = Object.freeze({
   makineRenk: Object.freeze(['#e8a8b8', '#a8c3e0', '#f0b46a', '#9fd0a8', '#c9a8dd', '#8fc4cf', '#e0908a']),
 });
 
-function arcadeSalonu({ THREE, kok, add, material, mekan }) {
+function arcadeSalonu({ THREE, kok, add, material, mekan, solid = () => {} }) {
   const S = MEKAN_PLOT;
   const P = (u, v) => [mekan.x + (u - 0.5) * S, mekan.z + (v - 0.5) * S];
   const M4 = new THREE.Matrix4();
@@ -752,6 +777,7 @@ function arcadeSalonu({ THREE, kok, add, material, mekan }) {
     m.makeScale(k.g, yuk, k.dd);
     m.setPosition(x, yuk / 2, z);
     mesh.setMatrixAt(i, m);
+    solid({ minX: x - k.g / 2, maxX: x + k.g / 2, minZ: z - k.dd / 2, maxZ: z + k.dd / 2, topY: yuk + 0.3 });
   });
 
   // Cabinets: body + dark screen + marquee, all instanced with tints. A claw
@@ -787,6 +813,10 @@ function arcadeSalonu({ THREE, kok, add, material, mekan }) {
     m.setPosition(x, 0.875, z);
     mesh.setMatrixAt(i, m);
     mesh.setColorAt(i, new THREE.Color(ARCADE.makineRenk[renk % ARCADE.makineRenk.length]));
+    const yan = Math.abs(Math.sin(rot)) > 0.5;
+    const w = yan ? 0.72 : 0.95;
+    const dd = yan ? 0.95 : 0.72;
+    solid({ minX: x - w / 2, maxX: x + w / 2, minZ: z - dd / 2, maxZ: z + dd / 2, topY: 1.75 });
   });
   seri(new THREE.BoxGeometry(0.7, 0.52, 0.05), material(0x241f2e, { roughness: 0.3 }),
     gov.length, (i, m, mesh) => {
@@ -814,6 +844,10 @@ function arcadeSalonu({ THREE, kok, add, material, mekan }) {
     m.setPosition(x, 0.31, z);
     mesh.setMatrixAt(i, m);
     mesh.setColorAt(i, new THREE.Color('#8fb6d8'));
+    const yan = Math.abs(Math.sin(rot)) > 0.5;
+    const w = yan ? 1.0 : 2.4;
+    const dd = yan ? 2.4 : 1.0;
+    solid({ minX: x - w / 2, maxX: x + w / 2, minZ: z - dd / 2, maxZ: z + dd / 2, topY: 0.65 });
   });
   {
     const [x, z] = P(ARCADE.sehpa[0], ARCADE.sehpa[1]);
@@ -834,6 +868,8 @@ function arcadeSalonu({ THREE, kok, add, material, mekan }) {
     tezgah.position.set(x, 0.5, z);
     tezgah.name = 'mekan:kafe-tezgah';
     kok.add(tezgah);
+    solid({ minX: x - (cx1 - cx0) * S / 2, maxX: x + (cx1 - cx0) * S / 2,
+      minZ: z - (cz1 - cz0) * S / 2, maxZ: z + (cz1 - cz0) * S / 2, topY: 1.05 });
     const serit = new THREE.Mesh(
       new THREE.BoxGeometry((cx1 - cx0) * S + 0.04, 0.22, (cz1 - cz0) * S + 0.04),
       material(0xe8a8b8, { roughness: 0.6 }),
