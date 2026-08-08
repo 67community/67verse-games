@@ -30,7 +30,11 @@ export function kurBasketAtisi({ ctx, scene, getSim }) {
     const kok = document.createElement('div');
     kok.style.cssText = 'position:fixed;left:50%;bottom:60px;transform:translateX(-50%);'
       + 'z-index:120;background:#ffffffee;border-radius:16px;padding:12px 16px;'
-      + 'box-shadow:0 12px 34px #0004;text-align:center;font-family:inherit;';
+      + 'box-shadow:0 12px 34px #0004;text-align:center;font-family:inherit;'
+      + 'max-width:calc(100vw - 16px);';
+    if (matchMedia('(max-width: 600px)').matches) {
+      kok.style.bottom = 'calc(env(safe-area-inset-bottom) + 136px)';
+    }
     const baslikEl = document.createElement('div');
     baslikEl.style.cssText = 'font-weight:700;font-size:13px;color:#17223a;margin-bottom:8px;';
     const canvas = document.createElement('canvas');

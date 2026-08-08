@@ -19,7 +19,7 @@ function mikroOyunKabuk({ ctx, baslik, ipucu, kur }) {
     + 'display:flex;align-items:center;justify-content:center;font-family:inherit;';
   const cerceve = document.createElement('div');
   cerceve.style.cssText = 'background:#fff;border-radius:22px;padding:18px 18px 14px;'
-    + 'box-shadow:0 30px 80px #0008;text-align:center;';
+    + 'box-shadow:0 30px 80px #0008;text-align:center;max-width:calc(100vw - 16px);';
   const ust = document.createElement('div');
   ust.style.cssText = 'display:flex;justify-content:space-between;align-items:center;'
     + 'margin:0 4px 10px;font-weight:700;color:#17223a;';
@@ -31,7 +31,8 @@ function mikroOyunKabuk({ ctx, baslik, ipucu, kur }) {
   ust.append(ad, skorEl);
   const canvas = document.createElement('canvas');
   canvas.width = 640; canvas.height = 400;
-  canvas.style.cssText = 'border-radius:14px;display:block;';
+  // Internal resolution stays 640x400; CSS scales it into small screens.
+  canvas.style.cssText = 'border-radius:14px;display:block;width:min(640px, calc(100vw - 64px));height:auto;';
   const alt = document.createElement('p');
   alt.style.cssText = 'margin:10px 0 0;font-size:12.5px;color:#6b7280;';
   alt.textContent = ipucu;

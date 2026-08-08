@@ -72,6 +72,19 @@ const STIL = `
 .tf-not { font-size: 12.5px; color: #6b7280; margin: 6px 2px; line-height: 1.5; }
 .tf-buyuk { width: 100%; border: none; border-radius: 14px; background: #17223a; color: #fff;
   padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 4px; }
+/* Phones: the JUMP/GRAB cluster owns the bottom-right corner, so the phone
+   button, its notification and the device itself ride above it. */
+@media (max-width: 600px) {
+  #tf-dugme { right: calc(env(safe-area-inset-right) + 16px);
+    bottom: calc(env(safe-area-inset-bottom) + 132px); width: 46px; height: 46px; }
+  #tf-bildirim { right: calc(env(safe-area-inset-right) + 16px);
+    bottom: calc(env(safe-area-inset-bottom) + 188px);
+    max-width: calc(100vw - 32px); }
+  #telefon { right: 50%; transform: translateX(50%);
+    bottom: calc(env(safe-area-inset-bottom) + 16px);
+    width: min(320px, calc(100vw - 20px));
+    height: min(560px, calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 90px)); }
+}
 `;
 
 const IKON = {

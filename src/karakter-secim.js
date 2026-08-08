@@ -90,6 +90,25 @@ const STIL = `
 #ks-sec:hover { transform: scale(1.03); }
 #ks-sec:disabled { opacity: 0.5; cursor: not-allowed; }
 #ks-sec.kilitli { background: #c8892f; box-shadow: 0 8px 22px #c8892f55; }
+/* Phones: tighter type, thumb-sized arrows kept clear of the edges, and the
+   bottom block inside the safe area. */
+@media (max-width: 600px) {
+  #ks-surum { gap: 20px; padding: 18px; }
+  #ks-surum-baslik { font-size: 18px; text-align: center; }
+  #ks-surum-kartlar { gap: 12px; }
+  .ks-kart { max-width: 44vw; padding: 18px 12px; border-radius: 16px; }
+  .ks-kart-ust svg { width: 36px; height: 36px; }
+  .ks-kart b { font-size: 15px; }
+  .ks-kart span { font-size: 11.5px; }
+  #ks-baslik { top: calc(env(safe-area-inset-top) + 15px); font-size: 15px; padding: 0 96px; }
+  .ks-ok { width: 46px; height: 46px; font-size: 21px; line-height: 46px; }
+  #ks-sol { left: 8px; } #ks-sag { right: 8px; }
+  #ks-alt { bottom: calc(env(safe-area-inset-bottom) + 18px); }
+  #ks-ad { font-size: 20px; }
+  #ks-durum { font-size: 13px; }
+  #ks-sec { padding: 13px 38px; font-size: 15px; }
+  #ks-geri { top: calc(env(safe-area-inset-top) + 12px); left: 12px; }
+}
 `;
 
 export function buildKarakterSecim({ ctx, onConfirm }) {

@@ -388,6 +388,14 @@ registerGame({
       <style>
         #karting-hud { position: fixed; inset: 0; pointer-events: none; z-index: 40;
           font-family: inherit; color: #17223a; }
+        @media (max-width: 600px) {
+          #karting-hud .kh-chip { font-size: 12.5px; padding: 7px 12px; }
+          #kh-lap { top: 58px; }
+          #kh-time { top: 58px !important; left: 12px !important; }
+          #kh-pos { top: 58px; right: 12px; }
+          #kh-speed { bottom: calc(env(safe-area-inset-bottom) + 132px); right: 12px; }
+          #kh-center { font-size: 58px; }
+        }
         #karting-hud .kh-chip { position: absolute; background: #ffffffd9; border-radius: 12px;
           padding: 9px 16px; font-weight: 700; font-size: 15px; letter-spacing: 0.04em;
           box-shadow: 0 6px 18px #0002; }

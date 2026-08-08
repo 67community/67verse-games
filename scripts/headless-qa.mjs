@@ -37,6 +37,8 @@ const takeFlag = (name) => {
 };
 const prefix = takeFlag('--out') || 'shot';
 const scriptPath = takeFlag('--script');
+const mobil = args.includes('--mobile');
+if (mobil) args.splice(args.indexOf('--mobile'), 1);
 const path = args[0] || '/?game=karting&qa=1';
 const times = args.slice(1).map(Number);
 const shots = times.length ? times : [3, 10, 20, 34];
@@ -48,7 +50,9 @@ const browser = await puppeteer.launch({
   executablePath: await chromeExecutable(),
   headless: 'new',
   args: ['--no-sandbox', '--disable-gpu-sandbox', '--window-size=1440,900', '--hide-scrollbars', '--mute-audio'],
-  defaultViewport: { width: 1440, height: 900, deviceScaleFactor: 1 },
+  defaultViewport: mobil
+    ? { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
+    : { width: 1440, height: 900, deviceScaleFactor: 1 },
 });
 const page = await browser.newPage();
 const errors = [];

@@ -1374,8 +1374,11 @@ function frame(now) {
     autoRate: 1.7,
   });
   const portrait = THREE.MathUtils.clamp((0.9 - camera.aspect) / 0.4, 0, 1);
-  const chaseDistance = 5.45 + portrait * 1.45;
-  const chaseHeight = 3.65 + portrait * 0.8;
+  // Phones sit much further back — Oscar's call: on a portrait screen the
+  // avatar filled half the view, so the chase pulls out and up with the
+  // aspect instead of hugging the shoulders.
+  const chaseDistance = 5.45 + portrait * 3.4;
+  const chaseHeight = 3.65 + portrait * 1.2;
   camFocus.set(sim.pos.x, sim.pos.y, sim.pos.z);
   camLook.set(
     sim.pos.x + sim.vel.x * 0.11,
