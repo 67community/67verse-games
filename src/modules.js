@@ -3,9 +3,6 @@
 // stable split points without changing the modules' self-registration contract.
 import { GAMES, SYSTEMS } from './core/registry.js';
 import './world/hub-plus.js';
-import './world/mekan-yasam.js';
-import './world/hava-durumu.js';
-import './systems/telefon.js';
 
 const GAME_LOADERS = Object.freeze({
   tag: () => import('./games/tag.js'),
@@ -116,6 +113,12 @@ export function loadIdleModules() {
     // the first bundle. It self-registers on import exactly as before.
     idleLoadPromise = Promise.allSettled([
       import('./systems/audio.js'),
+      // Venue life, weather and the phone register hub hooks late and rely on
+      // hook replay; riding the idle pass keeps them out of the first paint's
+      // budget.
+      import('./world/mekan-yasam.js'),
+      import('./world/hava-durumu.js'),
+      import('./systems/telefon.js'),
       ...IDLE_MODULE_IDS.map((id) => ensureSystemLoaded(id)),
     ])
       .then((results) => {

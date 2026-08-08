@@ -18,6 +18,10 @@ export default defineConfig(({ command }) => ({
             id.includes('/src/core/multiplayer.js')
             || id.includes('/src/core/room-protocol.js')
           ) return 'skyway-multiplayer';
+          // The venue interiors are shared by the deferred city chunk and the
+          // idle venue-life chunk; their own chunk keeps city-districts under
+          // the per-chunk budget.
+          if (id.includes('/src/world/mekanlar.js')) return 'mekanlar';
           // The city's measured plan — every building, road, tree, prop, bowl
           // and mooring read off Oscar's reference — is pure data and larger
           // than the code that reads it. Splitting it off keeps the city's own

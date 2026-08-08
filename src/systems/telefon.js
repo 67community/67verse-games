@@ -358,4 +358,4 @@ registerHook('boot', (ctx) => {
       ctx.bus.emit('sfx', 'notify');
     }
   });
-});
+}, { replay: true });

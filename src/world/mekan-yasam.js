@@ -94,7 +94,9 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
   const arcadeHop = af(0.31, 0.352);         // first sit-in cabinet row
   const arcadeDodge = af(0.41, 0.522);       // second row
   const arcadeKafe = af(0.64, 0.88);         // cafe corner table
-  let karakter = null;
+  // Riding the idle pass means 'player-ready' may have fired already, so the
+  // current character is read off ctx first and the bus keeps it fresh.
+  let karakter = ctx.hubCharacter || null;
   ctx.bus.on('player-ready', (data) => { karakter = data?.instance || karakter; });
 
   const basket = kurBasketAtisi({ ctx, scene, getSim });
@@ -633,4 +635,4 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
 
   // E is also the exit for swim/sunbed when standing at their markers — the
   // venue verb handler above toggles; movement handles the sunbed too.
-});
+}, { replay: true });

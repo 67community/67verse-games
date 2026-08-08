@@ -141,4 +141,4 @@ registerHook('hub', (ctx, { scene, getSim }) => {
       },
     };
   }
-});
+}, { replay: true });
