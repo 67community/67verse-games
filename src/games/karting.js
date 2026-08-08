@@ -216,10 +216,32 @@ registerGame({
       mesh.receiveShadow = true;
       return keep(mesh);
     }
-    scene.add(buildRing(-WIDTH / 2, WIDTH / 2, 0, 0xe9e1d2));
-    // Faint teal lane guides, like the reference's hairline lines.
-    scene.add(buildRing(-WIDTH / 6 - 0.05, -WIDTH / 6 + 0.05, 0.012, 0xa5d5d2, 0.8));
-    scene.add(buildRing(WIDTH / 6 - 0.05, WIDTH / 6 + 0.05, 0.012, 0xa5d5d2, 0.8));
+    // Real asphalt, per the video reference: a warm dark grey ribbon with a
+    // soft shoulder, solid white edge lines and a dashed centre line — the
+    // road reads as a road, not a painted band.
+    scene.add(buildRing(-WIDTH / 2 - 0.5, WIDTH / 2 + 0.5, -0.005, 0xb9b3a6, 0.95)); // shoulder
+    scene.add(buildRing(-WIDTH / 2, WIDTH / 2, 0, 0x83868c, 0.96));                  // asphalt
+    scene.add(buildRing(-WIDTH / 2 + 0.16, -WIDTH / 2 + 0.30, 0.012, 0xf2efe8, 0.85));
+    scene.add(buildRing(WIDTH / 2 - 0.30, WIDTH / 2 - 0.16, 0.012, 0xf2efe8, 0.85));
+    {
+      // Dashed centre line: short instanced strips along the loop.
+      const cizgiGeo = new T.BoxGeometry(0.14, 0.015, 1.5);
+      const cizgiMat = new T.MeshStandardMaterial({ color: 0xf2efe8, roughness: 0.85 });
+      disposables.push(cizgiGeo, cizgiMat);
+      const adet = Math.floor(SAMPLES / 6);
+      const cizgiler = new T.InstancedMesh(cizgiGeo, cizgiMat, adet);
+      const yerlestirici = new T.Object3D();
+      for (let i = 0; i < adet; i += 1) {
+        const idx = i * 6;
+        const t = tangentOf(idx);
+        yerlestirici.position.set(centre[idx].x, 0.012, centre[idx].z);
+        yerlestirici.rotation.set(0, Math.atan2(t.x, t.z), 0);
+        yerlestirici.updateMatrix();
+        cizgiler.setMatrixAt(i, yerlestirici.matrix);
+      }
+      cizgiler.instanceMatrix.needsUpdate = true;
+      scene.add(cizgiler);
+    }
 
     // ---------- Kerb walls (instanced rounded studs, cream) ----------
     const kerbGeo = new T.CapsuleGeometry(0.34, 0.5, 4, 10);
