@@ -180,7 +180,16 @@ export const COSMETICS = [
 
 const COSMETIC_BY_ID = new Map(COSMETICS.map((d) => [d.id, d]));
 const SLOT_IDS = ['hat', 'glasses', 'backpack'];
-const SLOT_LABEL = { hat: '🎩 Hats', glasses: '👓 Glasses', backpack: '🎒 Backpacks' };
+const SLOT_LABEL = { hat: 'Hats', glasses: 'Glasses', backpack: 'Backpacks' };
+// Clean line-icons per slot — no emoji, Apple-style.
+const SLOT_ICON = {
+  hat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 16a8.5 8.5 0 0 1 17 0"/><rect x="2" y="16" width="20" height="3.2" rx="1.6"/></svg>',
+  glasses: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="6.5" cy="13" r="3.4"/><circle cx="17.5" cy="13" r="3.4"/><path d="M9.9 13c.8-1 3.4-1 4.2 0"/><path d="M3.4 11 5 7.2h2"/><path d="M20.6 11 19 7.2h-2"/></svg>',
+  backpack: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="7" width="12" height="14" rx="4.5"/><path d="M9 7.5V6a3 3 0 0 1 6 0v1.5"/><rect x="9.5" y="12" width="5" height="4.6" rx="1.4"/></svg>',
+};
+// Most cosmetics are a purchase; the two starters stay free. Prices in coins.
+const PRICES = { beanie_sunny: 0, specs_round: 0, cap_terra: 120, crown_plum: 260, shades_star: 200, pack_sage: 180, pack_wings: 320 };
+const priceOf = (id) => (PRICES[id] ?? 150);
 // Free starters so every kid has something fun on day one (no pay-to-win,
 // no paid randomness; more items arrive via the Shop/quests modules).
 const STARTERS = ['beanie_sunny', 'specs_round'];
@@ -320,9 +329,51 @@ function unequip(slot) {
   ctxRef.bus.emit('cosmetic-unequipped', { slot });
   return true;
 }
+// Direct purchase from the Closet. Provisional unlock (trial): the item is
+// added to the owned set and persisted — the same way the character picker
+// unlocks — with a real coin-spend / IAP hook slotting in here later.
+function buy(id) {
+  const owned = getOwned();
+  if (owned.includes(id)) return true;
+  return ctxRef.save.set('ownedCosmetics', [...owned, id]) === true;
+}
 
 // ---------- Closet panel ----------
 let panel = null;
+
+const CLOSET_CSS = `
+.closet-premium { font-family: inherit; }
+.closet-premium .cp-intro { margin: 0 0 6px; color: #6b7280; font-size: 13.5px; line-height: 1.55; }
+.closet-premium .cp-slot-head { display: flex; align-items: center; gap: 9px; font-weight: 700;
+  font-size: 12.5px; letter-spacing: 0.05em; text-transform: uppercase; color: #111827; margin: 20px 0 11px; }
+.closet-premium .cp-slot-head svg { width: 19px; height: 19px; color: #2d6cdf; flex: none; }
+.closet-premium .cp-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+.closet-premium .cp-card { width: 132px; background: #fff; border: 1.5px solid #eceef2; border-radius: 16px;
+  padding: 12px 10px 13px; display: flex; flex-direction: column; align-items: center; gap: 7px;
+  box-shadow: 0 4px 14px #0000000a; transition: transform .14s, border-color .14s, box-shadow .14s; }
+.closet-premium .cp-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px #00000014; }
+.closet-premium .cp-card.equipped { border-color: #2d6cdf; box-shadow: 0 8px 22px #2d6cdf22; }
+.closet-premium .cp-thumb { width: 90px; height: 90px; border-radius: 13px;
+  background: radial-gradient(120% 120% at 50% 22%, #f4f7fb, #e7ecf4);
+  display: flex; align-items: center; justify-content: center; }
+.closet-premium .cp-thumb img { width: 82px; height: 82px; }
+.closet-premium .cp-name { font-weight: 650; font-size: 12.5px; color: #111827; text-align: center; line-height: 1.25; }
+.closet-premium .cp-price { font-size: 11.5px; color: #8a93a3; height: 15px; }
+.closet-premium .cp-btn { border: none; border-radius: 10px; padding: 8px 14px; font-size: 12.5px;
+  font-weight: 650; cursor: pointer; width: 100%; transition: transform .12s, opacity .12s; }
+.closet-premium .cp-btn:hover { transform: scale(1.03); }
+.closet-premium .cp-btn.equip { background: #17223a; color: #fff; }
+.closet-premium .cp-btn.equipped { background: #eef2fb; color: #2d6cdf; }
+.closet-premium .cp-btn.buy { background: #c8892f; color: #fff; }
+`;
+let cssInjected = false;
+function ensureClosetCss() {
+  if (cssInjected || typeof document === 'undefined') return;
+  cssInjected = true;
+  const s = document.createElement('style');
+  s.textContent = CLOSET_CSS;
+  document.head.appendChild(s);
+}
 
 // Small one-shot preview renderer: renders each item to a thumbnail data URL,
 // then disposes itself immediately (allowed per ARCHITECTURE.md).
@@ -368,84 +419,98 @@ function renderThumbnails() {
   return thumbs;
 }
 
-function cardEl(def, { equipped, locked, thumb }) {
+function cardEl(def, { equipped, owned, thumb }) {
   const card = document.createElement('div');
-  card.style.cssText = [
-    'width:124px', 'padding:10px 8px', 'border-radius:10px',
-    `border:2px solid ${equipped ? '#0A84FF' : '#e5e5ea'}`,
-    `background:${equipped ? '#fdf3dd' : '#f5f5f7'}`,
-    'display:flex', 'flex-direction:column', 'align-items:center', 'gap:6px',
-    locked ? 'opacity:.55' : '',
-  ].join(';');
+  card.className = 'cp-card' + (equipped ? ' equipped' : '');
+
+  const thumbWrap = document.createElement('div');
+  thumbWrap.className = 'cp-thumb';
   if (thumb) {
     const img = document.createElement('img');
     img.src = thumb;
     img.alt = def.name;
-    img.style.cssText = 'width:76px;height:76px;';
-    card.appendChild(img);
+    thumbWrap.appendChild(img);
   } else {
-    const ph = document.createElement('div');
-    ph.textContent = def.emoji;
-    ph.style.cssText = 'width:76px;height:76px;display:flex;align-items:center;justify-content:center;font-size:38px;';
-    card.appendChild(ph);
+    // no-emoji fallback: the item's initial on the soft chip.
+    const ph = document.createElement('span');
+    ph.textContent = def.name.slice(0, 1);
+    ph.style.cssText = 'font-weight:700;font-size:30px;color:#9aa4b5;';
+    thumbWrap.appendChild(ph);
   }
+  card.appendChild(thumbWrap);
+
   const name = document.createElement('div');
+  name.className = 'cp-name';
   name.textContent = def.name;
-  name.style.cssText = 'font-weight:600;font-size:12.5px;color:#060c21;text-align:center;';
   card.appendChild(name);
-  const btn = ctxRef.ui.button(
-    locked ? '🔒 Locked' : equipped ? 'Take off' : 'Put on',
-    () => {
-      if (locked) return;
-      const saved = equipped ? unequip(def.slot) : equip(def.id);
-      if (!saved) {
-        ctxRef.ui.toast('Closet change could not be saved on this device. Your previous look is still active.');
-        return;
-      }
-      ctxRef.ui.toast(equipped ? def.name + ' off!' : def.name + ' on! ✨');
-      renderBody(); // refresh card states; hub player behind the panel updates live
-    },
-    { primary: !locked && !equipped },
-  );
-  btn.disabled = locked;
-  btn.style.padding = '8px 12px';
-  btn.style.fontSize = '12px';
-  card.appendChild(btn);
-  if (locked) {
-    const hint = document.createElement('div');
-    hint.textContent = 'Find it in the Shop';
-    hint.style.cssText = 'font-size:10.5px;color:#9a9aa2;';
-    card.appendChild(hint);
+
+  const price = document.createElement('div');
+  price.className = 'cp-price';
+  price.textContent = owned ? (equipped ? 'Equipped' : 'Owned') : `${priceOf(def.id)} coins`;
+  card.appendChild(price);
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  if (!owned) {
+    btn.className = 'cp-btn buy';
+    btn.textContent = 'BUY';
+    btn.onclick = () => {
+      if (!buy(def.id)) { ctxRef.ui.toast('Purchase could not be saved on this device.'); return; }
+      equip(def.id);
+      ctxRef.ui.toast(def.name + ' unlocked');
+      renderBody();
+    };
+  } else if (equipped) {
+    btn.className = 'cp-btn equipped';
+    btn.textContent = 'Remove';
+    btn.onclick = () => {
+      if (!unequip(def.slot)) { ctxRef.ui.toast('Change could not be saved on this device.'); return; }
+      renderBody();
+    };
+  } else {
+    btn.className = 'cp-btn equip';
+    btn.textContent = 'Equip';
+    btn.onclick = () => {
+      if (!equip(def.id)) { ctxRef.ui.toast('Change could not be saved on this device.'); return; }
+      renderBody(); // hub player behind the panel updates live
+    };
   }
+  card.appendChild(btn);
   return card;
 }
 
 let thumbCache = null;
 function renderBody() {
   if (!panel) return;
+  ensureClosetCss();
   panel.body.textContent = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'closet-premium';
+
   const intro = document.createElement('p');
-  intro.textContent = 'Dress up your character — one item per slot. You can see it on your player right behind this panel!';
-  intro.style.cssText = 'margin:0 0 12px;color:#9a9aa2;font-size:13px;';
-  panel.body.appendChild(intro);
+  intro.className = 'cp-intro';
+  intro.textContent = 'One item per slot — it shows on your character live. The two starters are free; the rest you can pick up right here.';
+  wrap.appendChild(intro);
+
   const owned = new Set(getOwned());
   const eq = getEquipped();
   for (const slot of SLOT_IDS) {
     const head = document.createElement('div');
-    head.textContent = SLOT_LABEL[slot];
-    head.style.cssText = 'font-weight:600;font-size:14px;margin:12px 0 8px;color:#060c21;';
-    panel.body.appendChild(head);
+    head.className = 'cp-slot-head';
+    head.innerHTML = `${SLOT_ICON[slot]}<span>${SLOT_LABEL[slot]}</span>`;
+    wrap.appendChild(head);
     const grid = document.createElement('div');
-    grid.style.cssText = 'display:flex;flex-wrap:wrap;gap:10px;';
+    grid.className = 'cp-grid';
     for (const def of COSMETICS.filter((d) => d.slot === slot)) {
       grid.appendChild(cardEl(def, {
         equipped: eq[slot] === def.id,
-        locked: !owned.has(def.id),
+        owned: owned.has(def.id),
         thumb: thumbCache ? thumbCache.get(def.id) : null,
       }));
     }
-    panel.body.appendChild(grid);
+    wrap.appendChild(grid);
   }
+  panel.body.appendChild(wrap);
 }
 
 registerSystem('cosmetics', {
@@ -454,7 +519,7 @@ registerSystem('cosmetics', {
     ctxRef = ctx;
     thumbCache = renderThumbnails();
     panel = ctx.ui.panel({
-      title: '🎩 Closet',
+      title: 'Closet',
       onClose: () => { panel = null; thumbCache = null; },
     });
     renderBody();
