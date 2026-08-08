@@ -1,0 +1,18 @@
+# The shared-map realtime service, deployed separately from the game itself.
+# 67 Park ships as static files on GitHub Pages and cannot hold a socket open,
+# so the room lives in its own Worker. Keeping it out of wrangler.toml means a
+# room deploy never touches the game build and vice versa.
+name = "67park-room"
+main = "worker/park-room.js"
+compatibility_date = "2026-07-01"
+
+[[durable_objects.bindings]]
+name = "PARK_ROOM"
+class_name = "ParkRoom"
+
+# A free-plan account can only create Durable Object namespaces backed by
+# SQLite storage, which is all this room needs — it keeps no state between
+# ticks beyond the live socket list.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ParkRoom"]

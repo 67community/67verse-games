@@ -490,6 +490,15 @@ async function mountHubCharacter(id = ctx.characters.equippedId()) {
 }
 mountHubCharacter();
 ctx.bus.on('character-equipped', ({ id } = {}) => mountHubCharacter(id));
+// The room hands out a character derived from the caller's address, so a group
+// of friends is a group of different faces from the first second. It is only a
+// starting point: the moment the player picks their own, the pick wins and is
+// pushed back to the room. So this only remounts when nothing was ever picked.
+ctx.bus.on('park-online', ({ self } = {}) => {
+  if (!self?.characterId) return;
+  if (ctx.save.get('equipped', null) != null) return;
+  if (hubCharacter?.id !== self.characterId) mountHubCharacter(self.characterId);
+});
 const entryGate = document.getElementById('entry-gate');
 const enterButton = document.getElementById('enter-game');
 // Oscar's call: the entry gate is just the wordmark and the button — no
@@ -1041,6 +1050,16 @@ runHooks('boot', ctx);
 import('./world/friendsies.js').then(({ mountFriendsies }) => mountFriendsies(ctx, world));
 
 scheduleIdleModules();
+// The shared map. It rides its own late import rather than the first bundle:
+// the park is a complete place alone, and a player who never meets anyone
+// should not pay for the room on first paint. A room that cannot be reached
+// stays silent instead of breaking the game.
+let parkOnline = null;
+import('./core/park-online.js')
+  .then(({ createParkOnline }) => {
+    parkOnline = createParkOnline({ scene, getSim: () => sim, ctx });
+  })
+  .catch(() => { /* offline park, which is a complete park */ });
 async function requestReturnToSkypark() {
   if (!ctx.view.current || ctx.ui.hasAnyModal()) return;
   if (await ctx.ui.confirm('Return to 67 Park? Current round progress will be lost.')) ctx.goHome();
@@ -1466,6 +1485,7 @@ function frame(now) {
 
   // World animation hooks (portal pulse, label bob).
   for (const fn of world.animated) fn(t, frameDt);
+  parkOnline?.guncelle(frameDt);
 
   renderFrame(scene, camera);
   updateDevStats(frameDt);

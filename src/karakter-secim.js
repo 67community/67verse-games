@@ -85,6 +85,16 @@ const STIL = `
 #ks-nokta { display: flex; gap: 7px; justify-content: center; margin: 14px 0 18px; }
 #ks-nokta i { width: 8px; height: 8px; border-radius: 50%; background: #1a274033; }
 #ks-nokta i.on { background: #2d6cdf; }
+/* The name friends see over your head in the shared park. */
+#ks-isim { display: block; margin: 0 auto 16px; width: 240px; max-width: 74vw;
+  text-align: center; font-family: inherit; font-size: 16px; font-weight: 600;
+  letter-spacing: 0.04em; color: #17223a; background: #ffffffcc;
+  border: 1.5px solid #17223a22; border-radius: 13px; padding: 12px 14px;
+  outline: none; transition: border-color .14s, background .14s; }
+#ks-isim::placeholder { color: #17223a66; font-weight: 500; letter-spacing: 0.08em; }
+#ks-isim:focus { border-color: #2d6cdf; background: #fff; }
+/* Only offered on the character stage; the item stage is about cosmetics. */
+#karakter-secim.item-asamasi #ks-isim { display: none; }
 #ks-sec { background: #17223a; color: #fff; border: none; border-radius: 14px;
   padding: 15px 46px; font-size: 17px; font-weight: 600; cursor: pointer;
   box-shadow: 0 8px 22px #17223a44; transition: transform .12s, opacity .12s; }
@@ -160,6 +170,8 @@ export function buildKarakterSecim({ ctx, onConfirm }) {
       <div id="ks-ad">—</div>
       <div id="ks-durum"></div>
       <div id="ks-nokta"></div>
+      <input id="ks-isim" type="text" maxlength="16" autocomplete="off"
+             spellcheck="false" placeholder="YOUR NAME" aria-label="Your name" />
       <button id="ks-sec">SELECT</button><button id="ks-bitti" type="button">DONE</button>
     </div>`;
   document.body.appendChild(kok);
@@ -313,6 +325,24 @@ export function buildKarakterSecim({ ctx, onConfirm }) {
   let asama = 'karakter';   // 'karakter' -> 'item'
   let itemIndeks = 0;
   const bittiBtn = kok.querySelector('#ks-bitti');
+
+  // The name rides above your head in the shared park, so it is saved the
+  // moment it is typed rather than on a submit nobody would press, and the
+  // room is told at once — a friend sees the change without a reload.
+  const isimEl = kok.querySelector('#ks-isim');
+  if (isimEl) {
+    isimEl.value = localStorage.getItem('67v.playerName') || '';
+    isimEl.addEventListener('input', () => {
+      const temiz = isimEl.value.replace(/[^\p{L}\p{N} _.-]/gu, '').slice(0, 16);
+      if (temiz !== isimEl.value) isimEl.value = temiz;
+      localStorage.setItem('67v.playerName', temiz.trim());
+      ctx?.bus?.emit?.('player-name', { name: temiz.trim() });
+    });
+    // Typing must never reach the world: W/A/S/D in a name field would walk.
+    for (const olay of ['keydown', 'keyup', 'keypress']) {
+      isimEl.addEventListener(olay, (e) => e.stopPropagation());
+    }
+  }
 
   const itemSahipleri = () => ctx?.save?.get?.('ownedCosmetics', []) || [];
   const itemGiyilenler = () => ({
