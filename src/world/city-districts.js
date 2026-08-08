@@ -17,6 +17,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { TessellateModifier } from 'three/addons/modifiers/TessellateModifier.js';
 import {
   canvasTexture, squirclePoints, roundedBoxGeometry, insetPolygon,
   ribbonSides, shapeFromPoints, wallStripGeometry, copingTube, tinted, tintedByHeight,
@@ -338,22 +339,22 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     stadiumTrack: material(0x645c6a, { roughness: 0.92 }),
     grass: material(0x868b6e, { roughness: 0.95 }),
     sand: material(0xd8bcae, { roughness: 0.95 }),
-    water: (() => {
-      // Natural water, not a painted slab: a slow two-axis swell displaces
-      // the surface a few centimetres and the shader time drifts it. Shared
-      // by the sea, the river and the pond.
-      const su = material(0x8caddf, { roughness: 0.22, transparent: true, opacity: 0.96 });
-      su.onBeforeCompile = (shader) => {
-        shader.uniforms.suZaman = { value: 0 };
-        su.userData.suZaman = shader.uniforms.suZaman;
-        shader.vertexShader = shader.vertexShader
-          .replace('#include <common>', '#include <common>\nuniform float suZaman;')
-          .replace('#include <begin_vertex>', `#include <begin_vertex>
-            transformed.y += 0.05 * sin(position.x * 0.55 + suZaman * 1.1)
-                           + 0.04 * sin(position.z * 0.42 + suZaman * 0.8);`);
-      };
-      return su;
-    })(),
+    // Kimi's recipe, ported from the skate lobby's ocean.js on Oscar's call —
+    // the water only, nothing else of his. The reason it beats what was here:
+    // a vertex shader moves the surface but leaves the NORMALS flat, so light
+    // never catches a crest and the swell reads as a painted slab sliding
+    // about. His version displaces real geometry and recomputes normals every
+    // frame, so the sun actually glints off the waves. Vertex colours carry a
+    // shallow-to-deep gradient, and a little metalness gives the sky
+    // something to reflect.
+    water: material(0xffffff, {
+      vertexColors: true,
+      roughness: 0.22,
+      metalness: 0.5,
+      transparent: true,
+      opacity: 0.92,
+      side: THREE.DoubleSide,
+    }),
     // The reference's roads are a warm NEUTRAL grey — its green and blue
     // channels are equal (#d8cccc). Mine had blue well under green, which is
     // exactly what read as brown. Measured and corrected: green and blue now
@@ -416,6 +417,59 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // and 52. Several earlier guesses were two to six units out, which is what
   // pushed plan-placed buildings onto the carriageway.
   const ROAD_W = 4.6;
+  // ---- Kimi's water, one surface at a time -------------------------------
+  // Paints the shallow-to-deep gradient into vertex colours, then rides three
+  // summed sine trains and recomputes normals each frame. Recomputing the
+  // normals is the whole point — it is what makes light break on the crests
+  // instead of sliding over a flat sheet.
+  // eksen: which LOCAL axis is up for this surface. The sea's geometry is
+  // rotated flat before it is handed over, so its up is y; the pond is a plane
+  // rotated on the MESH, so in its own space up is z and displacing y would
+  // just slide the ripple sideways inside the puddle.
+  function suYuzeyiKur(mesh, { derin, sig, genlik = 0.18, hiz = 1, eksen = 'y' } = {}) {
+    const geo = mesh.geometry;
+    const poz = geo.attributes.position;
+    const taban = Float32Array.from(poz.array);
+    const renkler = new Float32Array(poz.count * 3);
+    const c = new THREE.Color();
+    const derinR = new THREE.Color(derin);
+    const sigR = new THREE.Color(sig);
+    // Depth by distance from the surface's own centre, so a river reads as a
+    // channel and the open sea darkens as it runs out.
+    geo.computeBoundingBox();
+    const kutu = geo.boundingBox;
+    const yariX = Math.max((kutu.max.x - kutu.min.x) / 2, 0.001);
+    const yariZ = Math.max((kutu.max.z - kutu.min.z) / 2, 0.001);
+    const mx = (kutu.max.x + kutu.min.x) / 2;
+    const mz = (kutu.max.z + kutu.min.z) / 2;
+    for (let i = 0; i < poz.count; i += 1) {
+      const dx = (taban[i * 3] - mx) / yariX;
+      const dz = (taban[i * 3 + 2] - mz) / yariZ;
+      const d = Math.min(1, Math.hypot(dx, dz));
+      c.copy(sigR).lerp(derinR, d);
+      renkler[i * 3] = c.r;
+      renkler[i * 3 + 1] = c.g;
+      renkler[i * 3 + 2] = c.b;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(renkler, 3));
+    const kayma = eksen === 'z' ? 2 : 1;
+    const duzlemA = 0;
+    const duzlemB = eksen === 'z' ? 1 : 2;
+    animated?.push((zaman) => {
+      const p = poz.array;
+      const t = zaman * hiz;
+      for (let i = 0; i < poz.count; i += 1) {
+        const a = taban[i * 3 + duzlemA];
+        const b = taban[i * 3 + duzlemB];
+        p[i * 3 + kayma] = taban[i * 3 + kayma]
+          + Math.sin(a * 0.12 + t * 1.1) * genlik
+          + Math.cos(b * 0.16 + t * 0.9) * genlik * 0.8
+          + Math.sin((a + b) * 0.3 + t * 1.8) * genlik * 0.25;
+      }
+      poz.needsUpdate = true;
+      geo.computeVertexNormals();
+    });
+  }
   // Filled once the river curve exists, further down; the returned world
   // object closes over it.
   let nehirdeMi = () => false;
@@ -743,9 +797,8 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     // whatever that road measures, where a fixed offset could not.
     return { axis, dir, from: seg.from, to: seg.to, lane: seg.road + dir * seg.width * 0.26 };
   }).filter(Boolean);
-  animated?.push((time) => {
-    if (mats.water.userData.suZaman) mats.water.userData.suZaman.value = time;
-  });
+  // (The shader-clock tick that used to live here went with the old painted
+  // swell; each water surface now drives its own geometry in suYuzeyiKur.)
 
   // Moving traffic is solid too: one live AABB per driver, repositioned every
   // frame with the car — Oscar walked through a moving car after the parked
@@ -1063,7 +1116,10 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
 
   // The two pools, and the grandstand blocks flanking the running track.
   const POOLS = [[-34.3, -57.4, 3.5, 5.8], [-29.6, -57.4, 4.5, 5.8]];
-  const pools = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.14, 1), mats.water, POOLS.length);
+  // The paddling pools keep a plain material: the shared water asks for vertex
+  // colours and an instanced box carries none, which would render them black.
+  const havuzSuyu = material(0x63b6d4, { roughness: 0.24, metalness: 0.35, transparent: true, opacity: 0.92 });
+  const pools = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 0.14, 1), havuzSuyu, POOLS.length);
   POOLS.forEach(([x, z, w, d], i) => {
     dm.makeScale(w, 1, d);
     dm.setPosition(x, 0.13, z);
@@ -1296,12 +1352,17 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   seaShape.lineTo(suKenar, -(kiyiSon[1] + 1.2));
   seaShape.lineTo(suKenar, -KIYI[0][1] + 8);
   seaShape.closePath();
-  const seaGeometry = new THREE.ShapeGeometry(seaShape);
+  // ShapeGeometry triangulates the outline and leaves the interior empty, so
+  // there is nothing between the shore and the map edge to displace. Tessellate
+  // it first: the swell needs vertices to ride on.
+  let seaGeometry = new THREE.ShapeGeometry(seaShape);
   seaGeometry.rotateX(-Math.PI / 2);
   seaGeometry.translate(0, 0.06, 0);
+  seaGeometry = new TessellateModifier(2.2, 6).modify(seaGeometry);
   const sea = new THREE.Mesh(seaGeometry, mats.water);
   sea.name = 'district:sea';
   add(sea, { camera: false, cast: false });
+  suYuzeyiKur(sea, { derin: 0x11557a, sig: 0x3fa6c8, genlik: 0.16 });
 
   // Sand follows the same shore inland, so the beach is the coast's own shape
   // rather than a blob dropped near it. Every sample taken just inland of the
@@ -2422,11 +2483,17 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   pondRim.position.set(POND.x, 0.13, POND.z);
   pondRim.name = 'district:pond-rim';
   add(pondRim, { camera: false, cast: false });
-  const pond = new THREE.Mesh(new THREE.ShapeGeometry(kidneyShape(1), 20), mats.water);
+  const pond = new THREE.Mesh(
+    new TessellateModifier(0.6, 5).modify(new THREE.ShapeGeometry(kidneyShape(1), 20)),
+    mats.water,
+  );
   pond.rotation.x = -Math.PI / 2;
   pond.position.set(POND.x, 0.16, POND.z);
   pond.name = 'district:pond';
   add(pond, { camera: false, cast: false });
+  // A pond is still water: a gentle ripple, not the sea's swell. The plane is
+  // authored flat and rotated, so its swell rides local z, not y.
+  suYuzeyiKur(pond, { derin: 0x3d86a8, sig: 0x6ec2da, genlik: 0.05, hiz: 0.7, eksen: 'z' });
 
   // Stepping stones across the waist.
   const stones = new THREE.InstancedMesh(new THREE.BoxGeometry(0.85, 0.14, 0.72), mats.concrete, 5);
@@ -2598,11 +2665,16 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // the kart circuit. Row centres down the west reach read -57.2 at z = -8,
   // -56.6 at z = -4, -56.5 at z = 10 and -55.6 at z = 20, so the northern
   // control points are those rather than the guesses they replace.
-  const river = new THREE.Mesh(new THREE.TubeGeometry(riverCurve, 72, 2.4, 6), mats.water);
+  // 220 rings instead of 72: the swell needs vertices along the channel, and
+  // a tube that coarse showed the wave as three long facets.
+  const river = new THREE.Mesh(new THREE.TubeGeometry(riverCurve, 220, 2.4, 8), mats.water);
   river.scale.y = 0.03;
   river.position.y = 0.05;
   river.name = 'district:river';
   add(river, { camera: false, cast: false });
+  // The tube is squashed to 0.03 of its height, so the swell has to be scaled
+  // up by the same amount to survive the squash and still read on the surface.
+  suYuzeyiKur(river, { derin: 0x2b6f96, sig: 0x59b4d2, genlik: 3.2, hiz: 1.25 });
 
   // The river was painted on but never solid: `isWater` only ever covered the
   // sea, so the whole length of it was open ground and the player walked

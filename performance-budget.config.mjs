@@ -8,7 +8,9 @@ export const PERFORMANCE_BUDGET = Object.freeze({
   // (collider chain + water test): the city chunk builds at 45.3k.
   initialJsRawBytes: 950_000,
   initialJsGzipBytes: 262_000,
-  maxAsyncJsRawBytes: 46_000,
+  // 48.7k once the displaced-geometry water landed (tessellation, per-vertex
+  // depth colour and the per-surface swell driver).
+  maxAsyncJsRawBytes: 50_000,
   requiredDeferredSources: Object.freeze([
     'src/core/performance-diagnostics.js',
     'src/systems/cosmetics.js',
