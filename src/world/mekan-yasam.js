@@ -196,6 +196,53 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     ctx.ui.toast('Up you get.');
   }
 
+  // Inside a venue you are INSIDE it: no outer shell, no town behind the
+  // walls, no horizon. The interiors stand on their own plots past the world
+  // edge, which put the whole city in view over the counter — 138 units away
+  // but well inside the sky dome and only half-hidden by fog. Stepping in
+  // now hides the town, its ground and its sky, and pulls the fog in tight so
+  // the room ends where the room ends. Stepping out puts all of it back.
+  let disDunya = null;
+  function disDunyayiGizle(gizle) {
+    const sahne = scene;
+    if (!sahne) return;
+    if (!disDunya) {
+      // The venue plots are children of the town group, so hiding that alone
+      // would take the room with it. Everything at the scene's top level that
+      // is NOT the venues, the player or a light goes dark instead — that
+      // catches the sky dome and the terrain without naming each one.
+      const korunan = new Set(['mekanlar']);
+      disDunya = {
+        parcalar: sahne.children.filter((o) => (
+          o.visible
+          && !o.isLight
+          && !korunan.has(o.name)
+          && !o.userData?.characterInstance
+          && !o.getObjectByName?.('mekanlar')
+        )),
+        sis: sahne.fog ? { near: sahne.fog.near, far: sahne.fog.far } : null,
+        sisRenk: sahne.fog ? sahne.fog.color.clone() : null,
+      };
+    }
+    for (const p of disDunya.parcalar) p.visible = !gizle;
+    if (sahne.fog && disDunya.sis) {
+      sahne.fog.near = gizle ? 14 : disDunya.sis.near;
+      sahne.fog.far = gizle ? 34 : disDunya.sis.far;
+    }
+    // With the sky gone the clear colour showed through as pure black, which
+    // reads as a hole rather than a room. A soft warm wall sits behind the
+    // interior instead, and the fog fades the floor into it.
+    if (gizle) {
+      if (disDunya.arka === undefined) disDunya.arka = sahne.background || null;
+      const duvar = new THREE.Color(0xe8e2dc);
+      sahne.background = duvar;
+      if (sahne.fog) sahne.fog.color.copy(duvar);
+    } else {
+      sahne.background = disDunya.arka ?? null;
+      if (sahne.fog && disDunya.sisRenk) sahne.fog.color.copy(disDunya.sisRenk);
+    }
+  }
+
   function seyahat(target) {
     const sim = getSim();
     yuzmeyiBirak();
@@ -214,8 +261,10 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
         minX: m.x - PLOT / 2 + 0.6, maxX: m.x + PLOT / 2 - 0.6,
         minZ: m.z - PLOT / 2 + 0.6, maxZ: m.z + PLOT / 2 - 0.6,
       };
+      disDunyayiGizle(true);
     } else {
       world.boundsBox = null;
+      disDunyayiGizle(false);
     }
     if (target.label) ctx.ui.toast(target.label);
     ctx.bus.emit('sfx', 'launch');

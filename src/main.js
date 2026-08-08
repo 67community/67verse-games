@@ -82,6 +82,8 @@ pmrem.dispose();
 // Plain daylight dome over the park — wide enough to also roof the off-map
 // venue plots (x≈200+), which otherwise sit against black void.
 const skyDome = createSkyDome(THREE, 330);
+// Named so the venue interiors can hide the horizon when you step inside.
+skyDome.name = 'sky-dome';
 skyDome.userData.perfGroup = 'hub-sky';
 scene.add(skyDome);
 
@@ -1271,7 +1273,12 @@ function frame(now) {
     // channel, so height is the honest test — but it has to be tested against
     // the deck, not against zero, or a player at ground level counts as dry.
     const kopruUstunde = sim.pos.y > 0.3;
-    const suda = !kopruUstunde && Boolean(world.isWater?.(sim.pos.x, sim.pos.z));
+    // Venue interiors stand on plots past the world edge, and everything past
+    // the shoreline reads as sea — so without this you swam across the floor
+    // of the clothes shop. Inside a venue the pen is set; there is no swimming
+    // in a room.
+    const suda = !kopruUstunde && !world.boundsBox
+      && Boolean(world.isWater?.(sim.pos.x, sim.pos.z));
     if (suda) {
       sim.pos.y = SU_SEVIYE;
       sim.vel.y = 0;
