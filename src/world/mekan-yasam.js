@@ -143,6 +143,7 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     icecek: null,        // drink prop + timer
     dans: null,          // { x, z, sure } while dancing
     oturan: null,        // { x, z } while sitting
+    kaykay: null,        // { board, bekleme } while riding
   };
 
   const donusNoktasi = { x: 51, z: -2 };   // the promenade, in front of the doors
@@ -201,6 +202,7 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     uzanmayiBirak();
     dansiBirak();
     oturmayiBirak();
+    kaykaydanIn();
     sim.pos.x = target.x;
     sim.pos.z = target.z;
     sim.pos.y = 0.4;
@@ -293,6 +295,38 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
     }
     durum.uzanan = enYakin;
     ctx.ui.toast('Lying back — press E or move to get up.');
+  }
+
+  function kaykayaBin() {
+    if (!karakter?.root || durum.kaykay) return;
+    const board = new THREE.Group();
+    board.name = 'mekan:kaykay';
+    const deck = new THREE.Mesh(
+      new THREE.BoxGeometry(0.34, 0.05, 0.92),
+      new THREE.MeshStandardMaterial({ color: 0xe8827c, roughness: 0.55 }),
+    );
+    deck.position.y = 0.11;
+    board.add(deck);
+    const tekerGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.06, 8);
+    const tekerMat = new THREE.MeshStandardMaterial({ color: 0xf6f2ec, roughness: 0.5 });
+    for (const [sx, sz] of [[-0.12, 0.32], [0.12, 0.32], [-0.12, -0.32], [0.12, -0.32]]) {
+      const teker = new THREE.Mesh(tekerGeo, tekerMat);
+      teker.rotation.z = Math.PI / 2;
+      teker.position.set(sx, 0.05, sz);
+      board.add(teker);
+    }
+    karakter.root.add(board);
+    durum.kaykay = { board, bekleme: 0.6 };
+    world.speedScale = 1.8;
+    ctx.ui.toast('On the board — E hops off.');
+  }
+
+  function kaykaydanIn() {
+    if (!durum.kaykay) return;
+    durum.kaykay.board.removeFromParent();
+    durum.kaykay = null;
+    world.speedScale = 1;
+    ctx.ui.toast('Board pocketed.');
   }
 
   function dansaBasla() {
@@ -398,6 +432,11 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
       id: 'mekan-magaza-kabin', label: 'Fitting room — open Closet', kind: 'system', radius: 2.4,
       x: magaza.x + PLOT * 0.137, z: magaza.z - PLOT * 0.425 + 2.2,
       target: 'cosmetics',
+    },
+    {
+      id: 'kaykay-al', label: 'Ride the board', kind: 'venue', radius: 2.6,
+      x: 2, z: -33.5,
+      target: 'skate-ride',
     },
     {
       id: 'basket-atisi', label: 'Hoop Shot', kind: 'venue', radius: 2.4,
@@ -576,6 +615,7 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
   isaret({ scene, x: magaza.x - PLOT * 0.055, z: magaza.z + PLOT * 0.05, metin: 'BUY', renk: 0xc9829a });
   isaret({ scene, x: 50.6, z: 16, metin: 'ARCADE 67', renk: 0x8fc4cf });
   isaret({ scene, x: -36, z: -1.7, metin: 'HOOP SHOT', renk: 0xe08a3c });
+  isaret({ scene, x: 2, z: -33.5, metin: 'RIDE', renk: 0xe8827c });
   isaret({ scene, x: 29.95, z: 5.2, metin: 'GOAL SHOT', renk: 0x5a9c7a });
   isaret({ scene, x: arcade.x + (0.49 - 0.5) * PLOT, z: arcade.z + PLOT * 0.485, metin: 'EXIT', renk: 0x17223a });
   isaret({ scene, x: arcadeHop.x, z: arcadeHop.z + 1.4, metin: 'SKY HOP', renk: 0x5a9cd8 });
@@ -610,6 +650,10 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
       if (target === 'gift-kahve') { birineIsmarla(kahveYap, 'coffee'); return; }
       if (target === 'hoop-shot') { basket.baslat(); return; }
       if (target === 'goal-shot') { futbol.baslat(); return; }
+      if (target === 'skate-ride') {
+        if (durum.kaykay) kaykaydanIn(); else kaykayaBin();
+        return;
+      }
       if (target === 'arcade-hop' || target === 'arcade-dodge') {
         acMikroOyun(target, ctx);
         return;
@@ -660,6 +704,11 @@ registerHook('hub', (ctx, { scene, world, getSim }) => {
         g.faz += dt;
         g.instance.animator?.update?.(dt, { speed: 0, grounded: true });
       }
+    }
+    if (durum.kaykay) {
+      durum.kaykay.bekleme = Math.max(0, durum.kaykay.bekleme - dt);
+      const pad = ctx.input.poll();
+      if (pad.grabPressed && durum.kaykay.bekleme <= 0) kaykaydanIn();
     }
     if (durum.dans) {
       const sim = getSim();
