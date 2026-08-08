@@ -1381,12 +1381,17 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // Oscar photographed twice. It hugs the west margin now and leaves at the
   // south-west corner, which measures zero walks and zero crossings in the
   // channel and leaves five road crossings, every one of them bridged below.
+  // Shifted a further 1.5 west after the audit: the riverside avenue at
+  // x -53.7 runs PARALLEL to the channel for its whole length, and its
+  // widened western edge sat about a unit inside the water. That is not a
+  // crossing and no bridge fixes it — the road and the river simply have to
+  // not share ground. Both now clear each other along the whole reach.
   const riverCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-59.5, 0.05, -14), new THREE.Vector3(-58, 0.05, -6),
-    new THREE.Vector3(-57.6, 0.05, 2), new THREE.Vector3(-57.6, 0.05, 12),
-    new THREE.Vector3(-57.4, 0.05, 22), new THREE.Vector3(-57.6, 0.05, 32),
-    new THREE.Vector3(-58, 0.05, 42), new THREE.Vector3(-58.6, 0.05, 52),
-    new THREE.Vector3(-59.4, 0.05, 62), new THREE.Vector3(-60, 0.05, 70),
+    new THREE.Vector3(-61, 0.05, -14), new THREE.Vector3(-59.5, 0.05, -6),
+    new THREE.Vector3(-59.1, 0.05, 2), new THREE.Vector3(-59.1, 0.05, 12),
+    new THREE.Vector3(-58.9, 0.05, 22), new THREE.Vector3(-59.1, 0.05, 32),
+    new THREE.Vector3(-59.5, 0.05, 42), new THREE.Vector3(-60.1, 0.05, 52),
+    new THREE.Vector3(-60.9, 0.05, 62), new THREE.Vector3(-61.5, 0.05, 70),
   ]);
   // Bridges are DERIVED, not typed. A hand-written list is a list that stops
   // being true the moment the river moves — which is how carriageways ended
@@ -1399,22 +1404,35 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     for (const [x, z, g, d] of PLAN_ANA_YOLLAR) {
       const yatay = yatayMi(g, d);
       const uzun = Math.max(g, d);
+      // A road is as wide as its carriageway, not as thin as its centre line.
+      // Testing the line alone found two crossings where the audit counted
+      // five: a street whose centre passes three units clear still has half
+      // its width in the channel, and that half was open water to drive into.
+      const yariGenislik = yolKalinlik(g, d) / 2;
       let enYakin = null;
       for (let t = -uzun / 2; t <= uzun / 2; t += 0.6) {
         const px = yatay ? x + t : x;
         const pz = yatay ? z : z + t;
         for (const p of NEHIR_YOLU) {
           const mesafe = Math.hypot(p.x - px, p.z - pz);
-          if (mesafe < 2.4 && (!enYakin || mesafe < enYakin.mesafe)) {
-            enYakin = { mesafe, px, pz };
+          // `nehirdeMi` marks water with a SQUARE test around each polyline
+          // point, so its reach is the diagonal, not the radius; matching the
+          // circle here left the x -53.7 avenue crossing unbridged.
+          if (mesafe < 2.4 * Math.SQRT2 + yariGenislik && (!enYakin || mesafe < enYakin.mesafe)) {
+            // The deck belongs over the WATER, so it is centred on the river
+            // point along the road's own axis, not on the road sample.
+            enYakin = { mesafe, px: yatay ? p.x : x, pz: yatay ? z : p.z };
           }
         }
       }
       if (!enYakin) continue;
-      // Long enough to land on both banks, wide enough to walk comfortably.
+      // The channel is 4.8 across and the deck has to land on DRY ground at
+      // both ends, not stop at the waterline — a deck that ends in the water
+      // drops you in one step short of the bank. Eleven units clears the
+      // channel with a landing either side whatever angle the road meets it.
       kopruler.push(yatay
-        ? [enYakin.px, enYakin.pz, 7.5, 0.4, yolKalinlik(g, d) + 1.2, 0]
-        : [enYakin.px, enYakin.pz, yolKalinlik(g, d) + 1.2, 0.4, 7.5, 0]);
+        ? [enYakin.px, enYakin.pz, 11, 0.4, yolKalinlik(g, d) + 1.2, 0]
+        : [enYakin.px, enYakin.pz, yolKalinlik(g, d) + 1.2, 0.4, 11, 0]);
     }
     return kopruler;
   })();
