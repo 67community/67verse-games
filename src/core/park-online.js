@@ -65,7 +65,11 @@ export function createParkOnline({ scene, getSim, ctx }) {
   function kimligimiGonder() {
     if (soket?.readyState !== WebSocket.OPEN) return;
     const ad = (localStorage.getItem('67v.playerName') || '').trim();
-    const karakter = ctx?.characters?.equippedId?.() || null;
+    // Only a REAL pick overrides the room. `equippedId()` answers 'gorilla'
+    // for anyone who never chose, so sending it unconditionally turned every
+    // fresh visitor into the same gorilla — the exact case this is for.
+    const secildi = ctx?.save?.get?.('equipped', null) != null;
+    const karakter = secildi ? ctx.characters.equippedId() : null;
     if (!ad && !karakter) return;
     soket.send(JSON.stringify({ t: 'kimlik', name: ad || undefined, characterId: karakter || undefined }));
     if (durum.self) {
