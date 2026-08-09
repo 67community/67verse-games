@@ -80,9 +80,13 @@ export function createInput() {
     stick.id = e.pointerId;
     stick.sx = e.clientX; stick.sy = e.clientY;
     stick.dx = 0; stick.dy = 0;
-    stickBase.style.display = 'block';
-    stickBase.style.left = e.clientX + 'px';
-    stickBase.style.top = e.clientY + 'px';
+    // The pad is fixed furniture now, so the stick's origin is the pad's own
+    // centre rather than wherever the thumb landed — that is what makes a
+    // visible control actually steer from where it is drawn.
+    const kutu = stickBase.getBoundingClientRect();
+    stick.sx = kutu.left + kutu.width / 2;
+    stick.sy = kutu.top + kutu.height / 2;
+    stickMove(e);
   }
   function stickMove(e) {
     if (!stick.active || e.pointerId !== stick.id) return;
@@ -91,14 +95,13 @@ export function createInput() {
     const len = Math.hypot(dx, dy);
     if (len > STICK_RADIUS) { dx = dx / len * STICK_RADIUS; dy = dy / len * STICK_RADIUS; }
     stick.dx = dx; stick.dy = dy;
-    stickKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    stickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
   }
   function stickEnd(e) {
     if (!stick.active || e.pointerId !== stick.id) return;
     stick.active = false; stick.id = null;
     stick.dx = 0; stick.dy = 0;
-    stickBase.style.display = 'none';
-    stickKnob.style.transform = 'translate(-50%, -50%)';
+    stickKnob.style.transform = 'translate(0, 0)';
   }
   window.addEventListener('pointerdown', stickStart);
   window.addEventListener('pointermove', stickMove);
@@ -176,8 +179,7 @@ export function createInput() {
     stick.id = null;
     stick.dx = 0;
     stick.dy = 0;
-    stickBase.style.display = 'none';
-    stickKnob.style.transform = 'translate(-50%, -50%)';
+    stickKnob.style.transform = 'translate(0, 0)';
     look.active = false;
     look.id = null;
     look.yaw = 0;

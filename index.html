@@ -360,16 +360,28 @@
     body.modal-open #touch-ui,
     body.show67-overlay-open #touch-ui { visibility: hidden; }
 
+    /* The skate page's stick, on Oscar's call: a fixed, ALWAYS-VISIBLE pad at
+       the bottom-left with a solid dark knob. 67 Park's was invisible until
+       you touched and then appeared wherever your thumb landed — you had to
+       find the control before you could steer with it. */
     #stick-base {
-      position: absolute; width: 120px; height: 120px; border-radius: 50%;
-      background: rgba(255, 255, 255, 0.40);
-      border: 2px solid rgba(42, 39, 36, 0.25);
-      display: none; transform: translate(-50%, -50%);
+      position: fixed;
+      left: calc(var(--safe-left) + 24px);
+      bottom: calc(var(--safe-bottom) + 24px);
+      width: 136px; height: 136px; border-radius: 50%;
+      background: rgba(255, 255, 255, 0.34);
+      border: 1px solid rgba(255, 255, 255, 0.65);
+      backdrop-filter: blur(6px);
+      display: block; transform: none;
+      touch-action: none;
     }
     #stick-knob {
-      position: absolute; width: 56px; height: 56px; border-radius: 50%;
-      background: rgba(42, 39, 36, 0.45);
-      left: 50%; top: 50%; transform: translate(-50%, -50%);
+      position: absolute; width: 60px; height: 60px; border-radius: 50%;
+      background: rgba(6, 12, 33, 0.82);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      box-shadow: 0 6px 18px rgba(6, 12, 33, 0.35);
+      left: 50%; top: 50%; margin: -30px 0 0 -30px; transform: none;
+      pointer-events: none;
     }
     #touch-buttons {
       position: absolute;
@@ -423,6 +435,16 @@
     /* Keep the full hub visible on phones: two compact icon rows share the
        top safe area with the wordmark instead of covering the city horizon. */
     @media (max-width: 600px) {
+      /* The stick is fixed furniture at bottom-left now, so the button
+         cluster has to clear it: a 136px pad plus a three-button row did not
+         fit across a 390px phone and the board button sat on the knob. */
+      #stick-base { width: 112px; height: 112px; }
+      #stick-knob { width: 50px; height: 50px; margin: -25px 0 0 -25px; }
+      #touch-buttons { gap: 10px; }
+      .tbtn { width: 62px; height: 62px; }
+      .tbtn svg { width: 26px; height: 26px; }
+      #btn-jump { width: 72px; height: 72px; }
+      #btn-jump svg { width: 30px; height: 30px; }
       #wordmark { top: calc(var(--safe-top) + 12px); left: calc(var(--safe-left) + 16px); }
       #wordmark img { height: 25px; }
       #hub-actions { top: calc(var(--safe-top) + 54px); left: calc(var(--safe-left) + 16px); gap: 6px; }
