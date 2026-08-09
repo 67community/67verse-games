@@ -3122,6 +3122,15 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     }
   }
 
+  // Every carriageway as a rectangle, shared by the sweep below and by the
+  // world's edge ring so both agree on where a road actually is.
+  const YOL_KUTULARI = PLAN_ANA_YOLLAR.map(([x, z, g, d]) => {
+    const k = yolKalinlik(g, d) / 2;
+    return yatayMi(g, d)
+      ? { minX: x - g / 2, maxX: x + g / 2, minZ: z - k, maxZ: z + k }
+      : { minX: x - k, maxX: x + k, minZ: z - d / 2, maxZ: z + d / 2 };
+  });
+
   // ---- Final sweep: nothing stands in a carriageway --------------------
   // Oscar keeps finding things in the middle of the road, and he keeps being
   // right: every district placed its own props with its own rules, so each
@@ -3132,12 +3141,7 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // whose centre lands on a road is pushed to the nearest kerb, and one that
   // still cannot clear is scaled away rather than left in a lane.
   {
-    const yolKutulari = PLAN_ANA_YOLLAR.map(([x, z, g, d]) => {
-      const k = yolKalinlik(g, d) / 2;
-      return yatayMi(g, d)
-        ? { minX: x - g / 2, maxX: x + g / 2, minZ: z - k, maxZ: z + k }
-        : { minX: x - k, maxX: x + k, minZ: z - d / 2, maxZ: z + d / 2 };
-    });
+    const yolKutulari = YOL_KUTULARI;
     const KORUNAN = /road|zebra|cross|kerb|dash|lane|patika|shadow|contact|sea|river|pond|ground|bridge|dock/i;
     const m = new THREE.Matrix4();
     const p = new THREE.Vector3();
@@ -3187,12 +3191,10 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     // just this district: the map edge, the lobby's own props and the trees
     // are added outside this group, and they were the ones still standing in
     // a lane after the pass above.
-    yoldanTemizle: (kok) => yoldanTemizle(kok, PLAN_ANA_YOLLAR.map(([x, z, g, d]) => {
-      const k = yolKalinlik(g, d) / 2;
-      return yatayMi(g, d)
-        ? { minX: x - g / 2, maxX: x + g / 2, minZ: z - k, maxZ: z + k }
-        : { minX: x - k, maxX: x + k, minZ: z - d / 2, maxZ: z + d / 2 };
-    })),
+    // Both: the world opens its edge kerb at these mouths, and runs the sweep
+    // over everything once its own props are in.
+    yolKutulari: YOL_KUTULARI,
+    yoldanTemizle: (kok) => yoldanTemizle(kok, YOL_KUTULARI),
     // The map lets you tap anywhere, so it needs the same shore test the
     // city uses to keep buildings out of the bay.
     // The river counts as water too, so a map tap can no longer drop the

@@ -129,6 +129,14 @@ export function buildWorld(scene, { buildCity, buildStadium, stadiumPitch } = {}
   {
     const m = new THREE.Matrix4();
     const step = (EDGE_LIMIT * 2) / EDGE_PER_SIDE;
+    // The ring is opened where a road runs off the map. Twelve kerb sections
+    // were sitting across road mouths — the last of the things standing in a
+    // lane, and the one case where moving the prop is the wrong answer: a
+    // kerb belongs on the edge, so the edge gets a gap instead.
+    const yolAgzi = districts.yolKutulari ?? [];
+    const agizdaMi = (x, z) => yolAgzi.some((r) => (
+      x > r.minX - 0.6 && x < r.maxX + 0.6 && z > r.minZ - 0.6 && z < r.maxZ + 0.6
+    ));
     let index = 0;
     for (let i = 0; i < EDGE_PER_SIDE; i += 1) {
       const t = -EDGE_LIMIT + step * (i + 0.5);
@@ -137,6 +145,7 @@ export function buildWorld(scene, { buildCity, buildStadium, stadiumPitch } = {}
         [-EDGE_LIMIT, t, Math.PI / 2], [EDGE_LIMIT, t, Math.PI / 2],
       ]) {
         m.makeRotationY(rot);
+        if (agizdaMi(x, z)) m.scale(new THREE.Vector3(0, 0, 0));
         m.setPosition(x, 0.25 + getHeight(x, z), z);
         edge.setMatrixAt(index, m);
         index += 1;
