@@ -442,7 +442,10 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     pink: material(0xe89ab8, { roughness: 0.7 }),
     carDark: material(0x3f4652, { roughness: 0.35 }),
     tire: material(0x2c2f34, { roughness: 0.9 }),
-    glass: material(0xcfe9f5, { roughness: 0.3, emissive: 0x88b8cc, emissiveIntensity: 0.25 }),
+    // Glazing in the reference is a dark slate that catches one cool highlight;
+    // some panes are lit warm from inside, which is what stops a facade
+    // reading as a grid of holes.
+    glass: material(0x5d6a78, { roughness: 0.36, emissive: 0x2a3644, emissiveIntensity: 0.22 }),
   };
   const CAR_PAINT = [0xe0745e, 0x5a80d6, 0xf6c445, 0x6fae72, 0xd8d3c8, 0xa78bda];
 
@@ -2060,8 +2063,11 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // wall and a sill standing proud under it. Both ride instanced meshes that
   // already exist (the shopfront glass and its cream surround), so a city of
   // real windows costs no extra draw call.
-  const PENCERE_G = 0.62;
-  const PENCERE_Y = 0.78;
+  // The reference punches SMALL dark windows in regular rows, not the wide
+  // pale plates this had — a big light rectangle reads as a missing wall,
+  // a small dark one reads as a window.
+  const PENCERE_G = 0.44;
+  const PENCERE_Y = 0.58;
   const PENCERE_TABAN = 2.3;
   const PENCERE_ARALIK = 1.5;
   const PENCERELER = [];
