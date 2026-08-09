@@ -278,6 +278,51 @@ function treeBlobs(positions, THREE_, blobMaterial) {
   return blobs;
 }
 
+// Push every instance off the carriageways it stands in. Exported so the world
+// can run it once more over EVERYTHING once the districts, the map edge and
+// the lobby's own props are all in place — a district-local pass can only ever
+// clean its own district, which is why the road kept having things on it.
+export function yoldanTemizle(kok, yolKutulari) {
+  if (!kok || !yolKutulari?.length) return 0;
+  const KORUNAN = /road|zebra|cross|kerb|dash|lane|patika|shadow|contact|sea|river|pond|ground|bridge|dock/i;
+  const m = new THREE.Matrix4();
+  const p = new THREE.Vector3();
+  const q = new THREE.Quaternion();
+  const s = new THREE.Vector3();
+  let temizlenen = 0;
+  kok.traverse((o) => {
+    if (!o.isInstancedMesh) return;
+    let ad = '';
+    for (let n = o; n; n = n.parent) if (n.name) { ad = n.name; break; }
+    if (KORUNAN.test(ad)) return;
+    let degisti = false;
+    for (let i = 0; i < o.count; i += 1) {
+      o.getMatrixAt(i, m);
+      m.decompose(p, q, s);
+      if (s.x === 0 && s.y === 0 && s.z === 0) continue;
+      const kutu = yolKutulari.find((r) => p.x > r.minX && p.x < r.maxX && p.z > r.minZ && p.z < r.maxZ);
+      if (!kutu) continue;
+      const cikis = [
+        [kutu.minX - 0.9 - p.x, 0], [kutu.maxX + 0.9 - p.x, 0],
+        [0, kutu.minZ - 0.9 - p.z], [0, kutu.maxZ + 0.9 - p.z],
+      ].sort((a, b) => Math.hypot(a[0], a[1]) - Math.hypot(b[0], b[1]))[0];
+      const nx = p.x + cikis[0];
+      const nz = p.z + cikis[1];
+      if (yolKutulari.some((r) => nx > r.minX && nx < r.maxX && nz > r.minZ && nz < r.maxZ)) {
+        s.set(0, 0, 0);                        // wedged between two roads: gone
+      } else {
+        p.set(nx, p.y, nz);
+      }
+      m.compose(p, q, s);
+      o.setMatrixAt(i, m);
+      degisti = true;
+      temizlenen += 1;
+    }
+    if (degisti) o.instanceMatrix.needsUpdate = true;
+  });
+  return temizlenen;
+}
+
 export function buildCityDistricts({ group, add, material, animated, buildStadium, stadiumPitch }) {
   // Live boxes for the moving traffic — the car animator repositions them
   // every frame; the collider list spreads them in so the sim sees a moving
@@ -3077,10 +3122,77 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     }
   }
 
+  // ---- Final sweep: nothing stands in a carriageway --------------------
+  // Oscar keeps finding things in the middle of the road, and he keeps being
+  // right: every district placed its own props with its own rules, so each
+  // fix only ever cleaned one district. Auditing the finished scene found
+  // eleven tree canopies, ten map-edge pieces, five marina decks, benches and
+  // a stand section sitting on asphalt. This runs LAST, over everything, so a
+  // prop added later cannot quietly reintroduce the problem: any instance
+  // whose centre lands on a road is pushed to the nearest kerb, and one that
+  // still cannot clear is scaled away rather than left in a lane.
+  {
+    const yolKutulari = PLAN_ANA_YOLLAR.map(([x, z, g, d]) => {
+      const k = yolKalinlik(g, d) / 2;
+      return yatayMi(g, d)
+        ? { minX: x - g / 2, maxX: x + g / 2, minZ: z - k, maxZ: z + k }
+        : { minX: x - k, maxX: x + k, minZ: z - d / 2, maxZ: z + d / 2 };
+    });
+    const KORUNAN = /road|zebra|cross|kerb|dash|lane|patika|shadow|contact|sea|river|pond|ground|bridge|dock/i;
+    const m = new THREE.Matrix4();
+    const p = new THREE.Vector3();
+    const q = new THREE.Quaternion();
+    const s = new THREE.Vector3();
+    let temizlenen = 0;
+    group.traverse((o) => {
+      if (!o.isInstancedMesh) return;
+      let ad = '';
+      for (let n = o; n; n = n.parent) if (n.name) { ad = n.name; break; }
+      if (KORUNAN.test(ad)) return;
+      let degisti = false;
+      for (let i = 0; i < o.count; i += 1) {
+        o.getMatrixAt(i, m);
+        m.decompose(p, q, s);
+        const kutu = yolKutulari.find((r) => p.x > r.minX && p.x < r.maxX && p.z > r.minZ && p.z < r.maxZ);
+        if (!kutu) continue;
+        // Out along whichever edge is nearer, with a kerb's clearance.
+        const cikis = [
+          [kutu.minX - 0.9 - p.x, 0], [kutu.maxX + 0.9 - p.x, 0],
+          [0, kutu.minZ - 0.9 - p.z], [0, kutu.maxZ + 0.9 - p.z],
+        ].sort((a, b) => Math.hypot(...a) - Math.hypot(...b))[0];
+        const nx = p.x + cikis[0];
+        const nz = p.z + cikis[1];
+        if (yolKutulari.some((r) => nx > r.minX && nx < r.maxX && nz > r.minZ && nz < r.maxZ)) {
+          s.set(0, 0, 0);                       // wedged between two roads: gone
+        } else {
+          p.set(nx, p.y, nz);
+        }
+        m.compose(p, q, s);
+        o.setMatrixAt(i, m);
+        degisti = true;
+        temizlenen += 1;
+      }
+      if (degisti) o.instanceMatrix.needsUpdate = true;
+    });
+    if (temizlenen && typeof console !== 'undefined' && globalThis.location?.search?.includes('qa=1')) {
+      console.log('[67VERSE] yoldan temizlenen nesne:', temizlenen);
+    }
+  }
+
   return {
     skatepark: Object.freeze({ minX: -15.5, maxX: 16.76, minZ: -49.21, maxZ: -20.34, topY: 0.44 }),
     stadiumPitch,
     blockCount: BLOCKS.length,
+    // The world runs the same sweep once more over EVERYTHING it holds, not
+    // just this district: the map edge, the lobby's own props and the trees
+    // are added outside this group, and they were the ones still standing in
+    // a lane after the pass above.
+    yoldanTemizle: (kok) => yoldanTemizle(kok, PLAN_ANA_YOLLAR.map(([x, z, g, d]) => {
+      const k = yolKalinlik(g, d) / 2;
+      return yatayMi(g, d)
+        ? { minX: x - g / 2, maxX: x + g / 2, minZ: z - k, maxZ: z + k }
+        : { minX: x - k, maxX: x + k, minZ: z - d / 2, maxZ: z + d / 2 };
+    })),
     // The map lets you tap anywhere, so it needs the same shore test the
     // city uses to keep buildings out of the bay.
     // The river counts as water too, so a map tap can no longer drop the

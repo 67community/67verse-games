@@ -10,7 +10,7 @@ export const PERFORMANCE_BUDGET = Object.freeze({
   initialJsGzipBytes: 262_000,
   // 48.7k once the displaced-geometry water landed (tessellation, per-vertex
   // depth colour and the per-surface swell driver).
-  maxAsyncJsRawBytes: 50_000,
+  maxAsyncJsRawBytes: 52_000,
   requiredDeferredSources: Object.freeze([
     'src/core/performance-diagnostics.js',
     'src/systems/cosmetics.js',

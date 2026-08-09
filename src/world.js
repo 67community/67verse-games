@@ -200,6 +200,16 @@ export function buildWorld(scene, { buildCity, buildStadium, stadiumPitch } = {}
     return 0;
   }
 
+  // The road sweep, run once more over the WHOLE world now that the map edge,
+  // the trees and the lobby's own props are all in. The districts run it on
+  // themselves, but a district can only clean its own group — twenty-two
+  // objects were still standing in a lane after that pass, which is why
+  // Oscar kept finding things in the middle of the road.
+  // The city hands the sweep back rather than the world importing it: the
+  // city is a deferred chunk and importing it here would drag the whole
+  // district into the first bundle.
+  districts.yoldanTemizle?.(group);
+
   return {
     group,
     // Live solid list — venue verbs (swimming) lift their own entries while
