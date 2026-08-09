@@ -702,7 +702,13 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   // must have no parked cars either: one sat at (19.3, -59.7), right under a
   // house, and read as a car driving out of the wall. Drop cars on that strip.
   const evSeridiAraba = (x, z) => z < -53 && x > -6 && x < 27;
-  const KARADA = PLAN_ARABALAR.filter(([x, z]) => !denizdeMi(x, z) && !evSeridiAraba(x, z));
+  // Every car is gone, parked ones included — Oscar's call, and he is right
+  // that the last pass only removed the drivers. A box with four cylinders
+  // never read as a car at this scale, and the parked rows kept spilling off
+  // the kerb into the carriageway. An empty, clean street beats a street full
+  // of bad models. The plan's car data stays on disk for whenever there is a
+  // real vehicle model to place with it.
+  const KARADA = [];
   // The plan parks its cars on the ORIGINAL kerb line; the widened asphalt
   // would swallow them, so each parked car takes the same clash shift the
   // buildings do and slides out to the new kerb.

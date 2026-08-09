@@ -374,11 +374,12 @@
     #touch-buttons {
       position: absolute;
       right: calc(var(--safe-right) + 20px);
-      bottom: calc(var(--safe-bottom) + 20px);
+      bottom: calc(var(--safe-bottom) + 46px);
       display: flex; gap: 16px; align-items: flex-end;
       pointer-events: none;
     }
     .tbtn {
+      position: relative;
       pointer-events: auto;
       width: 72px; height: 72px; border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
@@ -389,18 +390,27 @@
       backdrop-filter: blur(3px);
       font-family: inherit;
     }
-    .tbtn:active, .tbtn.held { background: rgba(6, 12, 33, 0.14); transform: scale(0.94); }
-    .tbtn svg { width: 30px; height: 30px; fill: none; stroke: var(--ink); stroke-width: 2.4;
-      stroke-linecap: round; stroke-linejoin: round; opacity: 0.88; }
-    #btn-jump { width: 84px; height: 84px; background: rgba(208, 119, 94, 0.55); border-color: rgba(208,119,94,0.7); }
+    /* The skate lobby's toolbar, on Oscar's call: a warm cream disc with a
+       dark line glyph and a real drop shadow, an amber press state, and a
+       small label pill underneath so a control says what it is. The pastel
+       translucent circles read as placeholders next to it. */
+    .tbtn { background: #fdf6e7; border: none;
+      box-shadow: 0 4px 14px rgba(10, 14, 40, 0.34); }
+    .tbtn:active, .tbtn.held, .tbtn.on { background: #f6c445; transform: scale(0.95); }
+    .tbtn svg { width: 30px; height: 30px; fill: none; stroke: #4a4034; stroke-width: 2.2;
+      stroke-linecap: round; stroke-linejoin: round; opacity: 1; }
+    .tbtn::after { content: attr(data-etiket); position: absolute; left: 50%; bottom: -19px;
+      transform: translateX(-50%); font: 700 11px/1 inherit; letter-spacing: 0.04em;
+      color: #fdf6e7; background: rgba(20, 24, 50, 0.5); padding: 3px 9px;
+      border-radius: 9px; pointer-events: none; white-space: nowrap; }
+    #btn-jump { width: 84px; height: 84px; }
     #btn-jump svg { width: 36px; height: 36px; }
     /* The cluster rises toward the thumb: board low, sprint mid, jump anchor. */
-    #btn-board { margin-bottom: 4px; background: rgba(232, 130, 124, 0.5); border-color: rgba(232,130,124,0.7); }
-    #btn-sprint { margin-bottom: 26px; background: rgba(90, 156, 216, 0.5); border-color: rgba(90,156,216,0.7); }
+    #btn-board { margin-bottom: 4px; }
+    #btn-sprint { margin-bottom: 26px; }
     /* FAST is a latch: lit while locked on. */
-    #btn-sprint.on { background: rgba(90, 156, 216, 0.95); border-color: rgba(56, 122, 186, 1);
-      box-shadow: 0 6px 20px rgba(90, 156, 216, 0.5); }
-    #btn-sprint.on svg { stroke: #fff; opacity: 1; }
+    #btn-sprint.on { background: #f6c445; box-shadow: 0 6px 20px rgba(246, 196, 69, 0.5); }
+    #btn-sprint.on svg { stroke: #3a3223; }
     /* Context pill: hidden until something is in reach, then it names the verb. */
     #btn-grab { pointer-events: auto; position: absolute; right: 4px; bottom: 128px;
       height: 46px; padding: 0 24px; border-radius: 999px; border: none;
@@ -527,13 +537,13 @@
            prototype. The interact pill is the one control that keeps text,
            because its verb changes with what is in front of you. -->
       <button id="btn-grab" type="button" aria-label="Interact" hidden>ENTER</button>
-      <button class="tbtn" id="btn-board" type="button" aria-label="Skateboard">
+      <button class="tbtn" id="btn-board" type="button" aria-label="Skateboard" data-etiket="BOARD">
         <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 18.5c3 2.7 7.2 3.5 12 3.5s9-.8 12-3.5"/><circle cx="11.5" cy="26" r="2.4"/><circle cx="20.5" cy="26" r="2.4"/></svg>
       </button>
-      <button class="tbtn" id="btn-sprint" type="button" aria-label="Sprint">
+      <button class="tbtn" id="btn-sprint" type="button" aria-label="Sprint" data-etiket="FAST">
         <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 8l8 8-8 8"/><path d="M17 8l8 8-8 8"/></svg>
       </button>
-      <button class="tbtn" id="btn-jump" type="button" aria-label="Jump">
+      <button class="tbtn" id="btn-jump" type="button" aria-label="Jump" data-etiket="JUMP">
         <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 20l8-9 8 9"/></svg>
       </button>
     </div>

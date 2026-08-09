@@ -219,9 +219,14 @@ export function buildWorld(scene, { buildCity, buildStadium, stadiumPitch } = {}
     // and deterministic replays are untouched.
     jumpScale: 1.24,
     airJumps: 1,
-    // Softer acceleration ramp in the hub: movement glides the way the skate
-    // lobby feels instead of snapping to top speed.
-    accelScale: 0.72,
+    // Oscar: the skate park's controls are the good ones — make the map grip
+    // and go like that. The lobby has NO acceleration ramp at all; you press
+    // and you are already at speed. Softening the ramp to 0.72 here was the
+    // wrong read of "glide": it made the town feel like it was catching up
+    // with the stick. The ramp is sharper than the base tuning now, not
+    // softer, and the walk itself is quicker.
+    accelScale: 1.55,
+    speedScale: 1.22,
     // The street runs along -z, so the far end of the avenue is where players
     // head for. Audio and the optional hub-plus layer read this.
     // North gate of the boulevard — the reference city's top exit.
