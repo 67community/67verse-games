@@ -1451,8 +1451,14 @@ function frame(now) {
   // aspect instead of hugging the shoulders.
   // A narrower lens shows less, so the chase pulls back to keep the same
   // amount of street in frame as before.
-  const chaseDistance = 6.2 + portrait * 3.6;
-  const chaseHeight = 3.9 + portrait * 1.3;
+  // Oscar's Brookhaven reference: its camera sits about shoulder height and
+  // looks almost level, so shopfronts rise past the top of the frame and the
+  // street feels big. Mine floated at 3.9 over a 1.38 character — nearly three
+  // times their height — and looked down, which flattens a town into a table
+  // top however large the buildings actually are. Just above the head, and
+  // closer.
+  const chaseDistance = 5.6 + portrait * 3.2;
+  const chaseHeight = 2.05 + portrait * 0.8;
   camFocus.set(sim.pos.x, sim.pos.y, sim.pos.z);
   camLook.set(
     sim.pos.x + sim.vel.x * 0.11,

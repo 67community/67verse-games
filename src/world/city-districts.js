@@ -1888,7 +1888,13 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
     const evSeridi = (x, z) => z < -53 && x > -6 && x < 27;
     const adaylar = PLAN_BINALAR
       .map(([x, z, w, d], i) => {
-        const h = Math.max(2, Math.min(6.5, 1.6 + Math.sqrt(w * d) * 0.62));
+        // Oscar: the buildings look small. They were — 4.8 units for an
+        // average block against a 1.38 character is barely three of them
+        // stacked, where the Brookhaven reference stands a shopfront five or
+        // six times the player's height with signage above the door. The
+        // ground floor alone needs that much, so the whole range moves up and
+        // the ceiling with it.
+        const h = Math.max(3.4, Math.min(11.5, 2.6 + Math.sqrt(w * d) * 1.02));
         return { x, z, w, h, d, renk: PLAN_BINA_RENK[i] };
       })
       .filter(({ x, z }) => !ozelIcinde(x, z) && !denizdeMi(x, z) && !evSeridi(x, z));
