@@ -2171,14 +2171,18 @@ test('town lobby ships the pedestrian city and nothing left over from the old hu
   const world = buildHubWorld(scene);
 
   // What the lobby is: the faithful island city from the 2026-08-04 rich
-  // reference — street grid with crosswalks and street cars, the framed 67
-  // plaza with towers, and every district in its referenced position.
+  // reference — the street grid, the framed 67 plaza with towers, and every
+  // district in its referenced position. The crossing markings and the street
+  // cars are BOTH gone on Oscar's call: the cars never read as cars at this
+  // scale and kept spilling off the kerb, and the crossings fought the
+  // widened carriageways. Asserting their absence keeps them from creeping
+  // back in unnoticed.
   assert.ok(world.group.getObjectByName('town:ground'));
   assert.ok(world.group.getObjectByName('district:road-grid'));
   assert.ok(world.group.getObjectByName('district:cross-roads')?.isInstancedMesh);
-  assert.ok(world.group.getObjectByName('district:crosswalks')?.isInstancedMesh);
+  assert.equal(world.group.getObjectByName('district:crosswalks'), undefined);
   assert.ok(world.group.getObjectByName('district:lane-dashes')?.isInstancedMesh);
-  assert.ok(world.group.getObjectByName('district:street-cars')?.isInstancedMesh);
+  assert.equal(world.group.getObjectByName('district:street-cars')?.count ?? 0, 0);
   assert.ok(world.group.getObjectByName('district:marina-boats')?.isInstancedMesh);
   assert.ok(world.group.getObjectByName('district:beach'));
   assert.ok(world.group.getObjectByName('district:lighthouse'));

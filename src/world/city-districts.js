@@ -735,7 +735,12 @@ export function buildCityDistricts({ group, add, material, animated, buildStadiu
   });
   stripes.instanceMatrix.needsUpdate = true;
   stripes.name = 'district:crosswalks';
-  add(stripes, { camera: false, cast: false });
+  // Oscar: take the crossing markings off the road. They were trouble the
+  // whole way — over the water, stacked on each other, oversized against the
+  // widened carriageways — and the street reads cleaner as plain asphalt with
+  // its centre line. The placement work above stays, so the moment there is
+  // artwork worth painting there it already lands on the right spots.
+  void stripes;
 
   // -------------------------------------------------------------------
   // CARS — real three-part cars (body + cabin + four wheels), exactly the
